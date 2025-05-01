@@ -52,9 +52,9 @@ export default function Layout({
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col w-full">
         <Navbar />
-        <main className="flex-1 p-4 md:p-6">
+        <main className="flex-1 p-4 md:p-6 animate-fade-in">
           {children}
         </main>
       </div>

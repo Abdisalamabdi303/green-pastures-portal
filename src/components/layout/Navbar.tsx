@@ -1,7 +1,6 @@
 
-import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Menu, Bell, User } from "lucide-react";
+import { Bell, User } from "lucide-react";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -11,32 +10,14 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function Navbar() {
   const { currentUser, userData, logout, isAdmin } = useAuth();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const isMobile = useIsMobile();
-
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(prev => !prev);
-  };
 
   return (
     <header className="border-b bg-white px-4 py-3 shadow-sm">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          {isMobile && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={toggleMobileMenu}
-              className="md:hidden"
-            >
-              <Menu className="h-5 w-5" />
-              <span className="sr-only">Toggle menu</span>
-            </Button>
-          )}
+        <div className="flex items-center gap-4 ml-12 md:ml-0">
           <h1 className="text-xl font-semibold text-farm-700">Green Pastures</h1>
         </div>
 
@@ -53,7 +34,7 @@ export default function Navbar() {
                 <span className="sr-only">User menu</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
                 <div className="flex flex-col">
                   <span>{userData?.name || 'User'}</span>
