@@ -34,6 +34,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   loading: boolean;
   isAdmin: boolean;
+  error: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -50,34 +51,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
-      
-      if (user) {
-        try {
-          const userRef = doc(db, "users", user.uid);
-          const userSnap = await getDoc(userRef);
-          
-          if (userSnap.exists()) {
-            const userData = userSnap.data() as Omit<UserData, 'uid'>;
-            setUserData({ ...userData, uid: user.uid });
-          } else {
-            console.error("No user data found");
+    try {
+      console.log("Setting up auth state listener");
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        setCurrentUser(user);
+        
+        if (user) {
+          try {
+            const userRef = doc(db, "users", user.uid);
+            const userSnap = await getDoc(userRef);
+            
+            if (userSnap.exists()) {
+              const userData = userSnap.data() as Omit<UserData, 'uid'>;
+              setUserData({ ...userData, uid: user.uid });
+            } else {
+              console.error("No user data found");
+            }
+          } catch (error) {
+            console.error("Error fetching user data:", error);
           }
-        } catch (error) {
-          console.error("Error fetching user data:", error);
+        } else {
+          setUserData(null);
         }
-      } else {
-        setUserData(null);
-      }
-      
-      setLoading(false);
-    });
+        
+        setLoading(false);
+      });
 
-    return unsubscribe;
+      return unsubscribe;
+    } catch (error) {
+      console.error("Failed to initialize auth:", error);
+      setError("Failed to initialize authentication. Please check your Firebase configuration.");
+      setLoading(false);
+      return () => {};
+    }
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -164,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     loading,
     isAdmin,
+    error
   };
 
   return (
