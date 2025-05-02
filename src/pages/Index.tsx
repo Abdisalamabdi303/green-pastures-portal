@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Tractor, Bird, Activity, PiggyBank, BarChart, Menu, X } from "lucide-react";
 
 const Index = () => {
+  console.log("Index component is rendering");
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Handle body overflow when mobile menu is open
   useEffect(() => {
+    console.log("Index component mounted");
     if (mobileMenuOpen) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -26,6 +28,7 @@ const Index = () => {
   useEffect(() => {
     // Redirect to dashboard if already logged in
     if (currentUser) {
+      console.log("User is logged in, redirecting to dashboard");
       navigate("/dashboard");
     }
   }, [currentUser, navigate]);
