@@ -45,6 +45,7 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Roboto', sans-serif;
+    overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -73,15 +74,15 @@
   }
 
   .animate-slide-in-right {
-    animation: slideInRight 0.3s ease-out forwards;
+    animation: slideInRight 0.5s ease-out forwards;
   }
 
   .animate-slide-in-left {
-    animation: slideInLeft 0.3s ease-out forwards;
+    animation: slideInLeft 0.5s ease-out forwards;
   }
 
   .animate-scale-in {
-    animation: scaleIn 0.2s ease-out forwards;
+    animation: scaleIn 0.3s ease-out forwards;
   }
 
   /* Add hover effects for cards */
@@ -100,32 +101,43 @@
     transform: translateY(0);
     transition: opacity 0.3s, transform 0.3s;
   }
+  
+  /* Responsive adjustments */
+  .sidebar-open {
+    @apply overflow-hidden md:overflow-auto;
+  }
 }
 
 /* Keyframes for animations */
 @keyframes fadeIn {
   from {
     opacity: 0;
+    transform: translateY(20px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
 @keyframes slideInRight {
   from {
-    transform: translateX(100%);
+    opacity: 0;
+    transform: translateX(50px);
   }
   to {
+    opacity: 1;
     transform: translateX(0);
   }
 }
 
 @keyframes slideInLeft {
   from {
-    transform: translateX(-100%);
+    opacity: 0;
+    transform: translateX(-50px);
   }
   to {
+    opacity: 1;
     transform: translateX(0);
   }
 }
@@ -138,5 +150,13 @@
   to {
     transform: scale(1);
     opacity: 1;
+  }
+}
+
+/* Mobile specific styles */
+@media (max-width: 768px) {
+  .dropdown-menu-content {
+    width: calc(100vw - 2rem) !important;
+    max-width: 20rem;
   }
 }

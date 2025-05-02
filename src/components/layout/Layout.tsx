@@ -1,5 +1,5 @@
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,6 +17,23 @@ export default function Layout({
   requireAdmin = false
 }: LayoutProps) {
   const { currentUser, userData, loading, isAdmin } = useAuth();
+
+  // Add effect to handle body overflow on mobile
+  useEffect(() => {
+    // Prevent body scrolling when mobile sidebar is open
+    const handleBodyScroll = () => {
+      const isSidebarOpen = document.body.classList.contains('sidebar-open');
+      document.body.style.overflow = isSidebarOpen ? 'hidden' : '';
+    };
+
+    window.addEventListener('resize', handleBodyScroll);
+    handleBodyScroll();
+
+    return () => {
+      window.removeEventListener('resize', handleBodyScroll);
+      document.body.style.overflow = '';
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -54,7 +71,7 @@ export default function Layout({
       <Sidebar />
       <div className="flex flex-1 flex-col w-full">
         <Navbar />
-        <main className="flex-1 p-4 md:p-6 animate-fade-in">
+        <main className="flex-1 p-4 md:p-6 animate-fade-in overflow-x-hidden">
           {children}
         </main>
       </div>
