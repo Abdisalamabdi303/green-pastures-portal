@@ -7,15 +7,14 @@ import {
   ReactNode 
 } from "react";
 import { 
-  createUserWithEmailAndPassword,
+  User,
   signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  User
+  createUserWithEmailAndPassword,
+  signOut
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 type UserRole = "admin" | "user";
 
@@ -47,68 +46,75 @@ export function useAuth() {
   return context;
 }
 
+// Mock user data for frontend-only development
+const MOCK_USERS = [
+  {
+    uid: "admin123",
+    email: "admin@example.com",
+    role: "admin" as UserRole,
+    name: "Admin User"
+  },
+  {
+    uid: "user123",
+    email: "user@example.com",
+    role: "user" as UserRole,
+    name: "Regular User"
+  }
+];
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-  
-  useEffect(() => {
-    try {
-      console.log("Setting up auth state listener");
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        setCurrentUser(user);
-        
-        if (user) {
-          try {
-            const userRef = doc(db, "users", user.uid);
-            const userSnap = await getDoc(userRef);
-            
-            if (userSnap.exists()) {
-              const userData = userSnap.data() as Omit<UserData, 'uid'>;
-              setUserData({ ...userData, uid: user.uid });
-            } else {
-              console.error("No user data found");
-            }
-          } catch (error) {
-            console.error("Error fetching user data:", error);
-          }
-        } else {
-          setUserData(null);
-        }
-        
-        setLoading(false);
-      });
+  const navigate = useNavigate();
 
-      return unsubscribe;
-    } catch (error) {
-      console.error("Failed to initialize auth:", error);
-      setError("Failed to initialize authentication. Please check your Firebase configuration.");
-      setLoading(false);
-      return () => {};
-    }
+  // Simulating auth state for frontend-only development
+  useEffect(() => {
+    console.log("Setting up mock auth state");
+    setLoading(false);
   }, []);
 
   const login = async (email: string, password: string) => {
     try {
       setLoading(true);
-      await signInWithEmailAndPassword(auth, email, password);
-      toast({
-        title: "Login successful",
-        description: "Welcome back to Green Pastures!",
-      });
-    } catch (error: any) {
-      let message = "Failed to login";
-      if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
-        message = "Invalid email or password";
+      // Frontend-only mock login
+      if (email === "admin@example.com" && password === "password") {
+        // Mock admin login
+        const mockAdminData = MOCK_USERS[0];
+        setCurrentUser({ uid: mockAdminData.uid, email: mockAdminData.email } as User);
+        setUserData(mockAdminData);
+        toast({
+          title: "Login successful",
+          description: "Welcome back to Green Pastures!",
+        });
+        navigate("/dashboard");
+      } else if (email === "user@example.com" && password === "password") {
+        // Mock regular user login
+        const mockUserData = MOCK_USERS[1];
+        setCurrentUser({ uid: mockUserData.uid, email: mockUserData.email } as User);
+        setUserData(mockUserData);
+        toast({
+          title: "Login successful",
+          description: "Welcome back to Green Pastures!",
+        });
+        navigate("/dashboard");
+      } else {
+        // Mock invalid credentials
+        toast({
+          title: "Login failed",
+          description: "Invalid email or password",
+          variant: "destructive",
+        });
       }
+    } catch (error: any) {
+      console.error("Login error:", error);
       toast({
         title: "Login failed",
-        description: message,
+        description: "Invalid email or password",
         variant: "destructive",
       });
-      throw error;
     } finally {
       setLoading(false);
     }
@@ -117,31 +123,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (email: string, password: string, name: string) => {
     try {
       setLoading(true);
-      const result = await createUserWithEmailAndPassword(auth, email, password);
+      // Frontend-only mock registration
+      const newUser = {
+        uid: `user_${Date.now()}`,
+        email: email,
+        role: "user" as UserRole,
+        name: name
+      };
       
-      // Set default role as user
-      await setDoc(doc(db, "users", result.user.uid), {
-        email,
-        role: "user",
-        name,
-        createdAt: new Date().toISOString(),
-      });
+      setCurrentUser({ uid: newUser.uid, email: newUser.email } as User);
+      setUserData(newUser);
       
       toast({
         title: "Registration successful",
         description: "Your account has been created",
       });
+      navigate("/dashboard");
     } catch (error: any) {
-      let message = "Failed to create account";
-      if (error.code === "auth/email-already-in-use") {
-        message = "Email already in use";
-      }
+      console.error("Registration error:", error);
       toast({
         title: "Registration failed",
-        description: message,
+        description: "Failed to create account",
         variant: "destructive",
       });
-      throw error;
     } finally {
       setLoading(false);
     }
@@ -149,18 +153,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await signOut(auth);
+      // Frontend-only mock logout
+      setCurrentUser(null);
+      setUserData(null);
       toast({
         title: "Logged out",
         description: "You have been successfully logged out",
       });
+      navigate("/login");
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to log out",
         variant: "destructive",
       });
-      throw error;
     }
   };
 

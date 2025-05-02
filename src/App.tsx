@@ -34,7 +34,11 @@ const FirebaseError = ({ error }: { error: string }) => {
         <AlertDescription>
           {error}
           <div className="mt-4 text-sm">
-            To fix this, you need to set up your Firebase configuration with valid API keys.
+            This is a frontend-only demo. Use these credentials:
+            <ul className="mt-2 ml-4 list-disc">
+              <li>Admin: admin@example.com / password</li>
+              <li>User: user@example.com / password</li>
+            </ul>
           </div>
         </AlertDescription>
       </Alert>
@@ -51,22 +55,20 @@ const AppRoutes = () => {
   }
   
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/animals" element={<Animals />} />
-        <Route path="/health" element={<Health />} />
-        <Route path="/expenses" element={<Expenses />} />
-        <Route path="/finance" element={<Finance />} />
-        <Route path="/users" element={<Users />} />
-        <Route path="/settings" element={<Settings />} />
-        {/* Catch-all route */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
+    <Routes>
+      <Route path="/" element={<Index />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/animals" element={<Animals />} />
+      <Route path="/health" element={<Health />} />
+      <Route path="/expenses" element={<Expenses />} />
+      <Route path="/finance" element={<Finance />} />
+      <Route path="/users" element={<Users />} />
+      <Route path="/settings" element={<Settings />} />
+      {/* Catch-all route */}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
   );
 };
 
@@ -75,13 +77,15 @@ const App = () => {
   
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <AppRoutes />
-        </TooltipProvider>
-      </AuthProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <AppRoutes />
+          </TooltipProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   );
 };

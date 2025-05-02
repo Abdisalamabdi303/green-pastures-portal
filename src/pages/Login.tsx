@@ -1,27 +1,33 @@
 
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Tractor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loginError, setLoginError] = useState("");
   const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError("");
     
     try {
       setIsSubmitting(true);
       await login(email, password);
+      // Navigation happens in the login function
     } catch (error) {
       console.error("Login error:", error);
+      setLoginError("Invalid email or password. Try admin@example.com / password");
     } finally {
       setIsSubmitting(false);
     }
@@ -39,6 +45,16 @@ export default function Login() {
             <CardDescription>
               Enter your credentials to access your livestock management
             </CardDescription>
+            {loginError && (
+              <Alert variant="destructive">
+                <AlertDescription>{loginError}</AlertDescription>
+              </Alert>
+            )}
+            <div className="mt-2 text-sm text-muted-foreground">
+              <p>Frontend Demo Credentials:</p>
+              <p>Admin: admin@example.com / password</p>
+              <p>User: user@example.com / password</p>
+            </div>
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
