@@ -45,7 +45,7 @@ export default function ExpenseChart({
       </CardHeader>
       <CardContent className="h-[300px]">
         <ResponsiveContainer width="100%" height="100%">
-          {chartType === 'line' && (
+          {chartType === 'line' ? (
             <LineChart
               data={recentExpenses}
               margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
@@ -63,9 +63,7 @@ export default function ExpenseChart({
                 name="Expense Amount"
               />
             </LineChart>
-          )}
-
-          {chartType === 'pie' && categoryData && (
+          ) : chartType === 'pie' && categoryData ? (
             <PieChart>
               <Pie
                 data={categoryData}
@@ -84,9 +82,7 @@ export default function ExpenseChart({
               <Tooltip formatter={(value) => [`₹${value}`, 'Amount']} />
               <Legend />
             </PieChart>
-          )}
-
-          {chartType === 'bar' && (
+          ) : (
             <BarChart
               data={recentExpenses}
               margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
