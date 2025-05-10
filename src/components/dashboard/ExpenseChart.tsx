@@ -16,6 +16,7 @@ import {
   Bar
 } from "recharts";
 import { ChartData } from "@/types";
+import { Wheat, ShoppingBasket, TrendingUp } from "lucide-react";
 
 interface ExpenseChartProps {
   recentExpenses: {
@@ -28,6 +29,7 @@ interface ExpenseChartProps {
   description?: string;
 }
 
+// Farm-themed color palette
 const COLORS = ['#94cf43', '#c9ea9e', '#619c11', '#49760d', '#304f08'];
 
 export default function ExpenseChart({ 
@@ -37,29 +39,53 @@ export default function ExpenseChart({
   title = "Recent Expenses",
   description = "Daily expenses for the past week"
 }: ExpenseChartProps) {
+  
+  const ChartIcon = () => {
+    switch(chartType) {
+      case 'pie': 
+        return <ShoppingBasket className="h-4 w-4 text-muted-foreground" />;
+      case 'bar': 
+        return <Wheat className="h-4 w-4 text-muted-foreground" />;
+      default: 
+        return <TrendingUp className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+  
   return (
-    <Card className="bg-white col-span-2 md:col-span-1">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+    <Card className="bg-white col-span-2 md:col-span-1 shadow-sm hover:shadow-md transition-shadow duration-200">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div>
+          <CardTitle className="text-farm-600">{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </div>
+        <ChartIcon />
       </CardHeader>
-      <CardContent className="h-[300px]">
+      <CardContent className="h-[300px] pt-4">
         <ResponsiveContainer width="100%" height="100%">
           {chartType === 'line' ? (
             <LineChart
               data={recentExpenses}
               margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
             >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip formatter={(value) => [`₹${value}`, 'Amount']} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="date" tick={{ fill: '#666' }} />
+              <YAxis tick={{ fill: '#666' }} />
+              <Tooltip 
+                formatter={(value) => [`₹${value}`, 'Amount']}
+                contentStyle={{ 
+                  backgroundColor: 'white', 
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}
+              />
               <Legend />
               <Line 
                 type="monotone" 
                 dataKey="amount" 
                 stroke="#94cf43" 
-                activeDot={{ r: 8 }} 
+                strokeWidth={2}
+                activeDot={{ r: 8, fill: '#94cf43', stroke: 'white', strokeWidth: 2 }} 
                 name="Expense Amount"
               />
             </LineChart>
@@ -69,30 +95,58 @@ export default function ExpenseChart({
                 data={categoryData}
                 cx="50%"
                 cy="50%"
-                labelLine={false}
+                labelLine={true}
                 label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
+                outerRadius={100}
                 fill="#8884d8"
                 dataKey="amount"
+                animationDuration={800}
               >
                 {categoryData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={COLORS[index % COLORS.length]} 
+                    stroke="white"
+                    strokeWidth={2}
+                  />
                 ))}
               </Pie>
-              <Tooltip formatter={(value) => [`₹${value}`, 'Amount']} />
-              <Legend />
+              <Tooltip 
+                formatter={(value) => [`₹${value}`, 'Amount']}
+                contentStyle={{ 
+                  backgroundColor: 'white', 
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}
+              />
+              <Legend formatter={(value) => <span style={{ color: '#333', fontWeight: 500 }}>{value}</span>} />
             </PieChart>
           ) : (
             <BarChart
               data={recentExpenses}
               margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
             >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip formatter={(value) => [`₹${value}`, 'Amount']} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="date" tick={{ fill: '#666' }} />
+              <YAxis tick={{ fill: '#666' }} />
+              <Tooltip 
+                formatter={(value) => [`₹${value}`, 'Amount']}
+                contentStyle={{ 
+                  backgroundColor: 'white', 
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}
+              />
               <Legend />
-              <Bar dataKey="amount" fill="#94cf43" name="Expense Amount" />
+              <Bar 
+                dataKey="amount" 
+                fill="#94cf43" 
+                name="Expense Amount" 
+                radius={[4, 4, 0, 0]}
+                barSize={30}
+              />
             </BarChart>
           )}
         </ResponsiveContainer>
