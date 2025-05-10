@@ -15,6 +15,7 @@ const vaccines = [
 ];
 
 export default function AnimalEntryForm() {
+  const [animalId, setAnimalId] = useState("");
   const [animalType, setAnimalType] = useState("");
   const [weight, setWeight] = useState("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -33,9 +34,10 @@ export default function AnimalEntryForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // This is just a demo, so we're not actually submitting anything
-    console.log("Animal form submitted:", { animalType, weight, photoPreview });
+    console.log("Animal form submitted:", { animalId, animalType, weight, photoPreview });
     
     // Reset form (but keep the photo for demo purposes)
+    setAnimalId("");
     setAnimalType("");
     setWeight("");
   };
@@ -45,6 +47,19 @@ export default function AnimalEntryForm() {
       <CardContent className="pt-6">
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
+            {/* Animal ID Field */}
+            <div className="grid gap-2">
+              <Label htmlFor="animal-id">Animal ID</Label>
+              <Input
+                id="animal-id"
+                type="text"
+                placeholder="Enter animal ID"
+                value={animalId}
+                onChange={(e) => setAnimalId(e.target.value)}
+                required
+              />
+            </div>
+
             {/* Photo Upload */}
             <div className="grid gap-2">
               <Label htmlFor="animal-photo">Animal Photo</Label>

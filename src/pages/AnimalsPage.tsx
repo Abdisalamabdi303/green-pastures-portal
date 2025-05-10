@@ -12,11 +12,13 @@ const AnimalsPage = () => {
   const [isAddAnimalOpen, setIsAddAnimalOpen] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [formData, setFormData] = useState({
+    id: '',
     type: '',
     breed: '',
     age: 0,
     health: 'Good',
-    weight: 0
+    weight: 0,
+    photoUrl: ''
   });
   const navigate = useNavigate();
 
@@ -34,7 +36,8 @@ const AnimalsPage = () => {
 
   const filteredAnimals = animals.filter(animal => 
     animal.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    animal.breed.toLowerCase().includes(searchTerm.toLowerCase())
+    animal.breed.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    animal.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -59,7 +62,12 @@ const AnimalsPage = () => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
+        const result = reader.result as string;
+        setPhotoPreview(result);
+        setFormData({
+          ...formData,
+          photoUrl: result
+        });
       };
       reader.readAsDataURL(file);
     }
@@ -70,9 +78,9 @@ const AnimalsPage = () => {
     
     // Create new animal object
     const newAnimal: Animal = {
-      id: `a${animals.length + 1}`,
+      id: formData.id || `a${animals.length + 1}`,
       ...formData,
-      weight: formData.weight // Add weight to the animal object
+      photoUrl: photoPreview || undefined
     };
     
     // Add to animals array
@@ -80,11 +88,13 @@ const AnimalsPage = () => {
     
     // Reset form
     setFormData({
+      id: '',
       type: '',
       breed: '',
       age: 0,
       health: 'Good',
-      weight: 0
+      weight: 0,
+      photoUrl: ''
     });
     setPhotoPreview(null);
     setIsAddAnimalOpen(false);
@@ -126,6 +136,69 @@ const AnimalsPage = () => {
             </div>
           </div>
           
+          {/* Display animals as cards to show photos */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+            {filteredAnimals.length > 0 ? (
+              filteredAnimals.map((animal) => (
+                <div key={animal.id} className="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
+                  <div className="h-48 w-full bg-gray-200 overflow-hidden">
+                    {animal.photoUrl ? (
+                      <img 
+                        src={animal.photoUrl} 
+                        alt={`${animal.type} - ${animal.breed}`}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-800">{animal.type}</h3>
+                        <p className="text-sm text-gray-600">ID: {animal.id}</p>
+                        <p className="text-sm text-gray-600">Breed: {animal.breed}</p>
+                      </div>
+                      <span className={`px-2 py-1 text-xs leading-5 font-semibold rounded-full ${
+                        animal.health === 'Excellent' ? 'bg-green-100 text-green-800' : 
+                        animal.health === 'Good' ? 'bg-blue-100 text-blue-800' : 
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {animal.health}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-gray-500">Age:</span>
+                        <span className="ml-2 text-gray-900">{animal.age} {animal.age === 1 ? 'year' : 'years'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Weight:</span>
+                        <span className="ml-2 text-gray-900">{animal.weight ? `${animal.weight} kg` : 'N/A'}</span>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex justify-end space-x-2">
+                      <button className="text-farm-600 hover:text-farm-900 text-sm font-medium">Edit</button>
+                      <button className="text-red-600 hover:text-red-900 text-sm font-medium">Delete</button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full text-center py-10 bg-white rounded-lg border border-gray-200">
+                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No animals found</h3>
+                <p className="mt-1 text-sm text-gray-500">Get started by adding a new animal.</p>
+              </div>
+            )}
+          </div>
+          
           {/* Animals Table */}
           <div className="bg-white shadow overflow-hidden sm:rounded-lg border border-gray-200">
             <div className="overflow-x-auto">
@@ -134,6 +207,9 @@ const AnimalsPage = () => {
                   <tr>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       ID
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Photo
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Type
@@ -161,6 +237,23 @@ const AnimalsPage = () => {
                       <tr key={animal.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {animal.id}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-10 w-10 rounded-full overflow-hidden bg-gray-100">
+                            {animal.photoUrl ? (
+                              <img 
+                                src={animal.photoUrl} 
+                                alt={`${animal.type}`}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="h-full w-full flex items-center justify-center text-gray-400">
+                                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {animal.type}
@@ -191,7 +284,7 @@ const AnimalsPage = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">
+                      <td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500">
                         No animals found
                       </td>
                     </tr>
@@ -220,6 +313,23 @@ const AnimalsPage = () => {
                     </h3>
                     
                     <form onSubmit={handleAddAnimal} className="mt-4 space-y-4">
+                      {/* Animal ID */}
+                      <div>
+                        <label htmlFor="id" className="block text-sm font-medium text-gray-700">
+                          Animal ID
+                        </label>
+                        <input
+                          type="text"
+                          name="id"
+                          id="id"
+                          value={formData.id}
+                          onChange={handleFormChange}
+                          className="mt-1 focus:ring-farm-500 focus:border-farm-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                          required
+                          placeholder="Enter animal ID"
+                        />
+                      </div>
+                      
                       {/* Photo Upload */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700">
@@ -237,7 +347,10 @@ const AnimalsPage = () => {
                                 <button 
                                   type="button"
                                   className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 text-xs"
-                                  onClick={() => setPhotoPreview(null)}
+                                  onClick={() => {
+                                    setPhotoPreview(null);
+                                    setFormData({...formData, photoUrl: ''});
+                                  }}
                                 >
                                   &times;
                                 </button>

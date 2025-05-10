@@ -12,7 +12,8 @@ export interface Animal {
   breed: string;
   age: number;
   health: string;
-  weight?: number; // Added weight property
+  weight?: number;
+  photoUrl?: string; // Add photoUrl property for storing the image
 }
 
 export interface Expense {
