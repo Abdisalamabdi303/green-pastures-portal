@@ -12,6 +12,7 @@ export interface Animal {
   breed: string;
   age: number;
   health: string;
+  weight?: number; // Added weight property
 }
 
 export interface Expense {

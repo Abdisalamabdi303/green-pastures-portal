@@ -9,6 +9,15 @@ const AnimalsPage = () => {
   const [user, setUser] = useState<User | null>(null);
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isAddAnimalOpen, setIsAddAnimalOpen] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    type: '',
+    breed: '',
+    age: 0,
+    health: 'Good',
+    weight: 0
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,6 +36,59 @@ const AnimalsPage = () => {
     animal.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
     animal.breed.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    
+    // Convert numeric values
+    if (type === 'number') {
+      setFormData({
+        ...formData,
+        [name]: parseFloat(value) || 0
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
+    }
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddAnimal = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Create new animal object
+    const newAnimal: Animal = {
+      id: `a${animals.length + 1}`,
+      ...formData,
+      weight: formData.weight // Add weight to the animal object
+    };
+    
+    // Add to animals array
+    setAnimals([...animals, newAnimal]);
+    
+    // Reset form
+    setFormData({
+      type: '',
+      breed: '',
+      age: 0,
+      health: 'Good',
+      weight: 0
+    });
+    setPhotoPreview(null);
+    setIsAddAnimalOpen(false);
+  };
 
   if (!user) {
     return <div className="p-8 text-center">Loading...</div>;
@@ -55,7 +117,10 @@ const AnimalsPage = () => {
                   </svg>
                 </div>
               </div>
-              <button className="bg-farm-600 text-white px-4 py-2 rounded-md hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500">
+              <button 
+                className="bg-farm-600 text-white px-4 py-2 rounded-md hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500"
+                onClick={() => setIsAddAnimalOpen(true)}
+              >
                 Add Animal
               </button>
             </div>
@@ -78,6 +143,9 @@ const AnimalsPage = () => {
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Age
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Weight
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Health
@@ -103,6 +171,9 @@ const AnimalsPage = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {animal.age} {animal.age === 1 ? 'year' : 'years'}
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {animal.weight ? `${animal.weight} kg` : 'N/A'}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                             animal.health === 'Excellent' ? 'bg-green-100 text-green-800' : 
@@ -120,7 +191,7 @@ const AnimalsPage = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
+                      <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">
                         No animals found
                       </td>
                     </tr>
@@ -131,6 +202,187 @@ const AnimalsPage = () => {
           </div>
         </div>
       </main>
+
+      {/* Add Animal Modal */}
+      {isAddAnimalOpen && (
+        <div className="fixed inset-0 z-10 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setIsAddAnimalOpen(false)}></div>
+
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                      Add New Animal
+                    </h3>
+                    
+                    <form onSubmit={handleAddAnimal} className="mt-4 space-y-4">
+                      {/* Photo Upload */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Animal Photo
+                        </label>
+                        <div className="mt-1 flex justify-center border-2 border-gray-300 border-dashed rounded-md">
+                          <div className="space-y-1 text-center p-4 w-full">
+                            {photoPreview ? (
+                              <div className="mx-auto w-32 h-32 relative">
+                                <img 
+                                  src={photoPreview} 
+                                  alt="Preview" 
+                                  className="mx-auto h-32 w-32 object-cover rounded-md"
+                                />
+                                <button 
+                                  type="button"
+                                  className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 text-xs"
+                                  onClick={() => setPhotoPreview(null)}
+                                >
+                                  &times;
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <div className="flex text-sm text-gray-600 justify-center">
+                                  <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-farm-600 hover:text-farm-500 focus-within:outline-none">
+                                    <span>Upload a photo</span>
+                                    <input id="file-upload" name="file-upload" type="file" accept="image/*" className="sr-only" onChange={handlePhotoChange} />
+                                  </label>
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                  PNG, JPG, GIF up to 10MB
+                                </p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Type */}
+                        <div>
+                          <label htmlFor="type" className="block text-sm font-medium text-gray-700">
+                            Type
+                          </label>
+                          <select
+                            id="type"
+                            name="type"
+                            value={formData.type}
+                            onChange={handleFormChange}
+                            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-farm-500 focus:border-farm-500 sm:text-sm rounded-md"
+                            required
+                          >
+                            <option value="" disabled>Select type</option>
+                            <option value="Cow">Cow</option>
+                            <option value="Goat">Goat</option>
+                            <option value="Sheep">Sheep</option>
+                            <option value="Chicken">Chicken</option>
+                            <option value="Duck">Duck</option>
+                            <option value="Horse">Horse</option>
+                          </select>
+                        </div>
+
+                        {/* Breed */}
+                        <div>
+                          <label htmlFor="breed" className="block text-sm font-medium text-gray-700">
+                            Breed
+                          </label>
+                          <input
+                            type="text"
+                            name="breed"
+                            id="breed"
+                            value={formData.breed}
+                            onChange={handleFormChange}
+                            className="mt-1 focus:ring-farm-500 focus:border-farm-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Age */}
+                        <div>
+                          <label htmlFor="age" className="block text-sm font-medium text-gray-700">
+                            Age (years)
+                          </label>
+                          <input
+                            type="number"
+                            name="age"
+                            id="age"
+                            min="0"
+                            step="0.1"
+                            value={formData.age}
+                            onChange={handleFormChange}
+                            className="mt-1 focus:ring-farm-500 focus:border-farm-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                            required
+                          />
+                        </div>
+
+                        {/* Weight */}
+                        <div>
+                          <label htmlFor="weight" className="block text-sm font-medium text-gray-700">
+                            Weight (kg)
+                          </label>
+                          <input
+                            type="number"
+                            name="weight"
+                            id="weight"
+                            min="0"
+                            step="0.1"
+                            value={formData.weight}
+                            onChange={handleFormChange}
+                            className="mt-1 focus:ring-farm-500 focus:border-farm-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Health Status */}
+                      <div>
+                        <label htmlFor="health" className="block text-sm font-medium text-gray-700">
+                          Health Status
+                        </label>
+                        <select
+                          id="health"
+                          name="health"
+                          value={formData.health}
+                          onChange={handleFormChange}
+                          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-farm-500 focus:border-farm-500 sm:text-sm rounded-md"
+                        >
+                          <option value="Excellent">Excellent</option>
+                          <option value="Good">Good</option>
+                          <option value="Fair">Fair</option>
+                          <option value="Poor">Poor</option>
+                        </select>
+                      </div>
+
+                      <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                        <button
+                          type="submit"
+                          className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-farm-600 text-base font-medium text-white hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500 sm:ml-3 sm:w-auto sm:text-sm"
+                        >
+                          Add Animal
+                        </button>
+                        <button
+                          type="button"
+                          className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500 sm:mt-0 sm:w-auto sm:text-sm"
+                          onClick={() => setIsAddAnimalOpen(false)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
