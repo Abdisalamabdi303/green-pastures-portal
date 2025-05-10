@@ -1,11 +1,11 @@
-
 import { Animal } from '@/types';
 
 interface AnimalCardProps {
   animal: Animal;
+  onEdit: (animal: Animal) => void;
+  onDelete: (id: string) => void;
 }
-
-const AnimalCard = ({ animal }: AnimalCardProps) => {
+const AnimalCard = ({ animal, onEdit, onDelete }: AnimalCardProps) => {
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
       <div className="h-48 w-full bg-gray-200 overflow-hidden">
@@ -38,6 +38,7 @@ const AnimalCard = ({ animal }: AnimalCardProps) => {
             {animal.health}
           </span>
         </div>
+
         <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
           <div>
             <span className="text-gray-500">Age:</span>
@@ -47,14 +48,30 @@ const AnimalCard = ({ animal }: AnimalCardProps) => {
             <span className="text-gray-500">Weight:</span>
             <span className="ml-2 text-gray-900">{animal.weight ? `${animal.weight} kg` : 'N/A'}</span>
           </div>
+          <div>
+            <span className="text-gray-500">Vaccinated:</span>
+            <span className="ml-2 text-gray-900">{animal.isVaccinated === 'Yes' ? 'Yes' : 'No'}</span>
+          </div>
         </div>
+
         <div className="mt-4 flex justify-end space-x-2">
-          <button className="text-farm-600 hover:text-farm-900 text-sm font-medium">Edit</button>
-          <button className="text-red-600 hover:text-red-900 text-sm font-medium">Delete</button>
+          <button
+            onClick={() => onEdit(animal)}
+            className="text-farm-600 hover:text-farm-900 text-sm font-medium"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => onDelete(animal.id)}
+            className="text-red-600 hover:text-red-900 text-sm font-medium"
+          >
+            Delete
+          </button>
         </div>
       </div>
     </div>
   );
 };
+
 
 export default AnimalCard;
