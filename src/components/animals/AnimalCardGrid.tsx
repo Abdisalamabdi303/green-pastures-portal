@@ -12,16 +12,11 @@ const AnimalCardGrid = ({ animals }: AnimalCardGridProps) => {
       {animals.length > 0 ? (
         animals.map((animal) => (
           <AnimalCard
-          key={animal.id}
-          animal={animal}
-          onEdit={(selectedAnimal) => {
-            setSelectedAnimal(selectedAnimal);
-            setIsAddAnimalOpen(true); // reuse same modal for editing
-          }}
-          onDelete={(id) => {
-            setAnimals(prev => prev.filter(a => a.id !== id));
-  }}
-/>
+            key={animal.id}
+            animal={animal}
+            onEdit={() => {}}
+            onDelete={() => {}}
+          />
         ))
       ) : (
         <div className="col-span-full text-center py-10 bg-white rounded-lg border border-gray-200">
