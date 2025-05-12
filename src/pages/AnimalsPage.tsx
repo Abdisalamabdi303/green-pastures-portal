@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
@@ -38,6 +39,7 @@ const AnimalsPage = () => {
   const handleAddAnimal = (newAnimal: Animal) => {
     setAnimals([...animals, newAnimal]);
   };
+  
   const handleEditAnimal = (animal: Animal) => {
     setSelectedAnimal(animal); // Set the selected animal for editing
     setIsAddAnimalOpen(true); // Open the modal for editing
@@ -46,6 +48,7 @@ const AnimalsPage = () => {
   const handleDeleteAnimal = (id: string) => {
     setAnimals((prevAnimals) => prevAnimals.filter((animal) => animal.id !== id)); // Remove the animal from the list
   };
+  
   if (!user) {
     return <div className="p-8 text-center text-gray-700 text-lg">Loading...</div>;
   }
@@ -98,12 +101,12 @@ const AnimalsPage = () => {
           {/* Conditional Display */}
           <div className="mt-8">
             {viewMode === 'card' ? (
-            <AnimalCardGrid
-              animals={animals}
-              setSelectedAnimal={setSelectedAnimal}
-              setIsAddAnimalOpen={setIsAddAnimalOpen}
-              setAnimals={setAnimals}
-            />
+              <AnimalCardGrid
+                animals={filteredAnimals}
+                setSelectedAnimal={setSelectedAnimal}
+                setIsAddAnimalOpen={setIsAddAnimalOpen}
+                setAnimals={setAnimals}
+              />
             ) : (
               <div className="overflow-x-auto">
                 <AnimalTable animals={filteredAnimals} />

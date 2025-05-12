@@ -1,3 +1,4 @@
+
 import { Animal } from '@/types';
 
 interface AnimalCardProps {
@@ -48,10 +49,12 @@ const AnimalCard = ({ animal, onEdit, onDelete }: AnimalCardProps) => {
             <span className="text-gray-500">Weight:</span>
             <span className="ml-2 text-gray-900">{animal.weight ? `${animal.weight} kg` : 'N/A'}</span>
           </div>
-          <div>
-            <span className="text-gray-500">Vaccinated:</span>
-            <span className="ml-2 text-gray-900">{animal.isVaccinated === 'Yes' ? 'Yes' : 'No'}</span>
-          </div>
+          {animal.isVaccinated && (
+            <div>
+              <span className="text-gray-500">Vaccinated:</span>
+              <span className="ml-2 text-gray-900">{animal.isVaccinated}</span>
+            </div>
+          )}
         </div>
 
         <div className="mt-4 flex justify-end space-x-2">
@@ -72,6 +75,5 @@ const AnimalCard = ({ animal, onEdit, onDelete }: AnimalCardProps) => {
     </div>
   );
 };
-
 
 export default AnimalCard;

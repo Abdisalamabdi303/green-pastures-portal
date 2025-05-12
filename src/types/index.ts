@@ -13,7 +13,8 @@ export interface Animal {
   age: number;
   health: string;
   weight?: number;
-  photoUrl?: string; // Add photoUrl property for storing the image
+  photoUrl?: string;
+  isVaccinated?: string; // Adding the isVaccinated property
 }
 
 export interface Expense {

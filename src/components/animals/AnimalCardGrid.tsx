@@ -1,12 +1,27 @@
 
 import { Animal } from '@/types';
 import AnimalCard from './AnimalCard';
+import { Dispatch, SetStateAction } from 'react';
 
 interface AnimalCardGridProps {
   animals: Animal[];
+  setSelectedAnimal?: Dispatch<SetStateAction<Animal | null>>;
+  setIsAddAnimalOpen?: Dispatch<SetStateAction<boolean>>;
+  setAnimals?: Dispatch<SetStateAction<Animal[]>>;
 }
 
-const AnimalCardGrid = ({ animals }: AnimalCardGridProps) => {
+const AnimalCardGrid = ({ animals, setSelectedAnimal, setIsAddAnimalOpen, setAnimals }: AnimalCardGridProps) => {
+  const handleEdit = (animal: Animal) => {
+    if (setSelectedAnimal) setSelectedAnimal(animal);
+    if (setIsAddAnimalOpen) setIsAddAnimalOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    if (setAnimals) {
+      setAnimals(prevAnimals => prevAnimals.filter(animal => animal.id !== id));
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
       {animals.length > 0 ? (
@@ -14,8 +29,8 @@ const AnimalCardGrid = ({ animals }: AnimalCardGridProps) => {
           <AnimalCard
             key={animal.id}
             animal={animal}
-            onEdit={() => {}}
-            onDelete={() => {}}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
           />
         ))
       ) : (

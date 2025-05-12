@@ -1,8 +1,8 @@
 
-import { ReactNode } from 'react';
+import { ReactElement } from 'react';
 import { Wheat, Carrot, LeafyGreen, Tractor, PiggyBank } from 'lucide-react';
 
-export const getCategoryIcon = (category: string): ReactNode => {
+export const getCategoryIcon = (category: string): ReactElement => {
   switch(category.toLowerCase()) {
     case 'feed':
       return <Wheat className="h-4 w-4 text-farm-600" />;
