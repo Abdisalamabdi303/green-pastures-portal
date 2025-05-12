@@ -9,7 +9,7 @@ import {
   Carrot, 
   LeafyGreen, 
   Tractor, 
-  Cow, 
+  Sheep, 
   Search, 
   PlusCircle, 
   Calendar, 
@@ -180,7 +180,7 @@ const ExpensesPage = () => {
       case 'equipment':
         return <Tractor className="h-4 w-4 text-amber-600" />;
       case 'labor':
-        return <Cow className="h-4 w-4 text-blue-500" />;
+        return <Sheep className="h-4 w-4 text-blue-500" />;
       default:
         return <Carrot className="h-4 w-4 text-green-500" />;
     }
