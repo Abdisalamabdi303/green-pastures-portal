@@ -3,9 +3,11 @@ import { Animal } from '@/types';
 
 interface AnimalTableProps {
   animals: Animal[];
+  onEdit?: (animal: Animal) => void;
+  onDelete?: (id: string) => void;
 }
 
-const AnimalTable = ({ animals }: AnimalTableProps) => {
+const AnimalTable = ({ animals, onEdit, onDelete }: AnimalTableProps) => {
   return (
     <div className="bg-white shadow overflow-hidden sm:rounded-lg border border-gray-200">
       <div className="overflow-x-auto">
@@ -100,8 +102,18 @@ const AnimalTable = ({ animals }: AnimalTableProps) => {
                     </td>
                   )}
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button className="text-farm-600 hover:text-farm-900 mr-3">Edit</button>
-                    <button className="text-red-600 hover:text-red-900">Delete</button>
+                    <button 
+                      onClick={() => onEdit && onEdit(animal)} 
+                      className="text-farm-600 hover:text-farm-900 mr-3"
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      onClick={() => onDelete && onDelete(animal.id)} 
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))

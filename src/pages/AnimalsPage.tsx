@@ -2,22 +2,47 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { animalData } from '../data/mockData';
 import { User, Animal } from '../types';
 import AnimalTable from '../components/animals/AnimalTable';
 import AnimalCardGrid from '../components/animals/AnimalCardGrid';
 import AddAnimalForm from '../components/animals/AddAnimalForm';
 import AnimalSearchBar from '../components/animals/AnimalSearchBar';
-import { LayoutGrid, List } from 'lucide-react'; // icon library
+import { LayoutGrid, List } from 'lucide-react';
+import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { toast } from 'sonner';
 
 const AnimalsPage = () => {
   const [user, setUser] = useState<User | null>(null);
   const [animals, setAnimals] = useState<Animal[]>([]);
-  const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null); // Selected animal for editing
+  const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddAnimalOpen, setIsAddAnimalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  // Fetch animals from Firestore
+  const fetchAnimals = async () => {
+    try {
+      setLoading(true);
+      const animalsCollection = collection(db, 'animals');
+      const snapshot = await getDocs(animalsCollection);
+      
+      const animalsList: Animal[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Animal[];
+      
+      setAnimals(animalsList);
+      console.log('Fetched animals:', animalsList);
+    } catch (error) {
+      console.error('Error fetching animals:', error);
+      toast.error('Failed to load animals from database');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -27,26 +52,57 @@ const AnimalsPage = () => {
     }
 
     setUser(JSON.parse(storedUser));
-    setAnimals(animalData);
+    fetchAnimals();
   }, [navigate]);
 
   const filteredAnimals = animals.filter(animal =>
-    animal.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    animal.breed.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    animal.id.toLowerCase().includes(searchTerm.toLowerCase())
+    animal.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    animal.breed?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    animal.id?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleAddAnimal = (newAnimal: Animal) => {
-    setAnimals([...animals, newAnimal]);
+  const handleAddAnimal = async (newAnimal: Animal) => {
+    try {
+      if (selectedAnimal) {
+        // Editing existing animal
+        const animalRef = doc(db, 'animals', selectedAnimal.id);
+        await updateDoc(animalRef, newAnimal);
+        setAnimals(prevAnimals => 
+          prevAnimals.map(animal => 
+            animal.id === selectedAnimal.id ? { ...newAnimal, id: selectedAnimal.id } : animal
+          )
+        );
+        toast.success('Animal updated successfully');
+      } else {
+        // Adding new animal
+        const docRef = await addDoc(collection(db, 'animals'), newAnimal);
+        const animalWithId = { ...newAnimal, id: docRef.id };
+        setAnimals(prevAnimals => [...prevAnimals, animalWithId]);
+        toast.success('Animal added successfully');
+      }
+      
+      setSelectedAnimal(null);
+      setIsAddAnimalOpen(false);
+    } catch (error) {
+      console.error('Error saving animal:', error);
+      toast.error('Failed to save animal');
+    }
   };
   
   const handleEditAnimal = (animal: Animal) => {
-    setSelectedAnimal(animal); // Set the selected animal for editing
-    setIsAddAnimalOpen(true); // Open the modal for editing
+    setSelectedAnimal(animal);
+    setIsAddAnimalOpen(true);
   };
 
-  const handleDeleteAnimal = (id: string) => {
-    setAnimals((prevAnimals) => prevAnimals.filter((animal) => animal.id !== id)); // Remove the animal from the list
+  const handleDeleteAnimal = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'animals', id));
+      setAnimals(prevAnimals => prevAnimals.filter(animal => animal.id !== id));
+      toast.success('Animal deleted successfully');
+    } catch (error) {
+      console.error('Error deleting animal:', error);
+      toast.error('Failed to delete animal');
+    }
   };
   
   if (!user) {
@@ -94,33 +150,50 @@ const AnimalsPage = () => {
             <AnimalSearchBar
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              onAddClick={() => setIsAddAnimalOpen(true)}
+              onAddClick={() => {
+                setSelectedAnimal(null);
+                setIsAddAnimalOpen(true);
+              }}
             />
           </div>
 
-          {/* Conditional Display */}
-          <div className="mt-8">
-            {viewMode === 'card' ? (
-              <AnimalCardGrid
-                animals={filteredAnimals}
-                setSelectedAnimal={setSelectedAnimal}
-                setIsAddAnimalOpen={setIsAddAnimalOpen}
-                setAnimals={setAnimals}
-              />
-            ) : (
-              <div className="overflow-x-auto">
-                <AnimalTable animals={filteredAnimals} />
-              </div>
-            )}
-          </div>
+          {/* Loading State */}
+          {loading ? (
+            <div className="text-center py-10">
+              <p className="text-gray-500">Loading animals...</p>
+            </div>
+          ) : (
+            <div className="mt-8">
+              {viewMode === 'card' ? (
+                <AnimalCardGrid
+                  animals={filteredAnimals}
+                  setSelectedAnimal={setSelectedAnimal}
+                  setIsAddAnimalOpen={setIsAddAnimalOpen}
+                  setAnimals={setAnimals}
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <AnimalTable 
+                    animals={filteredAnimals} 
+                    onEdit={handleEditAnimal}
+                    onDelete={handleDeleteAnimal}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </section>
       </main>
 
       {/* Modal */}
       {isAddAnimalOpen && (
         <AddAnimalForm
+          animalToEdit={selectedAnimal}
           onAddAnimal={handleAddAnimal}
-          onClose={() => setIsAddAnimalOpen(false)}
+          onClose={() => {
+            setIsAddAnimalOpen(false);
+            setSelectedAnimal(null);
+          }}
         />
       )}
     </div>

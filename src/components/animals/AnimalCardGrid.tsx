@@ -2,6 +2,9 @@
 import { Animal } from '@/types';
 import AnimalCard from './AnimalCard';
 import { Dispatch, SetStateAction } from 'react';
+import { doc, deleteDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { toast } from 'sonner';
 
 interface AnimalCardGridProps {
   animals: Animal[];
@@ -16,9 +19,20 @@ const AnimalCardGrid = ({ animals, setSelectedAnimal, setIsAddAnimalOpen, setAni
     if (setIsAddAnimalOpen) setIsAddAnimalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (setAnimals) {
-      setAnimals(prevAnimals => prevAnimals.filter(animal => animal.id !== id));
+  const handleDelete = async (id: string) => {
+    try {
+      // Delete from Firestore
+      await deleteDoc(doc(db, 'animals', id));
+      
+      // Update local state
+      if (setAnimals) {
+        setAnimals(prevAnimals => prevAnimals.filter(animal => animal.id !== id));
+      }
+      
+      toast.success('Animal deleted successfully');
+    } catch (error) {
+      console.error('Error deleting animal:', error);
+      toast.error('Failed to delete animal');
     }
   };
 
