@@ -1,6 +1,6 @@
-
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import DashboardPreview from '../components/home/DashboardPreview';
 import { statCardsData, expenseChartData } from '../data/mockData';
 
 const HomePage = () => {
@@ -93,34 +93,7 @@ const HomePage = () => {
             <p className="text-xl text-gray-600 mt-2">See your key farm metrics at a glance</p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {statCardsData.map((card, index) => (
-              <div key={index} className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                <h3 className="text-lg font-medium text-gray-500">{card.title}</h3>
-                <p className="text-3xl font-bold text-gray-800 mt-2">
-                  {card.unit && card.unit}{card.value.toLocaleString()}
-                </p>
-              </div>
-            ))}
-          </div>
-          
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">Monthly Expenses</h3>
-            <div className="h-80 w-full">
-              {/* Simple bar chart representation */}
-              <div className="flex h-64 items-end space-x-2">
-                {expenseChartData.map((item, index) => (
-                  <div key={index} className="flex flex-col items-center flex-1">
-                    <div 
-                      className="w-full bg-farm-400 rounded-t"
-                      style={{ height: `${(item.amount / 300000) * 100}%` }}
-                    ></div>
-                    <span className="text-xs mt-2">{item.name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <DashboardPreview />
         </div>
       </section>
 
