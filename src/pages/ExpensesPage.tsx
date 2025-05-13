@@ -2,19 +2,22 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { expenseData } from '../data/mockData';
 import { Expense, User, ChartData } from '../types';
 import { Search, PlusCircle, Calendar, DollarSign } from 'lucide-react';
 import ExpenseTable from '../components/expenses/ExpenseTable';
 import AddExpenseForm from '../components/expenses/AddExpenseForm';
 import ExpenseAnalytics from '../components/expenses/ExpenseAnalytics';
 import { getCategoryIcon } from '../utils/expenseIcons';
+import { db } from '../lib/firebase';
+import { collection, getDocs, addDoc, deleteDoc, doc, Timestamp, query, orderBy } from 'firebase/firestore';
+import { toast } from 'sonner';
 
 const ExpensesPage = () => {
   const [user, setUser] = useState<User | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState({
     category: '',
     amount: 0,
@@ -42,8 +45,38 @@ const ExpensesPage = () => {
     }
     
     setUser(JSON.parse(storedUser));
-    setExpenses(expenseData);
+    fetchExpenses();
   }, [navigate]);
+
+  const fetchExpenses = async () => {
+    setIsLoading(true);
+    try {
+      const q = query(collection(db, 'expenses'), orderBy('date', 'desc'));
+      const querySnapshot = await getDocs(q);
+      
+      const fetchedExpenses: Expense[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        fetchedExpenses.push({
+          id: doc.id,
+          category: data.category,
+          amount: data.amount,
+          date: data.date instanceof Timestamp ? 
+            data.date.toDate().toISOString().split('T')[0] : 
+            new Date(data.date).toISOString().split('T')[0],
+          description: data.description
+        });
+      });
+      
+      setExpenses(fetchedExpenses);
+      toast.success('Expenses loaded successfully');
+    } catch (error) {
+      console.error('Error fetching expenses:', error);
+      toast.error('Failed to load expenses');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (expenses.length > 0) {
@@ -129,35 +162,72 @@ const ExpensesPage = () => {
     }
   };
 
-  const handleAddExpense = (e: React.FormEvent) => {
+  const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Create new expense object
-    const newExpense: Expense = {
-      id: `e${expenses.length + 1}`,
-      ...formData
-    };
-    
-    // Add to expenses array
-    setExpenses([...expenses, newExpense]);
-    
-    // Reset form
-    setFormData({
-      category: '',
-      amount: 0,
-      date: new Date().toISOString().split('T')[0],
-      description: ''
-    });
-    setIsAddExpenseOpen(false);
+    try {
+      // Create new expense object
+      const newExpense = {
+        ...formData,
+        date: new Date(formData.date)
+      };
+      
+      // Add to Firestore
+      const docRef = await addDoc(collection(db, 'expenses'), newExpense);
+      
+      // Add to local state with Firestore ID
+      const expenseWithId: Expense = {
+        id: docRef.id,
+        ...formData
+      };
+      
+      setExpenses([expenseWithId, ...expenses]);
+      toast.success('Expense added successfully');
+      
+      // Reset form
+      setFormData({
+        category: '',
+        amount: 0,
+        date: new Date().toISOString().split('T')[0],
+        description: ''
+      });
+      setIsAddExpenseOpen(false);
+    } catch (error) {
+      console.error('Error adding expense:', error);
+      toast.error('Failed to add expense');
+    }
   };
 
-  const handleDeleteExpense = (id: string) => {
-    setExpenses(expenses.filter(expense => expense.id !== id));
+  const handleDeleteExpense = async (id: string) => {
+    try {
+      // Delete from Firestore
+      await deleteDoc(doc(db, 'expenses', id));
+      
+      // Update local state
+      setExpenses(expenses.filter(expense => expense.id !== id));
+      toast.success('Expense deleted successfully');
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      toast.error('Failed to delete expense');
+    }
   };
 
   if (!user) {
     return <div className="p-8 text-center">Loading...</div>;
   }
+
+  // Since we know the getCategoryIcon from utils/expenseIcons.tsx returns ReactNode but
+  // our component expects ReactElement, we'll create a wrapper function that ensures
+  // we return a ReactElement
+  const getCategoryIconElement = (category: string): JSX.Element => {
+    const iconElement = getCategoryIcon(category);
+    // If it's already a ReactElement, return it, otherwise return a default icon
+    if (React.isValidElement(iconElement)) {
+      return iconElement;
+    }
+    // Default icon if it's not a valid element (like if it returns a string)
+    return <DollarSign className="h-4 w-4 text-farm-600" />;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -205,7 +275,7 @@ const ExpensesPage = () => {
             highestExpense={highestExpense}
             monthlyData={monthlyData}
             categoryData={categoryData}
-            getCategoryIcon={getCategoryIcon}
+            getCategoryIcon={getCategoryIconElement}
           />
           
           {/* Expenses Table */}
@@ -216,12 +286,19 @@ const ExpensesPage = () => {
                 Expense Transactions
               </h2>
             </div>
-            <ExpenseTable 
-              expenses={expenses}
-              getCategoryIcon={getCategoryIcon}
-              handleDeleteExpense={handleDeleteExpense}
-              searchTerm={searchTerm}
-            />
+            {isLoading ? (
+              <div className="p-8 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-farm-600 mx-auto"></div>
+                <p className="mt-2 text-sm text-gray-500">Loading expenses...</p>
+              </div>
+            ) : (
+              <ExpenseTable 
+                expenses={expenses}
+                getCategoryIcon={getCategoryIconElement}
+                handleDeleteExpense={handleDeleteExpense}
+                searchTerm={searchTerm}
+              />
+            )}
           </div>
         </div>
       </main>

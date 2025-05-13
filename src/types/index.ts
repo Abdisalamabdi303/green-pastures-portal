@@ -1,20 +1,25 @@
-
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'user';
+  isAdmin: boolean;
 }
 
 export interface Animal {
   id: string;
+  name: string;
   type: string;
   breed: string;
   age: number;
   health: string;
-  weight?: number;
-  photoUrl?: string;
-  isVaccinated?: string; // Adding the isVaccinated property
+  purchaseDate: string;
+  purchasePrice: number;
+  weight: number;
+  gender: string;
+  status: string;
+  description?: string;
+  imageUrl?: string;
+  isVaccinated?: boolean;
 }
 
 export interface Expense {
@@ -23,13 +28,6 @@ export interface Expense {
   amount: number;
   date: string;
   description: string;
-}
-
-export interface StatCard {
-  title: string;
-  value: number | string;
-  unit?: string;
-  icon?: string;
 }
 
 export interface ChartData {

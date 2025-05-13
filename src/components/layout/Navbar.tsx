@@ -1,6 +1,6 @@
 
 import { useAuth } from "@/contexts/AuthContext";
-import { Bell, Menu, User, X } from "lucide-react";
+import { Bell, User, X, Tractor, Wheat, Cow } from "lucide-react";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -47,7 +47,7 @@ export default function Navbar() {
   };
 
   return (
-    <header className="border-b bg-white px-4 py-3 shadow-sm sticky top-0 z-20">
+    <header className="border-b bg-farm-50 px-4 py-3 shadow-sm sticky top-0 z-20">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button 
@@ -57,41 +57,53 @@ export default function Navbar() {
             onClick={toggleMobileMenu}
             aria-label="Toggle menu"
           >
-            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Tractor className="h-5 w-5" />}
           </Button>
-          <h1 className="text-xl font-semibold text-farm-700">Green Pastures</h1>
+          <div className="flex items-center gap-2">
+            <Wheat className="h-6 w-6 text-farm-600" />
+            <h1 className="text-xl font-semibold text-farm-700">Green Pastures</h1>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="text-muted-foreground">
+          <Button variant="ghost" size="icon" className="text-farm-600 hover:bg-farm-100">
             <Bell className="h-5 w-5" />
             <span className="sr-only">Notifications</span>
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full">
-                <User className="h-5 w-5" />
+              <Button variant="ghost" size="icon" className="rounded-full hover:bg-farm-100">
+                <User className="h-5 w-5 text-farm-600" />
                 <span className="sr-only">User menu</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-56 bg-farm-50 border-farm-200">
               <DropdownMenuLabel>
                 <div className="flex flex-col">
-                  <span>{userData?.name || 'User'}</span>
-                  <span className="text-xs font-normal text-muted-foreground">
+                  <span className="text-farm-800">{userData?.name || 'User'}</span>
+                  <span className="text-xs font-normal text-farm-600">
                     {userData?.email}
                   </span>
                   <span className="mt-1 rounded-full bg-farm-100 px-2 py-0.5 text-xs font-medium text-farm-800">
-                    {isAdmin ? 'Admin' : 'Regular User'}
+                    {isAdmin ? 'Farm Admin' : 'Farm Staff'}
                   </span>
                 </div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => logout()}>
+              <DropdownMenuSeparator className="bg-farm-200" />
+              <DropdownMenuItem className="text-farm-700 hover:bg-farm-100 cursor-pointer">
+                <Cow className="h-4 w-4 mr-2" />
+                Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem className="text-farm-700 hover:bg-farm-100 cursor-pointer">
+                <Wheat className="h-4 w-4 mr-2" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-farm-200" />
+              <DropdownMenuItem 
+                onClick={() => logout()}
+                className="text-farm-700 hover:bg-farm-100 cursor-pointer"
+              >
                 Logout
               </DropdownMenuItem>
             </DropdownMenuContent>

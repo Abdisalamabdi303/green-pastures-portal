@@ -27,6 +27,7 @@ interface ExpenseChartProps {
   chartType?: 'line' | 'pie' | 'bar';
   title?: string;
   description?: string;
+  loading?: boolean;
 }
 
 // Farm-themed color palette
@@ -37,7 +38,8 @@ export default function ExpenseChart({
   categoryData, 
   chartType = 'line',
   title = "Recent Expenses",
-  description = "Daily expenses for the past week"
+  description = "Daily expenses for the past week",
+  loading = false
 }: ExpenseChartProps) {
   
   const ChartIcon = () => {
@@ -50,6 +52,57 @@ export default function ExpenseChart({
         return <TrendingUp className="h-4 w-4 text-muted-foreground" />;
     }
   };
+  
+  if (loading) {
+    return (
+      <Card className="bg-white col-span-2 md:col-span-1 shadow-sm hover:shadow-md transition-shadow duration-200">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div>
+            <CardTitle className="text-farm-600">{title}</CardTitle>
+            <CardDescription>Loading data...</CardDescription>
+          </div>
+          <ChartIcon />
+        </CardHeader>
+        <CardContent className="h-[300px] pt-4 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-farm-600"></div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  if ((chartType === 'line' || chartType === 'bar') && (!recentExpenses || recentExpenses.length === 0)) {
+    return (
+      <Card className="bg-white col-span-2 md:col-span-1 shadow-sm hover:shadow-md transition-shadow duration-200">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div>
+            <CardTitle className="text-farm-600">{title}</CardTitle>
+            <CardDescription>No data available</CardDescription>
+          </div>
+          <ChartIcon />
+        </CardHeader>
+        <CardContent className="h-[300px] pt-4 flex items-center justify-center">
+          <p className="text-muted-foreground">No expense data available to display</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  if (chartType === 'pie' && (!categoryData || categoryData.length === 0)) {
+    return (
+      <Card className="bg-white col-span-2 md:col-span-1 shadow-sm hover:shadow-md transition-shadow duration-200">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div>
+            <CardTitle className="text-farm-600">{title}</CardTitle>
+            <CardDescription>No category data available</CardDescription>
+          </div>
+          <ChartIcon />
+        </CardHeader>
+        <CardContent className="h-[300px] pt-4 flex items-center justify-center">
+          <p className="text-muted-foreground">No category data available to display</p>
+        </CardContent>
+      </Card>
+    );
+  }
   
   return (
     <Card className="bg-white col-span-2 md:col-span-1 shadow-sm hover:shadow-md transition-shadow duration-200">

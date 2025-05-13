@@ -11,16 +11,35 @@ interface AnimalCardGridProps {
   setSelectedAnimal?: Dispatch<SetStateAction<Animal | null>>;
   setIsAddAnimalOpen?: Dispatch<SetStateAction<boolean>>;
   setAnimals?: Dispatch<SetStateAction<Animal[]>>;
+  onEdit?: (animal: Animal) => void;
+  onDelete?: (id: string) => Promise<void>;
 }
 
-const AnimalCardGrid = ({ animals, setSelectedAnimal, setIsAddAnimalOpen, setAnimals }: AnimalCardGridProps) => {
+const AnimalCardGrid = ({ 
+  animals, 
+  setSelectedAnimal, 
+  setIsAddAnimalOpen, 
+  setAnimals,
+  onEdit,
+  onDelete
+}: AnimalCardGridProps) => {
+  
   const handleEdit = (animal: Animal) => {
-    if (setSelectedAnimal) setSelectedAnimal(animal);
-    if (setIsAddAnimalOpen) setIsAddAnimalOpen(true);
+    if (onEdit) {
+      onEdit(animal);
+    } else if (setSelectedAnimal && setIsAddAnimalOpen) {
+      setSelectedAnimal(animal);
+      setIsAddAnimalOpen(true);
+    }
   };
 
   const handleDelete = async (id: string) => {
     try {
+      if (onDelete) {
+        await onDelete(id);
+        return;
+      }
+      
       // Delete from Firestore
       await deleteDoc(doc(db, 'animals', id));
       
