@@ -1,9 +1,8 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { statCardsData, expenseChartData } from '../data/mockData';
 import { User } from '../types';
+import { statCardsData, expenseChartData } from '../data/mockData';
 
 const DashboardPage = () => {
   const [user, setUser] = useState<User | null>(null);

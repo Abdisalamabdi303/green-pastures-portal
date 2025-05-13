@@ -1,5 +1,5 @@
 
-import { Expense } from "@/hooks/useExpenses";
+import { Expense } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Trash } from "lucide-react";
 import {

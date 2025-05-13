@@ -88,7 +88,8 @@ export const mockExpenses: Expense[] = [
     date: "2023-05-15",
     description: "Cattle feed",
     paymentMethod: "Cash",
-    animalRelated: false
+    animalRelated: false,
+    createdAt: null
   },
   {
     id: "2",
@@ -98,7 +99,8 @@ export const mockExpenses: Expense[] = [
     description: "Antibiotics",
     paymentMethod: "Bank Transfer",
     animalRelated: true,
-    animalName: "Bessie"
+    animalName: "Bessie",
+    createdAt: null
   },
   {
     id: "3",
@@ -107,7 +109,8 @@ export const mockExpenses: Expense[] = [
     date: "2023-05-22",
     description: "Farming tools",
     paymentMethod: "Cash",
-    animalRelated: false
+    animalRelated: false,
+    createdAt: null
   },
   {
     id: "4",
@@ -116,7 +119,8 @@ export const mockExpenses: Expense[] = [
     date: "2023-05-25",
     description: "Electricity bill",
     paymentMethod: "UPI",
-    animalRelated: false
+    animalRelated: false,
+    createdAt: null
   },
   {
     id: "5",
@@ -125,6 +129,24 @@ export const mockExpenses: Expense[] = [
     date: "2023-05-30",
     description: "Monthly wages",
     paymentMethod: "Bank Transfer",
-    animalRelated: false
+    animalRelated: false,
+    createdAt: null
   },
+];
+
+// Stat cards data for the dashboard
+export const statCardsData = [
+  { title: "Total Animals", value: 1578, unit: "" },
+  { title: "Monthly Expenses", value: 275000, unit: "₹" },
+  { title: "Profit/Loss", value: 125000, unit: "₹" },
+];
+
+// Expense chart data for the dashboard
+export const expenseChartData = [
+  { name: "Jan", amount: 240000 },
+  { name: "Feb", amount: 255000 },
+  { name: "Mar", amount: 262000 },
+  { name: "Apr", amount: 258000 },
+  { name: "May", amount: 265000 },
+  { name: "Jun", amount: 275000 },
 ];

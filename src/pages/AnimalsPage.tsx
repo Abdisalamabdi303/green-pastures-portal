@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
@@ -66,7 +65,9 @@ const AnimalsPage = () => {
       if (selectedAnimal) {
         // Editing existing animal
         const animalRef = doc(db, 'animals', selectedAnimal.id);
-        await updateDoc(animalRef, newAnimal);
+        const animalData = {...newAnimal};
+        delete animalData.id; // Remove id from the data being updated
+        await updateDoc(animalRef, animalData);
         setAnimals(prevAnimals => 
           prevAnimals.map(animal => 
             animal.id === selectedAnimal.id ? { ...newAnimal, id: selectedAnimal.id } : animal

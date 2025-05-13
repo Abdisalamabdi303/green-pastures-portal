@@ -13,6 +13,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { Expense, Animal } from "@/types";
 
 export const expenseSchema = z.object({
   category: z.string().min(1, { message: "Category is required" }),
@@ -25,17 +26,6 @@ export const expenseSchema = z.object({
 });
 
 export type ExpenseFormValues = z.infer<typeof expenseSchema>;
-
-export interface Expense extends Omit<ExpenseFormValues, 'date'> {
-  id: string;
-  date: any; // Changed from Timestamp to any to handle different date formats
-  createdAt: any; // Changed from Timestamp to any
-}
-
-export interface Animal {
-  id: string;
-  name: string;
-}
 
 export function useExpenses() {
   const { toast } = useToast();
@@ -58,7 +48,23 @@ export function useExpenses() {
       const animalsList: Animal[] = [];
       animalsSnapshot.forEach((doc) => {
         const animal = doc.data();
-        animalsList.push({ id: doc.id, name: animal.name });
+        animalsList.push({ 
+          id: doc.id, 
+          name: animal.name,
+          type: animal.type || '',
+          breed: animal.breed || '',
+          age: animal.age || 0,
+          health: animal.health || '',
+          purchaseDate: animal.purchaseDate || '',
+          purchasePrice: animal.purchasePrice || 0,
+          weight: animal.weight || 0,
+          gender: animal.gender || '',
+          status: animal.status || '',
+          description: animal.description,
+          imageUrl: animal.imageUrl,
+          photoUrl: animal.photoUrl,
+          isVaccinated: animal.isVaccinated || false
+        });
       });
       
       setAnimals(animalsList);
@@ -69,7 +75,11 @@ export function useExpenses() {
       
       const expensesList: Expense[] = [];
       querySnapshot.forEach((doc) => {
-        expensesList.push({ id: doc.id, ...doc.data() } as Expense);
+        expensesList.push({ 
+          id: doc.id, 
+          ...doc.data(),
+          createdAt: doc.data().createdAt || null
+        } as Expense);
       });
       
       setExpenses(expensesList);

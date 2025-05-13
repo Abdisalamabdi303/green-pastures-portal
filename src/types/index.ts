@@ -30,7 +30,7 @@ export interface Expense {
   amount: number;
   date: string;
   description: string;
-  createdAt?: any; // Added to match Firebase timestamp
+  createdAt: any; // Required to match Firebase timestamp
   paymentMethod?: string;
   animalName?: string;
   animalRelated?: boolean;

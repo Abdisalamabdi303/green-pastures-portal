@@ -35,6 +35,7 @@ import { ExpensesDialogForm } from "@/components/expenses/ExpensesDialogForm";
 import { ExpensesHeader } from "@/components/expenses/ExpensesHeader";
 import { ExpensesMonthFilter } from "@/components/expenses/ExpensesMonthFilter";
 import { ExpensesTabContent } from "@/components/expenses/ExpensesTabContent";
+import { Expense } from "@/types";
 
 export default function Expenses() {
   const { expenses, animals, loading, addExpense, deleteExpense } = useExpenses();
@@ -132,7 +133,7 @@ export default function Expenses() {
           
           <TabsContent value="all" className="space-y-4">
             <ExpensesTabContent 
-              expenses={expenses} 
+              expenses={expenses as Expense[]} 
               loading={loading} 
               deleteExpense={deleteExpense} 
               isFiltered={false} 
@@ -141,7 +142,7 @@ export default function Expenses() {
           
           <TabsContent value="monthly" className="space-y-4">
             <ExpensesTabContent 
-              expenses={filteredExpenses} 
+              expenses={filteredExpenses as Expense[]} 
               loading={loading} 
               deleteExpense={deleteExpense} 
               isFiltered={true} 

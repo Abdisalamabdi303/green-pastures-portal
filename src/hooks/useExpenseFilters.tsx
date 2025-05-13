@@ -24,9 +24,9 @@ export function useExpenseFilters(expenses: Expense[]) {
   const processExpenseData = () => {
     // Filter expenses for the selected year and month
     const filteredExpenses = expenses.filter(expense => {
-      // Handle Firebase Timestamp
+      // Handle Firebase Timestamp or string date
       let expenseDate;
-      if (expense.date && typeof expense.date.toDate === 'function') {
+      if (expense.date && typeof expense.date === 'object' && typeof expense.date.toDate === 'function') {
         expenseDate = expense.date.toDate();
       } else if (typeof expense.date === 'string') {
         expenseDate = new Date(expense.date);
@@ -76,7 +76,7 @@ export function useExpenseFilters(expenses: Expense[]) {
     filteredExpenses.forEach(expense => {
       // Handle Firebase Timestamp
       let date;
-      if (expense.date && typeof expense.date.toDate === 'function') {
+      if (expense.date && typeof expense.date === 'object' && typeof expense.date.toDate === 'function') {
         date = expense.date.toDate();
       } else if (typeof expense.date === 'string') {
         date = new Date(expense.date);
