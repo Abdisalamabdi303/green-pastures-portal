@@ -2,22 +2,20 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { Expense, User } from '../types';
-import { Search, PlusCircle, Calendar, DollarSign } from 'lucide-react';
+import { User } from '../types';
+import { Calendar } from 'lucide-react';
 import ExpenseTable from '../components/expenses/ExpenseTable';
 import AddExpenseForm from '../components/expenses/AddExpenseForm';
 import ExpenseAnalytics from '../components/expenses/ExpenseAnalytics';
 import { getCategoryIcon } from '../utils/expenseIcons';
-import { toast } from 'sonner';
 import { useExpenses } from '@/hooks/useExpenses';
+import { useExpenseFilters } from '@/hooks/useExpenseFilters';
+import ExpenseFilterBar from '@/components/expenses/ExpenseFilterBar';
 
 const ExpensesPage = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
-  const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     category: '',
     amount: 0,
@@ -27,12 +25,19 @@ const ExpensesPage = () => {
   
   const { expenses, loading, addExpense, deleteExpense } = useExpenses();
   
-  // For visualizations and analytics
-  const [categoryData, setCategoryData] = useState<Array<{name: string; amount: number}>>([]);
-  const [monthlyData, setMonthlyData] = useState<{date: string; amount: number}[]>([]);
-  const [totalExpense, setTotalExpense] = useState<number>(0);
-  const [averageExpense, setAverageExpense] = useState<number>(0);
-  const [highestExpense, setHighestExpense] = useState<{category: string; amount: number}>({category: '', amount: 0});
+  const {
+    selectedYear,
+    setSelectedYear,
+    selectedMonth,
+    setSelectedMonth,
+    searchTerm,
+    setSearchTerm,
+    categoryData,
+    monthlyData,
+    totalExpense,
+    averageExpense,
+    highestExpense
+  } = useExpenseFilters(expenses);
 
   useEffect(() => {
     // Check if user is logged in
@@ -44,91 +49,6 @@ const ExpensesPage = () => {
     
     setUser(JSON.parse(storedUser));
   }, [navigate]);
-
-  useEffect(() => {
-    if (expenses.length > 0) {
-      // Process data for visualizations
-      processExpenseData();
-    }
-  }, [expenses, selectedYear, selectedMonth]);
-
-  const processExpenseData = () => {
-    // Filter expenses for the selected year and month
-    const filteredExpenses = expenses.filter(expense => {
-      // Handle Firebase Timestamp
-      let expenseDate;
-      if (expense.date && typeof expense.date.toDate === 'function') {
-        expenseDate = expense.date.toDate();
-      } else if (typeof expense.date === 'string') {
-        expenseDate = new Date(expense.date);
-      } else {
-        return false; // Skip this expense if we can't determine the date
-      }
-      
-      return expenseDate.getFullYear() === selectedYear && 
-             (selectedMonth === -1 || expenseDate.getMonth() === selectedMonth);
-    });
-    
-    // Calculate total expense
-    const total = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-    setTotalExpense(total);
-    
-    // Calculate average expense
-    setAverageExpense(filteredExpenses.length > 0 ? total / filteredExpenses.length : 0);
-    
-    // Get expense by category
-    const categoryMap: Record<string, number> = {};
-    filteredExpenses.forEach(expense => {
-      categoryMap[expense.category] = (categoryMap[expense.category] || 0) + expense.amount;
-    });
-    
-    // Convert to array for charts
-    const categoryChartData = Object.keys(categoryMap).map(category => ({
-      name: category,
-      amount: categoryMap[category]
-    }));
-    
-    setCategoryData(categoryChartData);
-    
-    // Find highest expense category
-    if (categoryChartData.length > 0) {
-      const highest = categoryChartData.reduce((prev, current) => 
-        prev.amount > current.amount ? prev : current
-      );
-      
-      setHighestExpense({
-        category: highest.name,
-        amount: highest.amount
-      });
-    }
-    
-    // Get monthly data
-    const monthlyMap: Record<string, number> = {};
-    filteredExpenses.forEach(expense => {
-      // Handle Firebase Timestamp
-      let date;
-      if (expense.date && typeof expense.date.toDate === 'function') {
-        date = expense.date.toDate();
-      } else if (typeof expense.date === 'string') {
-        date = new Date(expense.date);
-      } else {
-        return; // Skip this expense if we can't determine the date
-      }
-      
-      const monthYear = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-      monthlyMap[monthYear] = (monthlyMap[monthYear] || 0) + expense.amount;
-    });
-    
-    // Convert to array for charts and sort by date
-    const monthlyChartData = Object.keys(monthlyMap)
-      .map(date => ({
-        date,
-        amount: monthlyMap[date]
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-    
-    setMonthlyData(monthlyChartData);
-  };
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -181,8 +101,21 @@ const ExpensesPage = () => {
       return iconElement;
     }
     // Default icon if it's not a valid element
-    return <DollarSign className="h-4 w-4 text-farm-600" />;
+    return <span className="h-4 w-4 text-farm-600">💲</span>;
   };
+
+  // Filter expenses based on search term
+  const filteredExpenses = expenses.filter(expense => {
+    if (!searchTerm) return true;
+    
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      expense.description.toLowerCase().includes(searchLower) ||
+      expense.category.toLowerCase().includes(searchLower) ||
+      (expense.animalName && expense.animalName.toLowerCase().includes(searchLower)) ||
+      (expense.paymentMethod && expense.paymentMethod.toLowerCase().includes(searchLower))
+    );
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -190,33 +123,12 @@ const ExpensesPage = () => {
       
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 space-y-4 md:space-y-0">
-            <h1 className="text-2xl font-semibold text-gray-900 flex items-center">
-              <DollarSign className="h-6 w-6 mr-2 text-farm-600" />
-              Expenses Management
-            </h1>
-            <div className="flex space-x-4">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search expenses..."
-                  className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-farm-500 focus:border-farm-500"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <Search className="h-4 w-4 text-gray-400" />
-                </div>
-              </div>
-              <button 
-                className="bg-farm-600 text-white px-4 py-2 rounded-md hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500 flex items-center"
-                onClick={() => setIsAddExpenseOpen(true)}
-              >
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Add Expense
-              </button>
-            </div>
-          </div>
+          {/* Expense filter bar */}
+          <ExpenseFilterBar 
+            searchTerm={searchTerm} 
+            setSearchTerm={setSearchTerm} 
+            setIsAddExpenseOpen={setIsAddExpenseOpen} 
+          />
           
           {/* Expense Analytics */}
           <ExpenseAnalytics 
@@ -248,9 +160,9 @@ const ExpensesPage = () => {
               </div>
             ) : (
               <ExpenseTable 
-                expenses={expenses}
+                expenses={filteredExpenses}
                 deleteExpense={deleteExpense}
-                searchTerm={searchTerm}
+                isFiltered={searchTerm.length > 0}
               />
             )}
           </div>

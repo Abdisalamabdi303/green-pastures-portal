@@ -17,7 +17,11 @@ interface ExpenseTableProps {
   isFiltered?: boolean;
 }
 
-export default function ExpenseTable({ expenses, deleteExpense, isFiltered = false }: ExpenseTableProps) {
+export default function ExpenseTable({ 
+  expenses, 
+  deleteExpense, 
+  isFiltered = false 
+}: ExpenseTableProps) {
   // Helper function to format date correctly
   const formatDate = (dateValue: any) => {
     if (!dateValue) return "-";
