@@ -12,12 +12,15 @@ import { db } from '../lib/firebase';
 import { collection, getDocs, addDoc, deleteDoc, doc, Timestamp, query, orderBy } from 'firebase/firestore';
 import { toast } from 'sonner';
 
+import { useExpenses } from '@/hooks/useExpenses';
+
 const ExpensesPage = () => {
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     category: '',
     amount: 0,
@@ -25,16 +28,14 @@ const ExpensesPage = () => {
     description: ''
   });
   
+  const { expenses, loading, addExpense, deleteExpense } = useExpenses();
+  
   // For visualizations and analytics
   const [categoryData, setCategoryData] = useState<ChartData[]>([]);
   const [monthlyData, setMonthlyData] = useState<{date: string; amount: number}[]>([]);
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [totalExpense, setTotalExpense] = useState<number>(0);
   const [averageExpense, setAverageExpense] = useState<number>(0);
   const [highestExpense, setHighestExpense] = useState<{category: string; amount: number}>({category: '', amount: 0});
-  
-  const navigate = useNavigate();
 
   useEffect(() => {
     // Check if user is logged in
@@ -45,38 +46,7 @@ const ExpensesPage = () => {
     }
     
     setUser(JSON.parse(storedUser));
-    fetchExpenses();
   }, [navigate]);
-
-  const fetchExpenses = async () => {
-    setIsLoading(true);
-    try {
-      const q = query(collection(db, 'expenses'), orderBy('date', 'desc'));
-      const querySnapshot = await getDocs(q);
-      
-      const fetchedExpenses: Expense[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        fetchedExpenses.push({
-          id: doc.id,
-          category: data.category,
-          amount: data.amount,
-          date: data.date instanceof Timestamp ? 
-            data.date.toDate().toISOString().split('T')[0] : 
-            new Date(data.date).toISOString().split('T')[0],
-          description: data.description
-        });
-      });
-      
-      setExpenses(fetchedExpenses);
-      toast.success('Expenses loaded successfully');
-    } catch (error) {
-      console.error('Error fetching expenses:', error);
-      toast.error('Failed to load expenses');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   useEffect(() => {
     if (expenses.length > 0) {
@@ -165,51 +135,23 @@ const ExpensesPage = () => {
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    try {
-      // Create new expense object
-      const newExpense = {
-        ...formData,
-        date: new Date(formData.date)
-      };
-      
-      // Add to Firestore
-      const docRef = await addDoc(collection(db, 'expenses'), newExpense);
-      
-      // Add to local state with Firestore ID
-      const expenseWithId: Expense = {
-        id: docRef.id,
-        ...formData
-      };
-      
-      setExpenses([expenseWithId, ...expenses]);
-      toast.success('Expense added successfully');
-      
-      // Reset form
-      setFormData({
-        category: '',
-        amount: 0,
-        date: new Date().toISOString().split('T')[0],
-        description: ''
-      });
-      setIsAddExpenseOpen(false);
-    } catch (error) {
-      console.error('Error adding expense:', error);
-      toast.error('Failed to add expense');
-    }
-  };
-
-  const handleDeleteExpense = async (id: string) => {
-    try {
-      // Delete from Firestore
-      await deleteDoc(doc(db, 'expenses', id));
-      
-      // Update local state
-      setExpenses(expenses.filter(expense => expense.id !== id));
-      toast.success('Expense deleted successfully');
-    } catch (error) {
-      console.error('Error deleting expense:', error);
-      toast.error('Failed to delete expense');
-    }
+    const expenseData = {
+      ...formData,
+      date: new Date(formData.date).toISOString(),
+      paymentMethod: 'Cash',
+      animalRelated: false
+    };
+    
+    await addExpense(expenseData);
+    
+    // Reset form
+    setFormData({
+      category: '',
+      amount: 0,
+      date: new Date().toISOString().split('T')[0],
+      description: ''
+    });
+    setIsAddExpenseOpen(false);
   };
 
   if (!user) {
@@ -286,16 +228,21 @@ const ExpensesPage = () => {
                 Expense Transactions
               </h2>
             </div>
-            {isLoading ? (
+            {loading ? (
               <div className="p-8 text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-farm-600 mx-auto"></div>
                 <p className="mt-2 text-sm text-gray-500">Loading expenses...</p>
               </div>
             ) : (
               <ExpenseTable 
-                expenses={expenses}
-                getCategoryIcon={getCategoryIconElement}
-                handleDeleteExpense={handleDeleteExpense}
+                expenses={expenses.map(exp => ({
+                  id: exp.id,
+                  category: exp.category,
+                  description: exp.description,
+                  amount: exp.amount,
+                  date: typeof exp.date === 'string' ? exp.date : exp.date.toDate().toISOString(),
+                }))}
+                deleteExpense={deleteExpense}
                 searchTerm={searchTerm}
               />
             )}

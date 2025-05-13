@@ -1,32 +1,57 @@
+
 import { Animal } from '@/types';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface AddAnimalFormProps {
   onAddAnimal: (animal: Animal) => void;
   onClose: () => void;
+  animalToEdit?: Animal;
 }
 
-const AddAnimalForm = ({ onAddAnimal, onClose }: AddAnimalFormProps) => {
+const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProps) => {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [formData, setFormData] = useState<Omit<Animal, 'photoUrl'> & { photoUrl: string; isVaccinated: string }>({
-  id: '',
-  type: '',
-  breed: '',
-  age: 0,
-  health: 'Good',
-  weight: 0,
-  photoUrl: '',
-  isVaccinated: '' // New field
-});
+  const [formData, setFormData] = useState<Partial<Animal>>({
+    id: '',
+    name: '',
+    type: '',
+    breed: '',
+    age: 0,
+    health: 'Good',
+    weight: 0,
+    gender: '',
+    status: 'Active',
+    purchaseDate: new Date().toISOString().split('T')[0],
+    purchasePrice: 0,
+    photoUrl: '',
+    isVaccinated: false
+  });
+
+  // Initialize form with edit data if provided
+  useEffect(() => {
+    if (animalToEdit) {
+      setFormData(animalToEdit);
+      if (animalToEdit.photoUrl) {
+        setPhotoPreview(animalToEdit.photoUrl);
+      }
+    }
+  }, [animalToEdit]);
 
   const handleFormChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value, type } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'number' ? parseFloat(value) || 0 : value
-    }));
+    
+    if (name === 'isVaccinated') {
+      setFormData({
+        ...formData,
+        isVaccinated: value === 'Yes'
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: type === 'number' ? parseFloat(value) || 0 : value
+      });
+    }
   };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -44,22 +69,31 @@ const AddAnimalForm = ({ onAddAnimal, onClose }: AddAnimalFormProps) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
     const newAnimal: Animal = {
-      ...formData,
-      id: formData.id || `a${Date.now()}`,
-      photoUrl: photoPreview || ''
+      ...formData as Animal,
+      id: formData.id || `animal_${Date.now()}`,
+      photoUrl: photoPreview || undefined
     };
+    
     onAddAnimal(newAnimal);
+    
+    // Reset form
     setFormData({
       id: '',
+      name: '',
       type: '',
       breed: '',
       age: 0,
       health: 'Good',
       weight: 0,
+      gender: '',
+      status: 'Active',
+      purchaseDate: new Date().toISOString().split('T')[0],
+      purchasePrice: 0,
       photoUrl: '',
-      isVaccinated: ''
-}); 
+      isVaccinated: false
+    });
     setPhotoPreview(null);
     onClose();
   };
@@ -73,37 +107,109 @@ const AddAnimalForm = ({ onAddAnimal, onClose }: AddAnimalFormProps) => {
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="sm:flex sm:items-start">
               <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">Add New Animal</h3>
+                <h3 className="text-lg leading-6 font-medium text-gray-900">
+                  {animalToEdit ? 'Edit Animal' : 'Add New Animal'}
+                </h3>
                 <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-                  <PhotoUpload preview={photoPreview} onFileChange={handlePhotoChange} onRemove={() => { setPhotoPreview(null); setFormData((prev) => ({ ...prev, photoUrl: '' })); }} />
-                  <InputField label="Animal ID" name="id" type="text" value={formData.id} onChange={handleFormChange} required placeholder="Enter animal ID" className='px-10 py-5'/>
+                  <PhotoUpload 
+                    preview={photoPreview || formData.photoUrl} 
+                    onFileChange={handlePhotoChange} 
+                    onRemove={() => { 
+                      setPhotoPreview(null); 
+                      setFormData((prev) => ({ ...prev, photoUrl: '' })); 
+                    }} 
+                  />
+                  
+                  <InputField 
+                    label="Animal ID" 
+                    name="id" 
+                    type="text" 
+                    value={formData.id || ''} 
+                    onChange={handleFormChange} 
+                    placeholder="Enter animal ID" 
+                  />
+                  
+                  <InputField 
+                    label="Name" 
+                    name="name" 
+                    type="text" 
+                    value={formData.name || ''} 
+                    onChange={handleFormChange} 
+                    required 
+                    placeholder="Enter animal name" 
+                  />
                  
                   <div className="grid grid-cols-2 gap-4">
-                    <SelectField label="Type" name="type" value={formData.type} onChange={handleFormChange} required options={["Cow", "Goat", "Sheep", "Camel"]} />
-                    <InputField label="Breed" name="breed" type="text" value={formData.breed} onChange={handleFormChange}  />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <InputField label="Age (years)" name="age" type="number" min={0} step={0.1} value={formData.age} onChange={handleFormChange} required />
-                    <InputField label="Weight (kg)" name="weight" type="number" min={0} step={0.1} value={formData.weight} onChange={handleFormChange} required />
-                  </div>
-                  <SelectField label="Health Status" 
-                    name="health" 
-                    value={formData.health} 
-                    onChange={handleFormChange} 
-                    options={["Excellent", "Good", "Fair", "Poor"]} />
-                  <SelectField
-                      label="Is Vaccinated?"
-                      name="isVaccinated"
-                      value={formData.isVaccinated}
-                      onChange={handleFormChange}
-                      required
-                      options={["Yes", "No"]}
+                    <SelectField 
+                      label="Type" 
+                      name="type" 
+                      value={formData.type || ''} 
+                      onChange={handleFormChange} 
+                      required 
+                      options={["Cow", "Goat", "Sheep", "Camel"]} 
                     />
+                    <InputField 
+                      label="Breed" 
+                      name="breed" 
+                      type="text" 
+                      value={formData.breed || ''} 
+                      onChange={handleFormChange} 
+                      required
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <InputField 
+                      label="Age (years)" 
+                      name="age" 
+                      type="number" 
+                      min={0} 
+                      step={0.1} 
+                      value={formData.age || 0} 
+                      onChange={handleFormChange} 
+                      required 
+                    />
+                    <InputField 
+                      label="Weight (kg)" 
+                      name="weight" 
+                      type="number" 
+                      min={0} 
+                      step={0.1} 
+                      value={formData.weight || 0} 
+                      onChange={handleFormChange} 
+                      required 
+                    />
+                  </div>
+                  
+                  <SelectField 
+                    label="Health Status" 
+                    name="health" 
+                    value={formData.health || 'Good'} 
+                    onChange={handleFormChange} 
+                    options={["Excellent", "Good", "Fair", "Poor"]} 
+                  />
+                  
+                  <SelectField
+                    label="Is Vaccinated?"
+                    name="isVaccinated"
+                    value={formData.isVaccinated === true ? 'Yes' : 'No'}
+                    onChange={handleFormChange}
+                    required
+                    options={["Yes", "No"]}
+                  />
+                  
                   <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
-                    <button type="submit" className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-farm-600 text-base font-medium text-white hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500 sm:ml-3 sm:w-auto sm:text-sm">
-                      Add Animal
+                    <button 
+                      type="submit" 
+                      className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-farm-600 text-base font-medium text-white hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500 sm:ml-3 sm:w-auto sm:text-sm"
+                    >
+                      {animalToEdit ? 'Update Animal' : 'Add Animal'}
                     </button>
-                    <button type="button" onClick={onClose} className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500 sm:mt-0 sm:w-auto sm:text-sm">
+                    <button 
+                      type="button" 
+                      onClick={onClose} 
+                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500 sm:mt-0 sm:w-auto sm:text-sm"
+                    >
                       Cancel
                     </button>
                   </div>
@@ -120,7 +226,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose }: AddAnimalFormProps) => {
 const InputField = ({ label, ...props }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) => (
   <div>
     <label htmlFor={props.name} className="block text-sm font-medium text-gray-700">{label}</label>
-    <input {...props} className="mt-1 focus:ring-farm-500 focus:border-farm-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md px-5 py-5" />
+    <input {...props} className="mt-1 focus:ring-farm-500 focus:border-farm-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md p-2" />
   </div>
 );
 
@@ -131,7 +237,6 @@ const SelectField = ({ label, options, ...props }: { label: string; options: str
       <option value="" disabled>Select {label.toLowerCase()}</option>
       {options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
     </select>
-    
   </div>
 );
 

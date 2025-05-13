@@ -1,18 +1,6 @@
 
-import { useState, useEffect } from "react";
-import { 
-  collection, 
-  addDoc, 
-  query, 
-  getDocs, 
-  Timestamp,
-  orderBy,
-  deleteDoc,
-  doc
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { useState } from "react";
 import Layout from "@/components/layout/Layout";
-import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { 
   Dialog, 
@@ -32,78 +20,30 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { 
-  PiggyBank, 
-  Banknote, 
   Plus, 
-  Trash,
   Calendar,
-  Filter
+  Filter,
+  Banknote
 } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip,
-  Legend,
-} from "recharts";
 
-const expenseSchema = z.object({
-  category: z.string().min(1, { message: "Category is required" }),
-  description: z.string().min(1, { message: "Description is required" }),
-  amount: z.number().min(0, { message: "Amount must be a positive number" }),
-  date: z.string(),
-  paymentMethod: z.string().min(1, { message: "Payment method is required" }),
-  animalRelated: z.boolean().default(false),
-  animalName: z.string().optional(),
-});
-
-type ExpenseFormValues = z.infer<typeof expenseSchema>;
-
-interface Expense extends Omit<ExpenseFormValues, 'date'> {
-  id: string;
-  date: Timestamp;
-  createdAt: Timestamp;
-}
-
-interface Animal {
-  id: string;
-  name: string;
-}
+import { useExpenses, expenseSchema, ExpenseFormValues } from "@/hooks/useExpenses";
+import ExpenseChart from "@/components/expenses/ExpenseChart";
+import ExpenseSummary from "@/components/expenses/ExpenseSummary";
+import ExpenseTable from "@/components/expenses/ExpenseTable";
 
 const COLORS = ['#94cf43', '#c1986a', '#6b768a', '#6b8e23', '#cd853f'];
 
 export default function Expenses() {
-  const { toast } = useToast();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [animals, setAnimals] = useState<Animal[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { expenses, animals, loading, addExpense, deleteExpense } = useExpenses();
   const [openDialog, setOpenDialog] = useState(false);
   const [filterMonth, setFilterMonth] = useState<string>(
     new Date().toISOString().slice(0, 7)
@@ -124,114 +64,11 @@ export default function Expenses() {
 
   const watchAnimalRelated = form.watch("animalRelated");
 
-  useEffect(() => {
-    const fetchExpensesAndAnimals = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch animals first
-        const animalsQuery = query(collection(db, "animals"));
-        const animalsSnapshot = await getDocs(animalsQuery);
-        
-        const animalsList: Animal[] = [];
-        animalsSnapshot.forEach((doc) => {
-          const animal = doc.data();
-          animalsList.push({ id: doc.id, name: animal.name });
-        });
-        
-        setAnimals(animalsList);
-        
-        // Then fetch expenses
-        const q = query(collection(db, "expenses"), orderBy("date", "desc"));
-        const querySnapshot = await getDocs(q);
-        
-        const expensesList: Expense[] = [];
-        querySnapshot.forEach((doc) => {
-          expensesList.push({ id: doc.id, ...doc.data() } as Expense);
-        });
-        
-        setExpenses(expensesList);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load expenses data",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchExpensesAndAnimals();
-  }, [toast]);
-
   const onSubmit = async (data: ExpenseFormValues) => {
-    try {
-      const expenseData = {
-        ...data,
-        date: Timestamp.fromDate(new Date(data.date)),
-        createdAt: Timestamp.now(),
-      };
-      
-      // If not animal related, remove animalName
-      if (!data.animalRelated) {
-        expenseData.animalName = undefined;
-      }
-      
-      await addDoc(collection(db, "expenses"), expenseData);
-      
-      toast({
-        title: "Expense Added",
-        description: `${data.description} expense has been recorded`,
-      });
-      
-      // Reset form and close dialog
+    const success = await addExpense(data);
+    if (success) {
       form.reset();
       setOpenDialog(false);
-      
-      // Refresh expense list
-      const q = query(collection(db, "expenses"), orderBy("date", "desc"));
-      const querySnapshot = await getDocs(q);
-      
-      const expensesList: Expense[] = [];
-      querySnapshot.forEach((doc) => {
-        expensesList.push({ id: doc.id, ...doc.data() } as Expense);
-      });
-      
-      setExpenses(expensesList);
-      
-    } catch (error) {
-      console.error("Error adding expense:", error);
-      toast({
-        title: "Error",
-        description: "Failed to record expense",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const deleteExpense = async (id: string, description: string) => {
-    if (confirm(`Are you sure you want to delete the expense: ${description}?`)) {
-      try {
-        await deleteDoc(doc(db, "expenses", id));
-        
-        toast({
-          title: "Expense Deleted",
-          description: `${description} has been removed`,
-        });
-        
-        // Update local state
-        setExpenses(expenses.filter(expense => expense.id !== id));
-        
-      } catch (error) {
-        console.error("Error deleting expense:", error);
-        toast({
-          title: "Error",
-          description: "Failed to delete expense",
-          variant: "destructive",
-        });
-      }
     }
   };
 
@@ -254,11 +91,18 @@ export default function Expenses() {
     return acc;
   }, {} as Record<string, number>);
 
+  // Prepare data for pie chart
   const pieChartData = Object.keys(expensesByCategory).map((category, index) => ({
     name: category,
     value: expensesByCategory[category],
     color: COLORS[index % COLORS.length],
   }));
+
+  // Format the month year for display
+  const formattedPeriod = new Date(filterMonth + "-01").toLocaleString('default', { 
+    month: 'long', 
+    year: 'numeric' 
+  });
 
   return (
     <Layout>
@@ -454,110 +298,17 @@ export default function Expenses() {
         </div>
         
         <div className="grid gap-4 md:grid-cols-12">
-          <Card className="md:col-span-8 bg-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div>
-                <CardTitle>Monthly Expenses</CardTitle>
-                <CardDescription>
-                  Breakdown of expenses for {new Date(filterMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' })}
-                </CardDescription>
-              </div>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 gap-1">
-                    <Calendar className="h-3.5 w-3.5" />
-                    <span>Filter</span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-4" align="end">
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Select Month</h4>
-                    <Input 
-                      type="month" 
-                      value={filterMonth}
-                      onChange={(e) => setFilterMonth(e.target.value)}
-                    />
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                {pieChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieChartData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        nameKey="name"
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {pieChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <RechartsTooltip 
-                        formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Amount']}
-                      />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex items-center justify-center">
-                    <div className="text-center">
-                      <PiggyBank className="h-12 w-12 mx-auto text-muted-foreground opacity-50" />
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        No expenses recorded for this month
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <ExpenseChart 
+            data={pieChartData}
+            title="Monthly Expenses"
+            description={`Breakdown of expenses for ${formattedPeriod}`}
+          />
           
-          <Card className="md:col-span-4 bg-white">
-            <CardHeader className="pb-2">
-              <CardTitle>Summary</CardTitle>
-              <CardDescription>
-                {new Date(filterMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' })}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Total Expenses</span>
-                    <span className="text-2xl font-bold">₹{totalExpenses.toLocaleString()}</span>
-                  </div>
-                  <div className="h-[1px] bg-muted"></div>
-                </div>
-                
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium">By Category</h4>
-                  {Object.keys(expensesByCategory).length > 0 ? (
-                    <div className="space-y-1">
-                      {Object.keys(expensesByCategory).map((category) => (
-                        <div key={category} className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">{category}</span>
-                          <span className="text-sm font-medium">
-                            ₹{expensesByCategory[category].toLocaleString()}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No data for this period</p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <ExpenseSummary
+            totalExpenses={totalExpenses}
+            expensesByCategory={expensesByCategory}
+            period={formattedPeriod}
+          />
         </div>
         
         <Tabs defaultValue="all" className="w-full">
@@ -593,46 +344,10 @@ export default function Expenses() {
                 </p>
               </div>
             ) : (
-              <div className="rounded-md border bg-white overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Animal</TableHead>
-                      <TableHead>Payment Method</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {expenses.map((expense) => (
-                      <TableRow key={expense.id}>
-                        <TableCell className="font-medium">{expense.description}</TableCell>
-                        <TableCell>{expense.category}</TableCell>
-                        <TableCell>{expense.date.toDate().toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          {expense.animalName ? expense.animalName : "-"}
-                        </TableCell>
-                        <TableCell>{expense.paymentMethod}</TableCell>
-                        <TableCell className="text-right">₹{expense.amount.toLocaleString()}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => deleteExpense(expense.id, expense.description)}
-                            className="text-destructive h-8 w-8"
-                          >
-                            <Trash className="h-4 w-4" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <ExpenseTable 
+                expenses={expenses}
+                deleteExpense={deleteExpense}
+              />
             )}
           </TabsContent>
           
@@ -651,46 +366,11 @@ export default function Expenses() {
                 </p>
               </div>
             ) : (
-              <div className="rounded-md border bg-white overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Animal</TableHead>
-                      <TableHead>Payment Method</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredExpenses.map((expense) => (
-                      <TableRow key={expense.id}>
-                        <TableCell className="font-medium">{expense.description}</TableCell>
-                        <TableCell>{expense.category}</TableCell>
-                        <TableCell>{expense.date.toDate().toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          {expense.animalName ? expense.animalName : "-"}
-                        </TableCell>
-                        <TableCell>{expense.paymentMethod}</TableCell>
-                        <TableCell className="text-right">₹{expense.amount.toLocaleString()}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => deleteExpense(expense.id, expense.description)}
-                            className="text-destructive h-8 w-8"
-                          >
-                            <Trash className="h-4 w-4" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <ExpenseTable 
+                expenses={filteredExpenses}
+                deleteExpense={deleteExpense}
+                isFiltered={true}
+              />
             )}
           </TabsContent>
         </Tabs>

@@ -48,15 +48,15 @@ export default function Dashboard() {
           });
         });
         
-        // Reverse to show chronological order
-        setRecentExpenses(expenses.reverse());
+        // Reverse to show chronological order and limit to 7
+        const sortedExpenses = [...expenses]
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          .slice(-7);
+        
+        setRecentExpenses(sortedExpenses);
       } catch (error) {
         console.error("Error fetching recent expenses:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load expense data",
-          variant: "destructive"
-        });
+        toast.error("Failed to load expense data");
       } finally {
         setExpensesLoading(false);
       }

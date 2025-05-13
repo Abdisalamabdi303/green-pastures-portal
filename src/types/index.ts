@@ -1,3 +1,4 @@
+
 export interface User {
   id: string;
   name: string;
@@ -19,7 +20,8 @@ export interface Animal {
   status: string;
   description?: string;
   imageUrl?: string;
-  isVaccinated?: boolean;
+  photoUrl?: string;
+  isVaccinated?: boolean | string;
 }
 
 export interface Expense {

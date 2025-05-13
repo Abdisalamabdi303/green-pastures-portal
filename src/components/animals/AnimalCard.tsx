@@ -6,13 +6,14 @@ interface AnimalCardProps {
   onEdit: (animal: Animal) => void;
   onDelete: (id: string) => void;
 }
+
 const AnimalCard = ({ animal, onEdit, onDelete }: AnimalCardProps) => {
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
       <div className="h-48 w-full bg-gray-200 overflow-hidden">
-        {animal.photoUrl ? (
+        {animal.photoUrl || animal.imageUrl ? (
           <img 
-            src={animal.photoUrl} 
+            src={animal.photoUrl || animal.imageUrl} 
             alt={`${animal.type} - ${animal.breed}`}
             className="w-full h-full object-cover"
           />
@@ -27,8 +28,8 @@ const AnimalCard = ({ animal, onEdit, onDelete }: AnimalCardProps) => {
       <div className="p-4">
         <div className="flex justify-between items-start">
           <div>
-            <h3 className="text-lg font-semibold text-gray-800">{animal.type}</h3>
-            <p className="text-sm text-gray-600">ID: {animal.id}</p>
+            <h3 className="text-lg font-semibold text-gray-800">{animal.name}</h3>
+            <p className="text-sm text-gray-600">Type: {animal.type}</p>
             <p className="text-sm text-gray-600">Breed: {animal.breed}</p>
           </div>
           <span className={`px-2 py-1 text-xs leading-5 font-semibold rounded-full ${
@@ -49,10 +50,14 @@ const AnimalCard = ({ animal, onEdit, onDelete }: AnimalCardProps) => {
             <span className="text-gray-500">Weight:</span>
             <span className="ml-2 text-gray-900">{animal.weight ? `${animal.weight} kg` : 'N/A'}</span>
           </div>
-          {animal.isVaccinated && (
+          {animal.isVaccinated !== undefined && (
             <div>
               <span className="text-gray-500">Vaccinated:</span>
-              <span className="ml-2 text-gray-900">{animal.isVaccinated}</span>
+              <span className="ml-2 text-gray-900">
+                {typeof animal.isVaccinated === 'boolean' 
+                  ? (animal.isVaccinated ? 'Yes' : 'No') 
+                  : animal.isVaccinated}
+              </span>
             </div>
           )}
         </div>

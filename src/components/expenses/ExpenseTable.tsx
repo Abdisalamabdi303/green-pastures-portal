@@ -1,92 +1,73 @@
 
-import { Expense } from '@/types';
-import { Trash2 } from 'lucide-react';
+import { Expense } from "@/hooks/useExpenses";
+import { Button } from "@/components/ui/button";
+import { Trash } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface ExpenseTableProps {
   expenses: Expense[];
-  getCategoryIcon: (category: string) => JSX.Element;
-  handleDeleteExpense: (id: string) => void;
-  searchTerm?: string;
+  deleteExpense: (id: string, description: string) => Promise<boolean>;
+  isFiltered?: boolean;
 }
 
-const ExpenseTable = ({ expenses, getCategoryIcon, handleDeleteExpense, searchTerm = '' }: ExpenseTableProps) => {
-  // Filter expenses based on search term
-  const filteredExpenses = expenses.filter(expense => 
-    expense.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    expense.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
+export default function ExpenseTable({ expenses, deleteExpense, isFiltered = false }: ExpenseTableProps) {
   return (
-    <div className="bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden sm:rounded-lg border border-gray-200">
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                ID
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Category
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Amount
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Date
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Description
-              </th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredExpenses.length > 0 ? (
-              filteredExpenses.map((expense) => (
-                <tr key={expense.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {expense.id}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center">
-                      {getCategoryIcon(expense.category)}
-                      <span className="ml-2">{expense.category}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-farm-600">
-                    ₹{expense.amount.toLocaleString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(expense.date).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
-                    {expense.description}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button 
-                      onClick={() => handleDeleteExpense(expense.id)}
-                      className="text-red-600 hover:text-red-900 flex items-center justify-end"
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      <span>Delete</span>
-                    </button>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
-                  No expenses found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+    <div className="rounded-md border bg-white overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Description</TableHead>
+            <TableHead>Category</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead>Animal</TableHead>
+            <TableHead>Payment Method</TableHead>
+            <TableHead className="text-right">Amount</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {expenses.length > 0 ? (
+            expenses.map((expense) => (
+              <TableRow key={expense.id}>
+                <TableCell className="font-medium">{expense.description}</TableCell>
+                <TableCell>{expense.category}</TableCell>
+                <TableCell>{expense.date.toDate().toLocaleDateString()}</TableCell>
+                <TableCell>
+                  {expense.animalName ? expense.animalName : "-"}
+                </TableCell>
+                <TableCell>{expense.paymentMethod}</TableCell>
+                <TableCell className="text-right">₹{expense.amount.toLocaleString()}</TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => deleteExpense(expense.id, expense.description)}
+                    className="text-destructive h-8 w-8"
+                  >
+                    <Trash className="h-4 w-4" />
+                    <span className="sr-only">Delete</span>
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                {isFiltered 
+                  ? "No expenses found for the selected period" 
+                  : "No expenses have been recorded yet"}
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
     </div>
   );
-};
-
-export default ExpenseTable;
+}

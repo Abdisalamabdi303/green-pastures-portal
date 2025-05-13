@@ -21,6 +21,9 @@ const AnimalTable = ({ animals, onEdit, onDelete }: AnimalTableProps) => {
                 Photo
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Name
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Type
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -35,9 +38,9 @@ const AnimalTable = ({ animals, onEdit, onDelete }: AnimalTableProps) => {
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Health
               </th>
-              {animals.some(animal => animal.isVaccinated) && (
+              {animals.some(animal => animal.isVaccinated !== undefined) && (
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Is Vaccinated?
+                  Vaccinated
                 </th>
               )}
               <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -54,10 +57,10 @@ const AnimalTable = ({ animals, onEdit, onDelete }: AnimalTableProps) => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="h-10 w-10 rounded-full overflow-hidden bg-gray-100">
-                      {animal.photoUrl ? (
+                      {animal.photoUrl || animal.imageUrl ? (
                         <img 
-                          src={animal.photoUrl} 
-                          alt={`${animal.type}`}
+                          src={animal.photoUrl || animal.imageUrl} 
+                          alt={`${animal.name}`}
                           className="h-full w-full object-cover"
                         />
                       ) : (
@@ -68,6 +71,9 @@ const AnimalTable = ({ animals, onEdit, onDelete }: AnimalTableProps) => {
                         </div>
                       )}
                     </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {animal.name}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {animal.type}
@@ -90,13 +96,17 @@ const AnimalTable = ({ animals, onEdit, onDelete }: AnimalTableProps) => {
                       {animal.health}
                     </span>
                   </td>
-                  {animals.some(animal => animal.isVaccinated) && (
+                  {animals.some(animal => animal.isVaccinated !== undefined) && (
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {animal.isVaccinated && (
+                      {animal.isVaccinated !== undefined && (
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          animal.isVaccinated === 'Yes' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                          animal.isVaccinated === true || animal.isVaccinated === 'Yes' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {animal.isVaccinated}
+                          {typeof animal.isVaccinated === 'boolean' 
+                            ? (animal.isVaccinated ? 'Yes' : 'No') 
+                            : animal.isVaccinated}
                         </span>
                       )}
                     </td>
@@ -119,7 +129,7 @@ const AnimalTable = ({ animals, onEdit, onDelete }: AnimalTableProps) => {
               ))
             ) : (
               <tr>
-                <td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500">
+                <td colSpan={9} className="px-6 py-4 text-center text-sm text-gray-500">
                   No animals found
                 </td>
               </tr>
