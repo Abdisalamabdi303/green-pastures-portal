@@ -28,8 +28,8 @@ export type ExpenseFormValues = z.infer<typeof expenseSchema>;
 
 export interface Expense extends Omit<ExpenseFormValues, 'date'> {
   id: string;
-  date: Timestamp;
-  createdAt: Timestamp;
+  date: any; // Changed from Timestamp to any to handle different date formats
+  createdAt: any; // Changed from Timestamp to any
 }
 
 export interface Animal {

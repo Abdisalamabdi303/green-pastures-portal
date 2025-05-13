@@ -1,4 +1,3 @@
-
 // Firebase configuration and setup
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
@@ -6,6 +5,10 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 // Firebase configuration object
+// NOTE: These are client-side keys that are meant to be public.
+// Firebase security is based on server-side security rules, not API key secrecy.
+// These keys identify your project to Firebase, but access to your data is protected
+// by Firebase Authentication and Security Rules, not by keeping these keys secret.
 const firebaseConfig = {
   apiKey: "AIzaSyAV9pbVZez9KPiqyayjVfTsXgBF08b8V44",
   authDomain: "animal-inventory-1f83b.firebaseapp.com",
@@ -16,7 +19,7 @@ const firebaseConfig = {
   measurementId: "G-HT1ZYBYF1G"
 };
 
-console.log("Firebase being initialized with real configuration");
+console.log("Firebase being initialized with client-side configuration");
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

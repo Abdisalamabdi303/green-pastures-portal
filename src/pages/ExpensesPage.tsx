@@ -2,16 +2,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { Expense, User, ChartData } from '../types';
+import { Expense, User } from '../types';
 import { Search, PlusCircle, Calendar, DollarSign } from 'lucide-react';
 import ExpenseTable from '../components/expenses/ExpenseTable';
 import AddExpenseForm from '../components/expenses/AddExpenseForm';
 import ExpenseAnalytics from '../components/expenses/ExpenseAnalytics';
 import { getCategoryIcon } from '../utils/expenseIcons';
-import { db } from '../lib/firebase';
-import { collection, getDocs, addDoc, deleteDoc, doc, Timestamp, query, orderBy } from 'firebase/firestore';
 import { toast } from 'sonner';
-
 import { useExpenses } from '@/hooks/useExpenses';
 
 const ExpensesPage = () => {
@@ -31,7 +28,7 @@ const ExpensesPage = () => {
   const { expenses, loading, addExpense, deleteExpense } = useExpenses();
   
   // For visualizations and analytics
-  const [categoryData, setCategoryData] = useState<ChartData[]>([]);
+  const [categoryData, setCategoryData] = useState<Array<{name: string; amount: number}>>([]);
   const [monthlyData, setMonthlyData] = useState<{date: string; amount: number}[]>([]);
   const [totalExpense, setTotalExpense] = useState<number>(0);
   const [averageExpense, setAverageExpense] = useState<number>(0);
@@ -58,7 +55,16 @@ const ExpensesPage = () => {
   const processExpenseData = () => {
     // Filter expenses for the selected year and month
     const filteredExpenses = expenses.filter(expense => {
-      const expenseDate = new Date(expense.date);
+      // Handle Firebase Timestamp
+      let expenseDate;
+      if (expense.date && typeof expense.date.toDate === 'function') {
+        expenseDate = expense.date.toDate();
+      } else if (typeof expense.date === 'string') {
+        expenseDate = new Date(expense.date);
+      } else {
+        return false; // Skip this expense if we can't determine the date
+      }
+      
       return expenseDate.getFullYear() === selectedYear && 
              (selectedMonth === -1 || expenseDate.getMonth() === selectedMonth);
     });
@@ -99,7 +105,16 @@ const ExpensesPage = () => {
     // Get monthly data
     const monthlyMap: Record<string, number> = {};
     filteredExpenses.forEach(expense => {
-      const date = new Date(expense.date);
+      // Handle Firebase Timestamp
+      let date;
+      if (expense.date && typeof expense.date.toDate === 'function') {
+        date = expense.date.toDate();
+      } else if (typeof expense.date === 'string') {
+        date = new Date(expense.date);
+      } else {
+        return; // Skip this expense if we can't determine the date
+      }
+      
       const monthYear = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
       monthlyMap[monthYear] = (monthlyMap[monthYear] || 0) + expense.amount;
     });
@@ -158,16 +173,14 @@ const ExpensesPage = () => {
     return <div className="p-8 text-center">Loading...</div>;
   }
 
-  // Since we know the getCategoryIcon from utils/expenseIcons.tsx returns ReactNode but
-  // our component expects ReactElement, we'll create a wrapper function that ensures
-  // we return a ReactElement
+  // Create a wrapper function for category icons
   const getCategoryIconElement = (category: string): JSX.Element => {
     const iconElement = getCategoryIcon(category);
-    // If it's already a ReactElement, return it, otherwise return a default icon
+    // If it's already a React element, return it, otherwise return a default icon
     if (React.isValidElement(iconElement)) {
       return iconElement;
     }
-    // Default icon if it's not a valid element (like if it returns a string)
+    // Default icon if it's not a valid element
     return <DollarSign className="h-4 w-4 text-farm-600" />;
   };
 
@@ -235,13 +248,7 @@ const ExpensesPage = () => {
               </div>
             ) : (
               <ExpenseTable 
-                expenses={expenses.map(exp => ({
-                  id: exp.id,
-                  category: exp.category,
-                  description: exp.description,
-                  amount: exp.amount,
-                  date: typeof exp.date === 'string' ? exp.date : exp.date.toDate().toISOString(),
-                }))}
+                expenses={expenses}
                 deleteExpense={deleteExpense}
                 searchTerm={searchTerm}
               />

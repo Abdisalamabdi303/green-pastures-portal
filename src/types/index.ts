@@ -21,7 +21,7 @@ export interface Animal {
   description?: string;
   imageUrl?: string;
   photoUrl?: string;
-  isVaccinated?: boolean | string;
+  isVaccinated: boolean | string;
 }
 
 export interface Expense {
@@ -30,6 +30,10 @@ export interface Expense {
   amount: number;
   date: string;
   description: string;
+  createdAt?: any; // Added to match Firebase timestamp
+  paymentMethod?: string;
+  animalName?: string;
+  animalRelated?: boolean;
 }
 
 export interface ChartData {

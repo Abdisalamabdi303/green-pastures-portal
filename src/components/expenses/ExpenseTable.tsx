@@ -18,6 +18,28 @@ interface ExpenseTableProps {
 }
 
 export default function ExpenseTable({ expenses, deleteExpense, isFiltered = false }: ExpenseTableProps) {
+  // Helper function to format date correctly
+  const formatDate = (dateValue: any) => {
+    if (!dateValue) return "-";
+    
+    // Handle Firebase Timestamp
+    if (dateValue && typeof dateValue.toDate === 'function') {
+      return dateValue.toDate().toLocaleDateString();
+    }
+    
+    // Handle string dates
+    if (typeof dateValue === 'string') {
+      return new Date(dateValue).toLocaleDateString();
+    }
+    
+    // Handle Date objects
+    if (dateValue instanceof Date) {
+      return dateValue.toLocaleDateString();
+    }
+    
+    return "-";
+  };
+
   return (
     <div className="rounded-md border bg-white overflow-hidden">
       <Table>
@@ -38,11 +60,11 @@ export default function ExpenseTable({ expenses, deleteExpense, isFiltered = fal
               <TableRow key={expense.id}>
                 <TableCell className="font-medium">{expense.description}</TableCell>
                 <TableCell>{expense.category}</TableCell>
-                <TableCell>{expense.date.toDate().toLocaleDateString()}</TableCell>
+                <TableCell>{formatDate(expense.date)}</TableCell>
                 <TableCell>
                   {expense.animalName ? expense.animalName : "-"}
                 </TableCell>
-                <TableCell>{expense.paymentMethod}</TableCell>
+                <TableCell>{expense.paymentMethod || "-"}</TableCell>
                 <TableCell className="text-right">₹{expense.amount.toLocaleString()}</TableCell>
                 <TableCell className="text-right">
                   <Button
