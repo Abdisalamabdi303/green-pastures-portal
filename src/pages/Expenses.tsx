@@ -30,7 +30,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useExpenses, expenseSchema, ExpenseFormValues } from "@/hooks/useExpenses";
 import ExpenseChart from "@/components/expenses/ExpenseChart";
 import ExpenseSummary from "@/components/expenses/ExpenseSummary";
-import ExpenseTable from "@/components/expenses/ExpenseTable";
 import { ExpensesDialogForm } from "@/components/expenses/ExpensesDialogForm";
 import { ExpensesHeader } from "@/components/expenses/ExpensesHeader";
 import { ExpensesMonthFilter } from "@/components/expenses/ExpensesMonthFilter";
@@ -69,11 +68,17 @@ export default function Expenses() {
 
   // Filter expenses by the selected month
   const filteredExpenses = expenses.filter(expense => {
-    const expenseDate = expense.date && typeof expense.date.toDate === 'function' 
-      ? expense.date.toDate() 
-      : new Date(expense.date);
-    const expenseMonth = expenseDate.toISOString().slice(0, 7);
-    return expenseMonth === filterMonth;
+    let expenseDate;
+    if (expense.date) {
+      if (typeof expense.date === 'object' && 'toDate' in expense.date && typeof expense.date.toDate === 'function') {
+        expenseDate = expense.date.toDate();
+      } else {
+        expenseDate = new Date(expense.date);
+      }
+      const expenseMonth = expenseDate.toISOString().slice(0, 7);
+      return expenseMonth === filterMonth;
+    }
+    return false;
   });
 
   // Calculate total for filtered expenses
@@ -84,7 +89,9 @@ export default function Expenses() {
 
   // Get expense data by category
   const expensesByCategory = filteredExpenses.reduce((acc, expense) => {
-    acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
+    if (expense.category) {
+      acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
+    }
     return acc;
   }, {} as Record<string, number>);
 

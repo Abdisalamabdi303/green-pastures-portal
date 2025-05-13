@@ -75,11 +75,18 @@ export function useExpenses() {
       
       const expensesList: Expense[] = [];
       querySnapshot.forEach((doc) => {
+        const data = doc.data();
         expensesList.push({ 
           id: doc.id, 
-          ...doc.data(),
-          createdAt: doc.data().createdAt || null
-        } as Expense);
+          category: data.category || '',
+          amount: data.amount || 0,
+          date: data.date || null,
+          description: data.description || '',
+          createdAt: data.createdAt || null,
+          paymentMethod: data.paymentMethod || '',
+          animalName: data.animalName || '',
+          animalRelated: data.animalRelated || false
+        });
       });
       
       setExpenses(expensesList);

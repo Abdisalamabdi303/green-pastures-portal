@@ -28,9 +28,9 @@ export interface Expense {
   id: string;
   category: string;
   amount: number;
-  date: string;
+  date: any; // To support both string and Firebase timestamp
   description: string;
-  createdAt: any; // Required to match Firebase timestamp
+  createdAt?: any; // Required to match Firebase timestamp
   paymentMethod?: string;
   animalName?: string;
   animalRelated?: boolean;

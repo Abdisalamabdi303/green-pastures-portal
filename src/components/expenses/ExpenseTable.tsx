@@ -27,7 +27,7 @@ export default function ExpenseTable({
     if (!dateValue) return "-";
     
     // Handle Firebase Timestamp
-    if (dateValue && typeof dateValue.toDate === 'function') {
+    if (dateValue && typeof dateValue === 'object' && 'toDate' in dateValue && typeof dateValue.toDate === 'function') {
       return dateValue.toDate().toLocaleDateString();
     }
     
@@ -45,17 +45,17 @@ export default function ExpenseTable({
   };
 
   return (
-    <div className="rounded-md border bg-white overflow-hidden">
+    <div className="rounded-md border bg-white overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Description</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead>Animal</TableHead>
-            <TableHead>Payment Method</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="whitespace-nowrap">Description</TableHead>
+            <TableHead className="whitespace-nowrap">Category</TableHead>
+            <TableHead className="whitespace-nowrap">Date</TableHead>
+            <TableHead className="whitespace-nowrap hidden md:table-cell">Animal</TableHead>
+            <TableHead className="whitespace-nowrap hidden md:table-cell">Payment Method</TableHead>
+            <TableHead className="text-right whitespace-nowrap">Amount</TableHead>
+            <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -65,16 +65,16 @@ export default function ExpenseTable({
                 <TableCell className="font-medium">{expense.description}</TableCell>
                 <TableCell>{expense.category}</TableCell>
                 <TableCell>{formatDate(expense.date)}</TableCell>
-                <TableCell>
+                <TableCell className="hidden md:table-cell">
                   {expense.animalName ? expense.animalName : "-"}
                 </TableCell>
-                <TableCell>{expense.paymentMethod || "-"}</TableCell>
-                <TableCell className="text-right">₹{expense.amount.toLocaleString()}</TableCell>
+                <TableCell className="hidden md:table-cell">{expense.paymentMethod || "-"}</TableCell>
+                <TableCell className="text-right font-medium">₹{expense.amount.toLocaleString()}</TableCell>
                 <TableCell className="text-right">
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => deleteExpense(expense.id, expense.description)}
+                    onClick={() => deleteExpense(expense.id, expense.description || "")}
                     className="text-destructive h-8 w-8"
                   >
                     <Trash className="h-4 w-4" />

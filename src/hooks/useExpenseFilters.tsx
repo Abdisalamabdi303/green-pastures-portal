@@ -26,16 +26,19 @@ export function useExpenseFilters(expenses: Expense[]) {
     const filteredExpenses = expenses.filter(expense => {
       // Handle Firebase Timestamp or string date
       let expenseDate;
-      if (expense.date && typeof expense.date === 'object' && typeof expense.date.toDate === 'function') {
-        expenseDate = expense.date.toDate();
-      } else if (typeof expense.date === 'string') {
-        expenseDate = new Date(expense.date);
-      } else {
-        return false; // Skip this expense if we can't determine the date
+      if (expense.date) {
+        if (typeof expense.date === 'object' && 'toDate' in expense.date && typeof expense.date.toDate === 'function') {
+          expenseDate = expense.date.toDate();
+        } else if (typeof expense.date === 'string') {
+          expenseDate = new Date(expense.date);
+        } else {
+          return false; // Skip this expense if we can't determine the date
+        }
+        
+        return expenseDate.getFullYear() === selectedYear && 
+               (selectedMonth === -1 || expenseDate.getMonth() === selectedMonth);
       }
-      
-      return expenseDate.getFullYear() === selectedYear && 
-             (selectedMonth === -1 || expenseDate.getMonth() === selectedMonth);
+      return false; // Skip if no date
     });
     
     // Calculate total expense
@@ -48,7 +51,9 @@ export function useExpenseFilters(expenses: Expense[]) {
     // Get expense by category
     const categoryMap: Record<string, number> = {};
     filteredExpenses.forEach(expense => {
-      categoryMap[expense.category] = (categoryMap[expense.category] || 0) + expense.amount;
+      if (expense.category) {
+        categoryMap[expense.category] = (categoryMap[expense.category] || 0) + expense.amount;
+      }
     });
     
     // Convert to array for charts
@@ -76,16 +81,18 @@ export function useExpenseFilters(expenses: Expense[]) {
     filteredExpenses.forEach(expense => {
       // Handle Firebase Timestamp
       let date;
-      if (expense.date && typeof expense.date === 'object' && typeof expense.date.toDate === 'function') {
-        date = expense.date.toDate();
-      } else if (typeof expense.date === 'string') {
-        date = new Date(expense.date);
-      } else {
-        return; // Skip this expense if we can't determine the date
+      if (expense.date) {
+        if (typeof expense.date === 'object' && 'toDate' in expense.date && typeof expense.date.toDate === 'function') {
+          date = expense.date.toDate();
+        } else if (typeof expense.date === 'string') {
+          date = new Date(expense.date);
+        } else {
+          return; // Skip this expense if we can't determine the date
+        }
+        
+        const monthYear = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+        monthlyMap[monthYear] = (monthlyMap[monthYear] || 0) + expense.amount;
       }
-      
-      const monthYear = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-      monthlyMap[monthYear] = (monthlyMap[monthYear] || 0) + expense.amount;
     });
     
     // Convert to array for charts and sort by date

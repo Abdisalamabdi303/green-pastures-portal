@@ -1,36 +1,81 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/layout/Layout";
-import useDashboardData from "@/hooks/useDashboardData";
+import { useEffect, useState } from "react";
+import { collection, getDocs, query, orderBy, limit, where, Timestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { toast } from "sonner";
 import StatCards from "@/components/dashboard/StatCards";
 import ExpenseChart from "@/components/dashboard/ExpenseChart";
 import AnimalTypesChart from "@/components/dashboard/AnimalTypesChart";
-import { useEffect, useState } from "react";
-import { collection, getDocs, query, orderBy, limit, Timestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Dashboard() {
   const { userData } = useAuth();
-  const { stats, loading } = useDashboardData();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalAnimals: 0,
+    dailyExpenses: 0,
+    monthlyProfit: 0,
+    animalsByType: [] as { name: string; count: number }[]
+  });
   const [recentExpenses, setRecentExpenses] = useState<{date: string; amount: number}[]>([]);
-  const [expensesLoading, setExpensesLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch recent expenses from Firestore
-    const fetchRecentExpenses = async () => {
+    const fetchDashboardData = async () => {
       try {
-        setExpensesLoading(true);
-        const q = query(
+        setLoading(true);
+        
+        // Get total animals and types
+        const animalsQuery = query(collection(db, "animals"));
+        const animalSnapshot = await getDocs(animalsQuery);
+        const totalAnimals = animalSnapshot.size;
+        
+        // Get animal types for chart
+        const animalTypes: Record<string, number> = {};
+        animalSnapshot.forEach((doc) => {
+          const animal = doc.data();
+          if (animal.type) {
+            animalTypes[animal.type] = (animalTypes[animal.type] || 0) + 1;
+          }
+        });
+        
+        const animalsByType = Object.keys(animalTypes).map(type => ({
+          name: type,
+          count: animalTypes[type]
+        }));
+        
+        // Get today's expenses
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const todayExpensesQuery = query(
+          collection(db, "expenses"),
+          where("date", ">=", Timestamp.fromDate(today))
+        );
+        
+        const expensesSnapshot = await getDocs(todayExpensesQuery);
+        let dailyExpenses = 0;
+        
+        expensesSnapshot.forEach((doc) => {
+          const expense = doc.data();
+          dailyExpenses += expense.amount || 0;
+        });
+        
+        // Get recent expenses for chart (last 7 days)
+        const last7Days = new Date();
+        last7Days.setDate(last7Days.getDate() - 7);
+        
+        const recentExpensesQuery = query(
           collection(db, "expenses"),
           orderBy("date", "desc"),
           limit(7)
         );
         
-        const querySnapshot = await getDocs(q);
+        const recentExpensesSnapshot = await getDocs(recentExpensesQuery);
         const expenses: {date: string; amount: number}[] = [];
         
-        querySnapshot.forEach((doc) => {
+        recentExpensesSnapshot.forEach((doc) => {
           const data = doc.data();
           const date = data.date instanceof Timestamp ? 
             data.date.toDate() : 
@@ -44,25 +89,32 @@ export default function Dashboard() {
           
           expenses.push({
             date: formattedDate,
-            amount: data.amount
+            amount: data.amount || 0
           });
         });
         
-        // Reverse to show chronological order and limit to 7
-        const sortedExpenses = [...expenses]
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-          .slice(-7);
+        // Calculate monthly profit (dummy value for now)
+        // In a real app, this would come from revenue - expenses
+        const monthlyProfit = 5000 - dailyExpenses;
         
-        setRecentExpenses(sortedExpenses);
+        setStats({
+          totalAnimals,
+          dailyExpenses,
+          monthlyProfit,
+          animalsByType
+        });
+        
+        setRecentExpenses(expenses.reverse()); // Reverse to show chronological order
+        
       } catch (error) {
-        console.error("Error fetching recent expenses:", error);
-        toast.error("Failed to load expense data");
+        console.error("Error fetching dashboard data:", error);
+        toast.error("Failed to load dashboard data");
       } finally {
-        setExpensesLoading(false);
+        setLoading(false);
       }
     };
     
-    fetchRecentExpenses();
+    fetchDashboardData();
   }, []);
 
   return (
@@ -73,9 +125,16 @@ export default function Dashboard() {
         </h1>
         
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-farm-600"></div>
-            <p className="ml-2">Loading dashboard data...</p>
+          <div className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-32 w-full" />
+              ))}
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Skeleton className="h-[350px] w-full" />
+              <Skeleton className="h-[350px] w-full" />
+            </div>
           </div>
         ) : (
           <>
@@ -88,7 +147,6 @@ export default function Dashboard() {
             <div className="grid gap-4 md:grid-cols-2">
               <ExpenseChart 
                 recentExpenses={recentExpenses} 
-                loading={expensesLoading}
                 title="Recent Expenses"
                 description="Daily expenses for the past week"
               />
