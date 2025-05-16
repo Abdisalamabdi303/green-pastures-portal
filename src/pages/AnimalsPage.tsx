@@ -7,8 +7,7 @@ import AnimalCardGrid from '../components/animals/AnimalCardGrid';
 import AddAnimalForm from '../components/animals/AddAnimalForm';
 import AnimalSearchBar from '../components/animals/AnimalSearchBar';
 import { LayoutGrid, List } from 'lucide-react';
-import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { animalServices } from '../services/firebase';
 import { toast } from 'sonner';
 
 const AnimalsPage = () => {
@@ -25,14 +24,7 @@ const AnimalsPage = () => {
   const fetchAnimals = async () => {
     try {
       setLoading(true);
-      const animalsCollection = collection(db, 'animals');
-      const snapshot = await getDocs(animalsCollection);
-      
-      const animalsList: Animal[] = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Animal[];
-      
+      const animalsList = await animalServices.getAnimals();
       setAnimals(animalsList);
       console.log('Fetched animals:', animalsList);
     } catch (error) {
@@ -64,21 +56,17 @@ const AnimalsPage = () => {
     try {
       if (selectedAnimal) {
         // Editing existing animal
-        const animalRef = doc(db, 'animals', selectedAnimal.id);
-        const animalData = {...newAnimal};
-        delete animalData.id; // Remove id from the data being updated
-        await updateDoc(animalRef, animalData);
+        const updatedAnimal = await animalServices.updateAnimal(selectedAnimal.id, newAnimal);
         setAnimals(prevAnimals => 
           prevAnimals.map(animal => 
-            animal.id === selectedAnimal.id ? { ...newAnimal, id: selectedAnimal.id } : animal
+            animal.id === selectedAnimal.id ? { ...updatedAnimal, id: selectedAnimal.id } : animal
           )
         );
         toast.success('Animal updated successfully');
       } else {
         // Adding new animal
-        const docRef = await addDoc(collection(db, 'animals'), newAnimal);
-        const animalWithId = { ...newAnimal, id: docRef.id };
-        setAnimals(prevAnimals => [...prevAnimals, animalWithId]);
+        const addedAnimal = await animalServices.addAnimal(newAnimal);
+        setAnimals(prevAnimals => [...prevAnimals, addedAnimal]);
         toast.success('Animal added successfully');
       }
       
@@ -97,7 +85,7 @@ const AnimalsPage = () => {
 
   const handleDeleteAnimal = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'animals', id));
+      await animalServices.deleteAnimal(id);
       setAnimals(prevAnimals => prevAnimals.filter(animal => animal.id !== id));
       toast.success('Animal deleted successfully');
     } catch (error) {

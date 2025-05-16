@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
@@ -8,22 +7,23 @@ import ExpenseTable from '../components/expenses/ExpenseTable';
 import AddExpenseForm from '../components/expenses/AddExpenseForm';
 import ExpenseAnalytics from '../components/expenses/ExpenseAnalytics';
 import { getCategoryIcon } from '../utils/expenseIcons';
-import { useExpenses } from '@/hooks/useExpenses';
+import { expenseServices } from '../services/firebase';
 import { useExpenseFilters } from '@/hooks/useExpenseFilters';
 import ExpenseFilterBar from '@/components/expenses/ExpenseFilterBar';
+import { toast } from 'sonner';
 
 const ExpensesPage = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [expenses, setExpenses] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     category: '',
     amount: 0,
     date: new Date().toISOString().split('T')[0],
     description: ''
   });
-  
-  const { expenses, loading, addExpense, deleteExpense } = useExpenses();
   
   const {
     selectedYear,
@@ -39,6 +39,20 @@ const ExpensesPage = () => {
     highestExpense
   } = useExpenseFilters(expenses);
 
+  // Fetch expenses from Firestore
+  const fetchExpenses = async () => {
+    try {
+      setLoading(true);
+      const expensesList = await expenseServices.getExpenses();
+      setExpenses(expensesList);
+    } catch (error) {
+      console.error('Error fetching expenses:', error);
+      toast.error('Failed to load expenses from database');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     // Check if user is logged in
     const storedUser = localStorage.getItem('user');
@@ -48,36 +62,30 @@ const ExpensesPage = () => {
     }
     
     setUser(JSON.parse(storedUser));
+    fetchExpenses();
   }, [navigate]);
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     
-    // Convert numeric values
-    if (type === 'number') {
       setFormData({
         ...formData,
-        [name]: parseFloat(value) || 0
+      [name]: type === 'number' ? parseFloat(value) || 0 : value
       });
-    } else {
-      setFormData({
-        ...formData,
-        [name]: value
-      });
-    }
   };
 
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    try {
     const expenseData = {
       ...formData,
-      date: new Date(formData.date).toISOString(),
       paymentMethod: 'Cash',
       animalRelated: false
     };
     
-    await addExpense(expenseData);
+      const addedExpense = await expenseServices.addExpense(expenseData);
+      setExpenses(prev => [addedExpense, ...prev]);
     
     // Reset form
     setFormData({
@@ -87,6 +95,24 @@ const ExpensesPage = () => {
       description: ''
     });
     setIsAddExpenseOpen(false);
+      toast.success('Expense added successfully');
+    } catch (error) {
+      console.error('Error adding expense:', error);
+      toast.error('Failed to add expense');
+    }
+  };
+
+  const handleDeleteExpense = async (id: string, description: string): Promise<boolean> => {
+    try {
+      await expenseServices.deleteExpense(id);
+      setExpenses(prev => prev.filter(expense => expense.id !== id));
+      toast.success(`Expense "${description}" deleted successfully`);
+      return true;
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      toast.error('Failed to delete expense');
+      return false;
+    }
   };
 
   if (!user) {
@@ -161,7 +187,7 @@ const ExpensesPage = () => {
             ) : (
               <ExpenseTable 
                 expenses={filteredExpenses}
-                deleteExpense={deleteExpense}
+                deleteExpense={handleDeleteExpense}
                 isFiltered={searchTerm.length > 0}
               />
             )}

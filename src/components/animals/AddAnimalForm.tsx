@@ -1,4 +1,3 @@
-
 import { Animal } from '@/types';
 import { useState, useEffect } from 'react';
 
@@ -73,7 +72,10 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
     const newAnimal: Animal = {
       ...formData as Animal,
       id: formData.id || `animal_${Date.now()}`,
-      photoUrl: photoPreview || undefined
+      photoUrl: photoPreview || undefined,
+      createdAt: new Date().toISOString(),
+      status: formData.status || 'Active',
+      isVaccinated: formData.isVaccinated || false
     };
     
     onAddAnimal(newAnimal);
