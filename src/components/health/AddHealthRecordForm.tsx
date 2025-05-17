@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils';
 const healthRecordSchema = z.object({
   animalId: z.string().min(1, { message: "Animal is required" }),
   animalName: z.string().min(1, { message: "Animal name is required" }),
+  animalType: z.string().min(1, { message: "Animal type is required" }),
   condition: z.string().min(1, { message: "Condition is required" }),
   status: z.enum(['critical', 'stable', 'recovered']),
   date: z.string().min(1, { message: "Date is required" }),
@@ -58,7 +59,7 @@ interface AddHealthRecordFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: Omit<HealthRecord, 'id' | 'createdAt'>) => Promise<void>;
-  animals: Array<{ id: string; name: string; }>;
+  animals: Array<{ id: string; name: string; type: string; }>;
 }
 
 export default function AddHealthRecordForm({ 
@@ -68,12 +69,14 @@ export default function AddHealthRecordForm({
   animals 
 }: AddHealthRecordFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedAnimalId, setSelectedAnimalId] = useState<string>("");
 
   const form = useForm<HealthRecordFormValues>({
     resolver: zodResolver(healthRecordSchema),
     defaultValues: {
       animalId: "",
       animalName: "",
+      animalType: "",
       condition: "",
       status: "stable",
       date: new Date().toISOString().split('T')[0],
@@ -88,6 +91,7 @@ export default function AddHealthRecordForm({
       const healthRecord: Omit<HealthRecord, 'id' | 'createdAt'> = {
         animalId: data.animalId,
         animalName: data.animalName,
+        animalType: data.animalType,
         condition: data.condition,
         status: data.status,
         date: data.date,
@@ -96,6 +100,7 @@ export default function AddHealthRecordForm({
       };
       await onSubmit(healthRecord);
       form.reset();
+      setSelectedAnimalId("");
       onOpenChange(false);
     } catch (error) {
       console.error('Error submitting health record:', error);
@@ -162,20 +167,52 @@ export default function AddHealthRecordForm({
                         if (animal) {
                           field.onChange(value);
                           form.setValue('animalName', animal.name);
+                          form.setValue('animalType', animal.type);
+                          setSelectedAnimalId(animal.id);
                         }
                       }}
                     >
-                      <SelectTrigger className="border-gray-200 dark:border-gray-700">
+                      <SelectTrigger className="border-gray-200">
                         <SelectValue placeholder="Select Animal" />
                       </SelectTrigger>
                       <SelectContent>
                         {animals.map((animal) => (
                           <SelectItem key={animal.id} value={animal.id}>
-                            {animal.name}
+                            <div className="flex flex-col">
+                              <span className="font-medium">{animal.name}</span>
+                              <span className="text-xs text-muted-foreground">ID: {animal.id}</span>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                  </FormControl>
+                  {selectedAnimalId && (
+                    <div className="text-sm text-muted-foreground mt-1">
+                      Selected Animal ID: {selectedAnimalId}
+                    </div>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="animalType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    Animal Type
+                  </FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Animal type" 
+                      className="border-gray-200"
+                      {...field}
+                      disabled
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -58,6 +58,7 @@ export interface Vaccination {
 
 export interface ChartData {
   name: string;
-  amount: number;
+  value: number;
+  amount?: number;
   color?: string;
 }

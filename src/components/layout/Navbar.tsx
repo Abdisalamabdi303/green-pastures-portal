@@ -9,10 +9,11 @@ import {
   Stethoscope, 
   Settings, 
   LogOut, 
-  Tractor,
-  ChevronDown
+  ChevronDown,
+  Compass
 } from 'lucide-react';
 import { User } from '@/types';
+import { cn } from '@/lib/utils';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -47,9 +48,32 @@ const Navbar = () => {
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <Link to="/dashboard" className="text-xl font-bold text-farm-700 flex items-center">
-                <Tractor className="h-8 w-8 mr-2 text-farm-600" />
-                <span>Farm Manager</span>
+              <Link 
+                to="/dashboard" 
+                className="group relative flex items-center py-2"
+              >
+                <div className="flex items-center">
+                  <div className="relative mr-3">
+                    <div className="absolute -left-0.5 -top-0.5">
+                      <Compass 
+                        className="h-8 w-8 text-farm-600/10 transform rotate-12" 
+                        strokeWidth={1.5}
+                      />
+                    </div>
+                    <Compass 
+                      className="h-8 w-8 text-farm-600 transition-transform duration-300 group-hover:rotate-45" 
+                      strokeWidth={2}
+                    />
+                  </div>
+                  <div className="flex flex-col border-l-2 border-farm-600/10 pl-3">
+                    <span className="text-xl font-bold text-farm-600 leading-tight tracking-widest">
+                      NEW DIRECTION
+                    </span>
+                    <span className="text-xs text-farm-500 font-medium tracking-wider uppercase">
+                      Farm Management System
+                    </span>
+                  </div>
+                </div>
               </Link>
             </div>
           </div>

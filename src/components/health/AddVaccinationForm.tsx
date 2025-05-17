@@ -44,6 +44,7 @@ import { Badge } from '@/components/ui/badge';
 const vaccinationSchema = z.object({
   animalId: z.string().min(1, { message: "Animal is required" }),
   animalName: z.string().min(1, { message: "Animal name is required" }),
+  animalType: z.string().min(1, { message: "Animal type is required" }),
   vaccineName: z.string().min(1, { message: "Vaccine name is required" }),
   date: z.string().min(1, { message: "Date is required" }),
   nextDueDate: z.string().min(1, { message: "Next due date is required" }),
@@ -57,7 +58,7 @@ interface AddVaccinationFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: Omit<Vaccination, 'id' | 'createdAt'>) => Promise<void>;
-  animals: Array<{ id: string; name: string; }>;
+  animals: Array<{ id: string; name: string; type: string; }>;
 }
 
 export default function AddVaccinationForm({ 
@@ -67,12 +68,14 @@ export default function AddVaccinationForm({
   animals 
 }: AddVaccinationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedAnimalId, setSelectedAnimalId] = useState<string>("");
 
   const form = useForm<VaccinationFormValues>({
     resolver: zodResolver(vaccinationSchema),
     defaultValues: {
       animalId: "",
       animalName: "",
+      animalType: "",
       vaccineName: "",
       date: new Date().toISOString().split('T')[0],
       nextDueDate: new Date().toISOString().split('T')[0],
@@ -87,6 +90,7 @@ export default function AddVaccinationForm({
       const vaccination: Omit<Vaccination, 'id' | 'createdAt'> = {
         animalId: data.animalId,
         animalName: data.animalName,
+        animalType: data.animalType,
         vaccineName: data.vaccineName,
         date: data.date,
         nextDueDate: data.nextDueDate,
@@ -95,6 +99,7 @@ export default function AddVaccinationForm({
       };
       await onSubmit(vaccination);
       form.reset();
+      setSelectedAnimalId("");
       onOpenChange(false);
     } catch (error) {
       console.error('Error submitting vaccination:', error);
@@ -135,20 +140,52 @@ export default function AddVaccinationForm({
                         if (animal) {
                           field.onChange(value);
                           form.setValue('animalName', animal.name);
+                          form.setValue('animalType', animal.type);
+                          setSelectedAnimalId(animal.id);
                         }
                       }}
                     >
-                      <SelectTrigger className="border-gray-200 dark:border-gray-700">
+                      <SelectTrigger className="border-gray-200">
                         <SelectValue placeholder="Select Animal" />
                       </SelectTrigger>
                       <SelectContent>
                         {animals.map((animal) => (
                           <SelectItem key={animal.id} value={animal.id}>
-                            {animal.name}
+                            <div className="flex flex-col">
+                              <span className="font-medium">{animal.name}</span>
+                              <span className="text-xs text-muted-foreground">ID: {animal.id}</span>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                  </FormControl>
+                  {selectedAnimalId && (
+                    <div className="text-sm text-muted-foreground mt-1">
+                      Selected Animal ID: {selectedAnimalId}
+                    </div>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="animalType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    Animal Type
+                  </FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Animal type" 
+                      className="border-gray-200"
+                      {...field}
+                      disabled
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -167,7 +204,7 @@ export default function AddVaccinationForm({
                   <FormControl>
                     <Input 
                       placeholder="Enter vaccine name" 
-                      className="border-gray-200 dark:border-gray-700" 
+                      className="border-gray-200" 
                       {...field} 
                     />
                   </FormControl>
@@ -189,7 +226,7 @@ export default function AddVaccinationForm({
                     <FormControl>
                       <Input 
                         type="date" 
-                        className="border-gray-200 dark:border-gray-700" 
+                        className="border-gray-200" 
                         {...field} 
                       />
                     </FormControl>
@@ -210,7 +247,7 @@ export default function AddVaccinationForm({
                     <FormControl>
                       <Input 
                         type="date" 
-                        className="border-gray-200 dark:border-gray-700" 
+                        className="border-gray-200" 
                         {...field} 
                       />
                     </FormControl>
@@ -225,7 +262,7 @@ export default function AddVaccinationForm({
               name="administered"
               render={({ field }) => (
                 <FormItem>
-                  <div className="flex items-center space-x-2 p-2 rounded-md border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center space-x-2 p-2 rounded-md border border-gray-200">
                     <input
                       type="checkbox"
                       checked={field.value}
@@ -254,7 +291,7 @@ export default function AddVaccinationForm({
                   <FormControl>
                     <Textarea 
                       placeholder="Additional notes"
-                      className="resize-none border-gray-200 dark:border-gray-700 min-h-[100px]"
+                      className="resize-none border-gray-200 min-h-[100px]"
                       {...field}
                     />
                   </FormControl>
@@ -268,7 +305,7 @@ export default function AddVaccinationForm({
                 variant="outline" 
                 onClick={() => onOpenChange(false)} 
                 type="button"
-                className="border-gray-200 dark:border-gray-700"
+                className="border-gray-200"
               >
                 Cancel
               </Button>
