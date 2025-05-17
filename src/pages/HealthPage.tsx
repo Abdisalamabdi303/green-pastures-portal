@@ -16,11 +16,20 @@ import {
   CheckCircle2,
   Clock,
   Syringe,
-  Plus
+  Plus,
+  Trash2,
+  Calendar,
+  FileText,
+  Stethoscope
 } from 'lucide-react';
 import { formatDate } from '../utils/format';
-import { healthServices, vaccinationServices } from '@/services/firebase';
+import { healthServices, vaccinationServices, animalServices } from '@/services/firebase';
 import { toast } from 'sonner';
+import AddHealthRecordForm from '@/components/health/AddHealthRecordForm';
+import AddVaccinationForm from '@/components/health/AddVaccinationForm';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 const HealthPage = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -28,6 +37,9 @@ const HealthPage = () => {
   const [healthRecords, setHealthRecords] = useState<HealthRecord[]>([]);
   const [vaccinations, setVaccinations] = useState<Vaccination[]>([]);
   const [loading, setLoading] = useState(true);
+  const [animals, setAnimals] = useState<Array<{ id: string; name: string; }>>([]);
+  const [openHealthForm, setOpenHealthForm] = useState(false);
+  const [openVaccinationForm, setOpenVaccinationForm] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -43,12 +55,14 @@ const HealthPage = () => {
   const fetchHealthData = async () => {
     try {
       setLoading(true);
-      const [records, vacs] = await Promise.all([
+      const [records, vacs, animalsList] = await Promise.all([
         healthServices.getHealthRecords(),
-        vaccinationServices.getVaccinations()
+        vaccinationServices.getVaccinations(),
+        animalServices.getAnimals()
       ]);
       setHealthRecords(records);
       setVaccinations(vacs);
+      setAnimals(animalsList.map(animal => ({ id: animal.id, name: animal.name })));
     } catch (error) {
       console.error('Error fetching health data:', error);
       toast.error('Failed to load health records');
@@ -57,7 +71,7 @@ const HealthPage = () => {
     }
   };
 
-  const handleAddHealthRecord = async (data: Omit<HealthRecord, 'id'>) => {
+  const handleAddHealthRecord = async (data: Omit<HealthRecord, 'id' | 'createdAt'>) => {
     try {
       const newRecord = await healthServices.addHealthRecord(data);
       setHealthRecords(prev => [newRecord, ...prev]);
@@ -68,7 +82,7 @@ const HealthPage = () => {
     }
   };
 
-  const handleAddVaccination = async (data: Omit<Vaccination, 'id'>) => {
+  const handleAddVaccination = async (data: Omit<Vaccination, 'id' | 'createdAt'>) => {
     try {
       const newVaccination = await vaccinationServices.addVaccination(data);
       setVaccinations(prev => [newVaccination, ...prev]);
@@ -104,11 +118,11 @@ const HealthPage = () => {
   const getStatusIcon = (status: HealthRecord['status']) => {
     switch (status) {
       case 'critical':
-        return <AlertCircle className="h-5 w-5 text-red-500" />;
+        return <AlertCircle className="h-4 w-4 text-red-500" />;
       case 'stable':
-        return <Activity className="h-5 w-5 text-yellow-500" />;
+        return <Activity className="h-4 w-4 text-yellow-500" />;
       case 'recovered':
-        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
       default:
         return null;
     }
@@ -131,62 +145,119 @@ const HealthPage = () => {
     return <div className="p-8 text-center">Loading...</div>;
   }
 
+  const criticalCount = healthRecords.filter(r => r.status === 'critical').length;
+  const stableCount = healthRecords.filter(r => r.status === 'stable').length;
+  const recoveredCount = healthRecords.filter(r => r.status === 'recovered').length;
+  const upcomingVaccinations = vaccinations.filter(v => !v.administered).length;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 sm:px-0">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-semibold text-gray-900">Health Management</h1>
-            <button 
-              onClick={() => {
-                // TODO: Open add record modal based on active tab
-                if (activeTab === 'records') {
-                  // Open health record form
-                } else {
-                  // Open vaccination form
-                }
-              }}
-              className="flex items-center px-4 py-2 bg-farm-600 text-white rounded-md hover:bg-farm-700 transition-colors"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              Add Record
-            </button>
-          </div>
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        {/* Header Section */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Health Management</h1>
+          <p className="mt-2 text-gray-600">Monitor and manage animal health records and vaccinations</p>
+        </div>
 
-          {/* Tabs */}
-          <div className="flex space-x-4 mb-6">
-            <button
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Critical Cases</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <AlertCircle className="h-8 w-8 text-red-500" />
+                <span className="text-2xl font-bold text-red-600">{criticalCount}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Stable Cases</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <Activity className="h-8 w-8 text-yellow-500" />
+                <span className="text-2xl font-bold text-yellow-600">{stableCount}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Recovered</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <CheckCircle2 className="h-8 w-8 text-green-500" />
+                <span className="text-2xl font-bold text-green-600">{recoveredCount}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Upcoming Vaccinations</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <Calendar className="h-8 w-8 text-blue-500" />
+                <span className="text-2xl font-bold text-blue-600">{upcomingVaccinations}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Tabs and Actions */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div className="flex space-x-2 p-1 bg-muted rounded-lg">
+            <Button
+              variant={activeTab === 'records' ? 'default' : 'ghost'}
+              size="sm"
               onClick={() => setActiveTab('records')}
-              className={`flex items-center px-4 py-2 rounded-md ${
-                activeTab === 'records'
-                  ? 'bg-farm-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
+              className="gap-2"
             >
-              <Activity className="h-5 w-5 mr-2" />
+              <Stethoscope className="h-4 w-4" />
               Health Records
-            </button>
-            <button
+            </Button>
+            <Button
+              variant={activeTab === 'vaccinations' ? 'default' : 'ghost'}
+              size="sm"
               onClick={() => setActiveTab('vaccinations')}
-              className={`flex items-center px-4 py-2 rounded-md ${
-                activeTab === 'vaccinations'
-                  ? 'bg-farm-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
+              className="gap-2"
             >
-              <Syringe className="h-5 w-5 mr-2" />
+              <Syringe className="h-4 w-4" />
               Vaccinations
-            </button>
+            </Button>
           </div>
 
-          {/* Content */}
-          <div className="bg-white rounded-lg shadow">
+          <Button
+            onClick={() => {
+              if (activeTab === 'records') {
+                setOpenHealthForm(true);
+              } else {
+                setOpenVaccinationForm(true);
+              }
+            }}
+            size="sm"
+            className="bg-farm-600 hover:bg-farm-700 text-white"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add {activeTab === 'records' ? 'Health Record' : 'Vaccination'}
+          </Button>
+        </div>
+
+        {/* Content */}
+        <Card>
+          <CardContent className="p-0">
             {loading ? (
               <div className="p-8 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-farm-600 mx-auto"></div>
-                <p className="mt-2 text-sm text-gray-500">Loading records...</p>
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-farm-600 border-t-transparent mx-auto"></div>
+                <p className="mt-2 text-sm text-muted-foreground">Loading records...</p>
               </div>
             ) : activeTab === 'records' ? (
               <Table>
@@ -198,38 +269,59 @@ const HealthPage = () => {
                     <TableHead>Date</TableHead>
                     <TableHead>Treatment</TableHead>
                     <TableHead>Notes</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead className="w-[100px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {healthRecords.map((record) => (
-                    <TableRow key={record.id}>
-                      <TableCell>
-                        <div className="flex items-center">
-                          {getStatusIcon(record.status)}
-                          <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(record.status)}`}>
-                            {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{record.animalName}</div>
-                        <div className="text-sm text-gray-500">ID: {record.animalId}</div>
-                      </TableCell>
-                      <TableCell>{record.condition}</TableCell>
-                      <TableCell>{formatDate(record.date.toString())}</TableCell>
-                      <TableCell>{record.treatment}</TableCell>
-                      <TableCell>{record.notes}</TableCell>
-                      <TableCell>
-                        <button
-                          onClick={() => handleDeleteHealthRecord(record.id)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          Delete
-                        </button>
+                  {healthRecords.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8">
+                        <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-muted-foreground">No health records found</p>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    healthRecords.map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>
+                          <Badge 
+                            variant="outline" 
+                            className={`flex items-center gap-1 w-fit ${getStatusClass(record.status)}`}
+                          >
+                            {getStatusIcon(record.status)}
+                            {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{record.animalName}</div>
+                          <div className="text-xs text-muted-foreground">ID: {record.animalId}</div>
+                        </TableCell>
+                        <TableCell>{record.condition}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            {formatDate(record.date.toString())}
+                          </div>
+                        </TableCell>
+                        <TableCell>{record.treatment}</TableCell>
+                        <TableCell>
+                          <div className="max-w-[200px] truncate" title={record.notes}>
+                            {record.notes || "-"}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteHealthRecord(record.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             ) : (
@@ -242,52 +334,92 @@ const HealthPage = () => {
                     <TableHead>Date</TableHead>
                     <TableHead>Next Due</TableHead>
                     <TableHead>Notes</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead className="w-[100px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {vaccinations.map((vaccination) => (
-                    <TableRow key={vaccination.id}>
-                      <TableCell>
-                        <div className="flex items-center">
-                          {vaccination.administered ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-500" />
-                          ) : (
-                            <Clock className="h-5 w-5 text-yellow-500" />
-                          )}
-                          <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
-                            vaccination.administered
-                              ? 'bg-green-50 text-green-700'
-                              : 'bg-yellow-50 text-yellow-700'
-                          }`}>
-                            {vaccination.administered ? 'Completed' : 'Scheduled'}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{vaccination.animalName}</div>
-                        <div className="text-sm text-gray-500">ID: {vaccination.animalId}</div>
-                      </TableCell>
-                      <TableCell>{vaccination.vaccineName}</TableCell>
-                      <TableCell>{formatDate(vaccination.date.toString())}</TableCell>
-                      <TableCell>{formatDate(vaccination.nextDueDate.toString())}</TableCell>
-                      <TableCell>{vaccination.notes}</TableCell>
-                      <TableCell>
-                        <button
-                          onClick={() => handleDeleteVaccination(vaccination.id)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          Delete
-                        </button>
+                  {vaccinations.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8">
+                        <Syringe className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-muted-foreground">No vaccination records found</p>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    vaccinations.map((vaccination) => (
+                      <TableRow key={vaccination.id}>
+                        <TableCell>
+                          <Badge 
+                            variant="outline" 
+                            className={`flex items-center gap-1 w-fit ${
+                              vaccination.administered
+                                ? 'bg-green-50 text-green-700 border-green-100'
+                                : 'bg-yellow-50 text-yellow-700 border-yellow-100'
+                            }`}
+                          >
+                            {vaccination.administered ? (
+                              <CheckCircle2 className="h-4 w-4" />
+                            ) : (
+                              <Clock className="h-4 w-4" />
+                            )}
+                            {vaccination.administered ? 'Completed' : 'Scheduled'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{vaccination.animalName}</div>
+                          <div className="text-xs text-muted-foreground">ID: {vaccination.animalId}</div>
+                        </TableCell>
+                        <TableCell>{vaccination.vaccineName}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            {formatDate(vaccination.date.toString())}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            {formatDate(vaccination.nextDueDate.toString())}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="max-w-[200px] truncate" title={vaccination.notes}>
+                            {vaccination.notes || "-"}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteVaccination(vaccination.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </main>
+
+      {/* Form Dialogs */}
+      <AddHealthRecordForm
+        open={openHealthForm}
+        onOpenChange={setOpenHealthForm}
+        onSubmit={handleAddHealthRecord}
+        animals={animals}
+      />
+      <AddVaccinationForm
+        open={openVaccinationForm}
+        onOpenChange={setOpenVaccinationForm}
+        onSubmit={handleAddVaccination}
+        animals={animals}
+      />
     </div>
   );
 };

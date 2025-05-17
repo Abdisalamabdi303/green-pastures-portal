@@ -106,14 +106,20 @@ export const expenseServices = {
 // Health Record Services
 export const healthServices = {
   // Add a new health record
-  addHealthRecord: async (recordData: Omit<HealthRecord, 'id'>) => {
+  addHealthRecord: async (recordData: Omit<HealthRecord, 'id' | 'createdAt'>) => {
     try {
       const docRef = await addDoc(collection(db, 'health_records'), {
         ...recordData,
         createdAt: Timestamp.now(),
-        date: Timestamp.fromDate(new Date(recordData.date))
+        date: typeof recordData.date === 'string' 
+          ? Timestamp.fromDate(new Date(recordData.date))
+          : recordData.date
       });
-      return { id: docRef.id, ...recordData };
+      return { 
+        id: docRef.id, 
+        ...recordData,
+        createdAt: Timestamp.now()
+      };
     } catch (error) {
       console.error('Error adding health record:', error);
       throw error;
@@ -140,10 +146,13 @@ export const healthServices = {
   updateHealthRecord: async (id: string, recordData: Partial<HealthRecord>) => {
     try {
       const recordRef = doc(db, 'health_records', id);
-      if (recordData.date) {
-        recordData.date = Timestamp.fromDate(new Date(recordData.date));
+      const updateData = { ...recordData };
+      
+      if (updateData.date && typeof updateData.date === 'string') {
+        updateData.date = Timestamp.fromDate(new Date(updateData.date));
       }
-      await updateDoc(recordRef, recordData);
+      
+      await updateDoc(recordRef, updateData);
       return { id, ...recordData };
     } catch (error) {
       console.error('Error updating health record:', error);
@@ -166,15 +175,23 @@ export const healthServices = {
 // Vaccination Services
 export const vaccinationServices = {
   // Add a new vaccination record
-  addVaccination: async (vaccinationData: Omit<Vaccination, 'id'>) => {
+  addVaccination: async (vaccinationData: Omit<Vaccination, 'id' | 'createdAt'>) => {
     try {
       const docRef = await addDoc(collection(db, 'vaccinations'), {
         ...vaccinationData,
         createdAt: Timestamp.now(),
-        date: Timestamp.fromDate(new Date(vaccinationData.date)),
-        nextDueDate: Timestamp.fromDate(new Date(vaccinationData.nextDueDate))
+        date: typeof vaccinationData.date === 'string'
+          ? Timestamp.fromDate(new Date(vaccinationData.date))
+          : vaccinationData.date,
+        nextDueDate: typeof vaccinationData.nextDueDate === 'string'
+          ? Timestamp.fromDate(new Date(vaccinationData.nextDueDate))
+          : vaccinationData.nextDueDate
       });
-      return { id: docRef.id, ...vaccinationData };
+      return { 
+        id: docRef.id, 
+        ...vaccinationData,
+        createdAt: Timestamp.now()
+      };
     } catch (error) {
       console.error('Error adding vaccination:', error);
       throw error;
@@ -201,13 +218,16 @@ export const vaccinationServices = {
   updateVaccination: async (id: string, vaccinationData: Partial<Vaccination>) => {
     try {
       const vaccinationRef = doc(db, 'vaccinations', id);
-      if (vaccinationData.date) {
-        vaccinationData.date = Timestamp.fromDate(new Date(vaccinationData.date));
+      const updateData = { ...vaccinationData };
+      
+      if (updateData.date && typeof updateData.date === 'string') {
+        updateData.date = Timestamp.fromDate(new Date(updateData.date));
       }
-      if (vaccinationData.nextDueDate) {
-        vaccinationData.nextDueDate = Timestamp.fromDate(new Date(vaccinationData.nextDueDate));
+      if (updateData.nextDueDate && typeof updateData.nextDueDate === 'string') {
+        updateData.nextDueDate = Timestamp.fromDate(new Date(updateData.nextDueDate));
       }
-      await updateDoc(vaccinationRef, vaccinationData);
+      
+      await updateDoc(vaccinationRef, updateData);
       return { id, ...vaccinationData };
     } catch (error) {
       console.error('Error updating vaccination:', error);
