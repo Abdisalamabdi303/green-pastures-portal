@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   collection, 
@@ -82,6 +81,7 @@ import {
   BarChart,
   Bar
 } from "recharts";
+import { formatCurrency } from "@/utils/format";
 
 const incomeSchema = z.object({
   source: z.string().min(1, { message: "Source is required" }),
@@ -385,7 +385,7 @@ export default function Finance() {
                       name="amount"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Amount (₹)</FormLabel>
+                          <FormLabel>Amount ($)</FormLabel>
                           <FormControl>
                             <Input 
                               type="number"
@@ -499,7 +499,7 @@ export default function Finance() {
               <TrendingUp className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">₹{totalIncome.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-green-600">{formatCurrency(totalIncome)}</div>
               <p className="text-xs text-muted-foreground">
                 For {new Date(filterMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' })}
               </p>
@@ -512,7 +512,7 @@ export default function Finance() {
               <TrendingDown className="h-4 w-4 text-red-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">₹{totalExpense.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-red-600">{formatCurrency(totalExpense)}</div>
               <p className="text-xs text-muted-foreground">
                 For {new Date(filterMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' })}
               </p>
@@ -530,7 +530,7 @@ export default function Finance() {
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                ₹{Math.abs(profitLoss).toLocaleString()}
+                {formatCurrency(Math.abs(profitLoss))}
               </div>
               <p className="text-xs text-muted-foreground">
                 {profitLoss >= 0 ? 'Profit' : 'Loss'} for {new Date(filterMonth + "-01").toLocaleString('default', { month: 'long', year: 'numeric' })}
@@ -578,8 +578,16 @@ export default function Finance() {
                   >
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
-                    <YAxis />
-                    <RechartsTooltip formatter={(value) => [`₹${value.toLocaleString()}`, '']} />
+                    <YAxis tickFormatter={(value) => `$${value}`} />
+                    <RechartsTooltip 
+                      formatter={(value) => [`$${Number(value).toLocaleString()}`, '']}
+                      contentStyle={{ 
+                        backgroundColor: 'white', 
+                        border: '1px solid #e0e0e0',
+                        borderRadius: '8px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                      }}
+                    />
                     <Legend />
                     <Bar dataKey="income" name="Income" fill="#94cf43" />
                     <Bar dataKey="expenses" name="Expenses" fill="#c1986a" />
@@ -647,7 +655,7 @@ export default function Finance() {
                           {income.animalName ? income.animalName : "-"}
                         </TableCell>
                         <TableCell className="text-right text-green-600">
-                          ₹{income.amount.toLocaleString()}
+                          {formatCurrency(income.amount)}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button
@@ -699,7 +707,7 @@ export default function Finance() {
                             <div className="h-2 w-2 rounded-full bg-farm-400"></div>
                             <span>{source}</span>
                           </div>
-                          <span className="font-medium">₹{incomeBySource[source].toLocaleString()}</span>
+                          <span className="font-medium">{formatCurrency(incomeBySource[source])}</span>
                         </div>
                       ))}
                     </div>
@@ -723,19 +731,19 @@ export default function Finance() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Total Income</span>
                       <span className="text-lg font-medium text-green-600">
-                        ₹{totalIncome.toLocaleString()}
+                        {formatCurrency(totalIncome)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Total Expenses</span>
                       <span className="text-lg font-medium text-red-600">
-                        ₹{totalExpense.toLocaleString()}
+                        {formatCurrency(totalExpense)}
                       </span>
                     </div>
                     <div className="border-t pt-2 flex items-center justify-between">
                       <span className="font-medium">{profitLoss >= 0 ? 'Net Profit' : 'Net Loss'}</span>
                       <span className={`text-xl font-bold ${profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        ₹{Math.abs(profitLoss).toLocaleString()}
+                        {formatCurrency(Math.abs(profitLoss))}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">

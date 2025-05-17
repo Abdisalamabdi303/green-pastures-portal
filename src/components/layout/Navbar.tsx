@@ -1,7 +1,17 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Home, Users, DollarSign, Activity, Settings, LogOut, Tractor } from 'lucide-react';
+import { 
+  Menu, 
+  X, 
+  LayoutDashboard, 
+  Bird, 
+  Receipt, 
+  Stethoscope, 
+  Settings, 
+  LogOut, 
+  Tractor,
+  ChevronDown
+} from 'lucide-react';
 import { User } from '@/types';
 
 const Navbar = () => {
@@ -45,19 +55,19 @@ const Navbar = () => {
           </div>
           <div className="hidden md:ml-6 md:flex md:items-center md:space-x-4">
             <Link to="/dashboard" className={getLinkClass('/dashboard')}>
-              <Home className="h-5 w-5 mr-2" />
+              <LayoutDashboard className="h-5 w-5 mr-2" />
               Dashboard
             </Link>
             <Link to="/animals" className={getLinkClass('/animals')}>
-              <Users className="h-5 w-5 mr-2" />
+              <Bird className="h-5 w-5 mr-2" />
               Animals
             </Link>
             <Link to="/expenses" className={getLinkClass('/expenses')}>
-              <DollarSign className="h-5 w-5 mr-2" />
+              <Receipt className="h-5 w-5 mr-2" />
               Expenses
             </Link>
             <Link to="/health" className={getLinkClass('/health')}>
-              <Activity className="h-5 w-5 mr-2" />
+              <Stethoscope className="h-5 w-5 mr-2" />
               Health
             </Link>
             <Link to="/settings" className={getLinkClass('/settings')}>
@@ -68,14 +78,21 @@ const Navbar = () => {
           <div className="hidden md:ml-6 md:flex md:items-center">
             {user && (
               <div className="flex items-center">
-                <span className="mr-4 text-gray-700">{user.name}</span>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center px-3 py-2 border border-farm-500 text-farm-500 rounded-md hover:bg-farm-50 transition-colors"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </button>
+                <div className="relative group">
+                  <button className="flex items-center px-3 py-2 text-gray-700 hover:text-farm-600 transition-colors">
+                    <span className="mr-2">{user.name}</span>
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                  <div className="absolute right-0 w-48 mt-2 py-1 bg-white rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-farm-50 hover:text-farm-600"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Logout
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -104,7 +121,7 @@ const Navbar = () => {
               className={getLinkClass('/dashboard')}
               onClick={closeMenu}
             >
-              <Home className="h-5 w-5 mr-2" />
+              <LayoutDashboard className="h-5 w-5 mr-2" />
               Dashboard
             </Link>
             <Link
@@ -112,7 +129,7 @@ const Navbar = () => {
               className={getLinkClass('/animals')}
               onClick={closeMenu}
             >
-              <Users className="h-5 w-5 mr-2" />
+              <Bird className="h-5 w-5 mr-2" />
               Animals
             </Link>
             <Link
@@ -120,7 +137,7 @@ const Navbar = () => {
               className={getLinkClass('/expenses')}
               onClick={closeMenu}
             >
-              <DollarSign className="h-5 w-5 mr-2" />
+              <Receipt className="h-5 w-5 mr-2" />
               Expenses
             </Link>
             <Link
@@ -128,7 +145,7 @@ const Navbar = () => {
               className={getLinkClass('/health')}
               onClick={closeMenu}
             >
-              <Activity className="h-5 w-5 mr-2" />
+              <Stethoscope className="h-5 w-5 mr-2" />
               Health
             </Link>
             <Link

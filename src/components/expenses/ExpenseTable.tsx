@@ -1,4 +1,3 @@
-
 import { Expense } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Trash } from "lucide-react";
@@ -10,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatCurrency } from "@/utils/format";
 
 interface ExpenseTableProps {
   expenses: Expense[];
@@ -69,7 +69,7 @@ export default function ExpenseTable({
                   {expense.animalName ? expense.animalName : "-"}
                 </TableCell>
                 <TableCell className="hidden md:table-cell">{expense.paymentMethod || "-"}</TableCell>
-                <TableCell className="text-right font-medium">₹{expense.amount.toLocaleString()}</TableCell>
+                <TableCell className="text-right font-medium">{formatCurrency(expense.amount)}</TableCell>
                 <TableCell className="text-right">
                   <Button
                     variant="ghost"

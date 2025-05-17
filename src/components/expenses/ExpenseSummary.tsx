@@ -1,4 +1,3 @@
-
 import {
   Card,
   CardContent,
@@ -6,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { formatCurrency } from "@/utils/format";
 
 interface ExpenseSummaryProps {
   totalExpenses: number;
@@ -29,7 +29,7 @@ export default function ExpenseSummary({
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Total Expenses</span>
-              <span className="text-2xl font-bold">₹{totalExpenses.toLocaleString()}</span>
+              <span className="text-2xl font-bold">{formatCurrency(totalExpenses)}</span>
             </div>
             <div className="h-[1px] bg-muted"></div>
           </div>
@@ -42,7 +42,7 @@ export default function ExpenseSummary({
                   <div key={category} className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">{category}</span>
                     <span className="text-sm font-medium">
-                      ₹{expensesByCategory[category].toLocaleString()}
+                      {formatCurrency(expensesByCategory[category])}
                     </span>
                   </div>
                 ))}

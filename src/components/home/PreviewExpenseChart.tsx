@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   LineChart, 
@@ -10,6 +9,7 @@ import {
   Legend, 
   ResponsiveContainer 
 } from "recharts";
+import { formatCurrency } from "@/utils/format";
 
 interface ExpenseData {
   name: string;
@@ -35,8 +35,16 @@ export default function PreviewExpenseChart({ data }: ExpenseChartProps) {
             >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip formatter={(value) => [`₹${value}`, 'Amount']} />
+              <YAxis tickFormatter={(value) => `$${value}`} />
+              <Tooltip 
+                formatter={(value) => [`$${Number(value).toLocaleString()}`, 'Amount']}
+                contentStyle={{ 
+                  backgroundColor: 'white', 
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '8px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}
+              />
               <Legend />
               <Line 
                 type="monotone" 

@@ -1,149 +1,245 @@
-
 import { useState } from 'react';
 import { PlusCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Animal } from "@/types";
+
+const expenseSchema = z.object({
+  category: z.string().min(1, { message: "Category is required" }),
+  description: z.string().min(1, { message: "Description is required" }),
+  amount: z.number().min(0, { message: "Amount must be a positive number" }),
+  date: z.string(),
+  paymentMethod: z.string().min(1, { message: "Payment method is required" }),
+  animalRelated: z.boolean().default(false),
+  animalName: z.string().optional(),
+});
+
+type ExpenseFormValues = z.infer<typeof expenseSchema>;
 
 interface AddExpenseFormProps {
-  handleAddExpense: (e: React.FormEvent) => void;
-  formData: {
-    category: string;
-    amount: number;
-    date: string;
-    description: string;
-  };
-  handleFormChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
+  handleAddExpense: (data: ExpenseFormValues) => Promise<void>;
   isAddExpenseOpen: boolean;
   setIsAddExpenseOpen: (isOpen: boolean) => void;
+  animals?: Animal[];
 }
 
 const AddExpenseForm = ({ 
   handleAddExpense, 
-  formData, 
-  handleFormChange, 
   isAddExpenseOpen, 
-  setIsAddExpenseOpen 
+  setIsAddExpenseOpen,
+  animals = []
 }: AddExpenseFormProps) => {
-  if (!isAddExpenseOpen) return null;
+  const form = useForm<ExpenseFormValues>({
+    resolver: zodResolver(expenseSchema),
+    defaultValues: {
+      category: "",
+      description: "",
+      amount: 0,
+      date: new Date().toISOString().split('T')[0],
+      paymentMethod: "Cash",
+      animalRelated: false,
+      animalName: "",
+    },
+  });
+
+  const watchAnimalRelated = form.watch("animalRelated");
+
+  const onSubmit = async (data: ExpenseFormValues) => {
+    try {
+      await handleAddExpense(data);
+      form.reset();
+      setIsAddExpenseOpen(false);
+    } catch (error) {
+      console.error('Error submitting form:', error);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-10 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-      <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setIsAddExpenseOpen(false)}></div>
-
-        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-            <div className="sm:flex sm:items-start">
-              <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-farm-100 sm:mx-0 sm:h-10 sm:w-10">
-                <PlusCircle className="h-6 w-6 text-farm-600" />
-              </div>
-              <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
-                  Add New Expense
-                </h3>
-                
-                <form onSubmit={handleAddExpense} className="mt-4 space-y-4">
-                  {/* Category */}
-                  <div>
-                    <label htmlFor="category" className="block text-sm font-medium text-gray-700">
-                      Category
-                    </label>
-                    <select
-                      id="category"
-                      name="category"
-                      value={formData.category}
-                      onChange={handleFormChange}
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-farm-500 focus:border-farm-500 sm:text-sm rounded-md"
-                      required
-                    >
-                      <option value="" disabled>Select category</option>
-                      <option value="Feed">Feed</option>
-                      <option value="Medicine">Medicine</option>
-                      <option value="Equipment">Equipment</option>
-                      <option value="Labor">Labor</option>
-                      <option value="Utilities">Utilities</option>
-                      <option value="Maintenance">Maintenance</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-
-                  {/* Amount */}
-                  <div>
-                    <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
-                      Amount (₹)
-                    </label>
-                    <div className="mt-1 relative rounded-md shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span className="text-gray-500 sm:text-sm">₹</span>
-                      </div>
-                      <input
+    <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
+      <DialogContent className="sm:max-w-[525px]">
+        <DialogHeader>
+          <DialogTitle>Record New Expense</DialogTitle>
+          <DialogDescription>
+            Enter the details of your farm expense
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <FormControl>
+                      <Select 
+                        value={field.value} 
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Feed">Feed</SelectItem>
+                          <SelectItem value="Medicine">Medicine</SelectItem>
+                          <SelectItem value="Supplies">Supplies</SelectItem>
+                          <SelectItem value="Labor">Labor</SelectItem>
+                          <SelectItem value="Utilities">Utilities</SelectItem>
+                          <SelectItem value="Transport">Transport</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount ($)</FormLabel>
+                    <FormControl>
+                      <Input 
                         type="number"
-                        name="amount"
-                        id="amount"
-                        min="0"
-                        step="0.01"
-                        value={formData.amount}
-                        onChange={handleFormChange}
-                        className="mt-1 focus:ring-farm-500 focus:border-farm-500 block w-full pl-7 shadow-sm sm:text-sm border-gray-300 rounded-md"
-                        required
+                        placeholder="Amount"
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value))}
                       />
-                    </div>
-                  </div>
-
-                  {/* Date */}
-                  <div>
-                    <label htmlFor="date" className="block text-sm font-medium text-gray-700">
-                      Date
-                    </label>
-                    <input
-                      type="date"
-                      name="date"
-                      id="date"
-                      value={formData.date}
-                      onChange={handleFormChange}
-                      className="mt-1 focus:ring-farm-500 focus:border-farm-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                      required
-                    />
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                      Description
-                    </label>
-                    <textarea
-                      id="description"
-                      name="description"
-                      rows={3}
-                      value={formData.description}
-                      onChange={handleFormChange}
-                      className="mt-1 focus:ring-farm-500 focus:border-farm-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                      required
-                    />
-                  </div>
-
-                  <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
-                    <button
-                      type="submit"
-                      className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-farm-600 text-base font-medium text-white hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500 sm:ml-3 sm:w-auto sm:text-sm"
-                    >
-                      Add Expense
-                    </button>
-                    <button
-                      type="button"
-                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500 sm:mt-0 sm:w-auto sm:text-sm"
-                      onClick={() => setIsAddExpenseOpen(false)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
+            
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Description" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="paymentMethod"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payment Method</FormLabel>
+                    <FormControl>
+                      <Select 
+                        value={field.value} 
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Cash">Cash</SelectItem>
+                          <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                          <SelectItem value="UPI">UPI</SelectItem>
+                          <SelectItem value="Cheque">Cheque</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <FormField
+              control={form.control}
+              name="animalRelated"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                  <FormControl>
+                    <Input 
+                      type="checkbox" 
+                      checked={field.value}
+                      className="h-4 w-4" 
+                      onChange={(e) => field.onChange(e.target.checked)}
+                    />
+                  </FormControl>
+                  <FormLabel className="text-sm font-normal">
+                    This expense is for a specific animal
+                  </FormLabel>
+                </FormItem>
+              )}
+            />
+            
+            {watchAnimalRelated && (
+              <FormField
+                control={form.control}
+                name="animalName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Animal</FormLabel>
+                    <FormControl>
+                      <Select 
+                        value={field.value} 
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Animal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {animals.map((animal) => (
+                            <SelectItem key={animal.id} value={animal.name}>
+                              {animal.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsAddExpenseOpen(false)} type="button">
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-farm-600 hover:bg-farm-700 text-white">
+                Save Expense
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 };
 

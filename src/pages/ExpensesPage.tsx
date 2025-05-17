@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Navbar from '../components/Navbar';
+import Navbar from '../components/layout/Navbar';
 import { User } from '../types';
 import { Calendar } from 'lucide-react';
 import ExpenseTable from '../components/expenses/ExpenseTable';
