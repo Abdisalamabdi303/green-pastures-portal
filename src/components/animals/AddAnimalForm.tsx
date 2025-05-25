@@ -1,5 +1,6 @@
 import { Animal } from '@/types';
 import { useState, useEffect } from 'react';
+import { Timestamp } from 'firebase/firestore';
 
 interface AddAnimalFormProps {
   onAddAnimal: (animal: Animal) => void;
@@ -11,7 +12,6 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Animal>>({
     id: '',
-    name: '',
     type: '',
     breed: '',
     age: 0,
@@ -22,7 +22,8 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
     purchaseDate: new Date().toISOString().split('T')[0],
     purchasePrice: 0,
     photoUrl: '',
-    isVaccinated: false
+    isVaccinated: false,
+    notes: ''
   });
 
   // Initialize form with edit data if provided
@@ -69,13 +70,26 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.id) {
+      alert('Animal ID is required');
+      return;
+    }
+
+    // Remove any whitespace from ID
+    const cleanId = formData.id.trim();
+    if (!cleanId) {
+      alert('Animal ID cannot be empty');
+      return;
+    }
+    
     const newAnimal: Animal = {
       ...formData as Animal,
-      id: formData.id || `animal_${Date.now()}`,
+      id: cleanId,
       photoUrl: photoPreview || undefined,
-      createdAt: new Date().toISOString(),
+      createdAt: Timestamp.now(),
       status: formData.status || 'Active',
-      isVaccinated: formData.isVaccinated || false
+      isVaccinated: formData.isVaccinated || false,
+      notes: formData.notes || ''
     };
     
     onAddAnimal(newAnimal);
@@ -83,7 +97,6 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
     // Reset form
     setFormData({
       id: '',
-      name: '',
       type: '',
       breed: '',
       age: 0,
@@ -94,7 +107,8 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
       purchaseDate: new Date().toISOString().split('T')[0],
       purchasePrice: 0,
       photoUrl: '',
-      isVaccinated: false
+      isVaccinated: false,
+      notes: ''
     });
     setPhotoPreview(null);
     onClose();
@@ -129,16 +143,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
                     value={formData.id || ''} 
                     onChange={handleFormChange} 
                     placeholder="Enter animal ID" 
-                  />
-                  
-                  <InputField 
-                    label="Name" 
-                    name="name" 
-                    type="text" 
-                    value={formData.name || ''} 
-                    onChange={handleFormChange} 
-                    required 
-                    placeholder="Enter animal name" 
+                    required
                   />
                  
                   <div className="grid grid-cols-2 gap-4">
@@ -156,7 +161,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
                       type="text" 
                       value={formData.breed || ''} 
                       onChange={handleFormChange} 
-                      required
+                     
                     />
                   </div>
                   
@@ -178,6 +183,27 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
                       min={0} 
                       step={0.1} 
                       value={formData.weight || 0} 
+                      onChange={handleFormChange} 
+                      required 
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <SelectField 
+                      label="Gender" 
+                      name="gender" 
+                      value={formData.gender || ''} 
+                      onChange={handleFormChange} 
+                      required 
+                      options={["Male", "Female"]} 
+                    />
+                    <InputField 
+                      label="Purchase Price" 
+                      name="purchasePrice" 
+                      type="number" 
+                      min={0} 
+                      step={0.01} 
+                      value={formData.purchasePrice || 0} 
                       onChange={handleFormChange} 
                       required 
                     />
