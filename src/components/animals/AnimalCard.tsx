@@ -1,34 +1,30 @@
-
 import { Animal } from '@/types';
+import { Edit, Trash, Loader2 } from 'lucide-react';
 
 interface AnimalCardProps {
   animal: Animal;
   onEdit: (animal: Animal) => void;
   onDelete: (id: string) => void;
+  isDeleting: string | null;
 }
 
-const AnimalCard = ({ animal, onEdit, onDelete }: AnimalCardProps) => {
+const AnimalCard = ({ animal, onEdit, onDelete, isDeleting }: AnimalCardProps) => {
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
-      <div className="h-48 w-full bg-gray-200 overflow-hidden">
-        {animal.photoUrl || animal.imageUrl ? (
+    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      {animal.photoUrl && (
+        <div className="h-48 overflow-hidden">
           <img 
-            src={animal.photoUrl || animal.imageUrl} 
-            alt={`${animal.type} - ${animal.breed}`}
+            src={animal.photoUrl} 
+            alt={`${animal.type} ${animal.breed}`} 
             className="w-full h-full object-cover"
           />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-400">
-            <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
+      
       <div className="p-4">
         <div className="flex justify-between items-start">
           <div>
-            <h3 className="text-lg font-semibold text-gray-800">{animal.name}</h3>
+            <h3 className="text-lg font-semibold text-gray-800">ID: {animal.id}</h3>
             <p className="text-sm text-gray-600">Type: {animal.type}</p>
             <p className="text-sm text-gray-600">Breed: {animal.breed}</p>
           </div>
@@ -50,6 +46,14 @@ const AnimalCard = ({ animal, onEdit, onDelete }: AnimalCardProps) => {
             <span className="text-gray-500">Weight:</span>
             <span className="ml-2 text-gray-900">{animal.weight ? `${animal.weight} kg` : 'N/A'}</span>
           </div>
+          <div>
+            <span className="text-gray-500">Gender:</span>
+            <span className="ml-2 text-gray-900">{animal.gender}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">Price:</span>
+            <span className="ml-2 text-gray-900">${animal.purchasePrice.toFixed(2)}</span>
+          </div>
           {animal.isVaccinated !== undefined && (
             <div>
               <span className="text-gray-500">Vaccinated:</span>
@@ -65,15 +69,21 @@ const AnimalCard = ({ animal, onEdit, onDelete }: AnimalCardProps) => {
         <div className="mt-4 flex justify-end space-x-2">
           <button
             onClick={() => onEdit(animal)}
-            className="text-farm-600 hover:text-farm-900 text-sm font-medium"
+            className="p-2 text-gray-600 hover:text-farm-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isDeleting === animal.id}
           >
-            Edit
+            <Edit className="h-5 w-5" />
           </button>
           <button
             onClick={() => onDelete(animal.id)}
-            className="text-red-600 hover:text-red-900 text-sm font-medium"
+            className="p-2 text-gray-600 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isDeleting === animal.id}
           >
-            Delete
+            {isDeleting === animal.id ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Trash className="h-5 w-5" />
+            )}
           </button>
         </div>
       </div>

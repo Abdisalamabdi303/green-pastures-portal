@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   collection, 
@@ -149,28 +148,31 @@ export default function Health() {
         createdAt: Timestamp.now(),
       };
       
-      await addDoc(collection(db, "health"), healthData);
+      const docRef = await addDoc(collection(db, "health"), healthData);
       
-      toast({
-        title: "Health Record Added",
-        description: `Treatment for ${data.animalName} has been registered`,
-      });
-      
-      // Reset form and close dialog
-      form.reset();
-      setOpenDialog(false);
-      
-      // Refresh health records
-      const q = query(collection(db, "health"), orderBy("createdAt", "desc"));
-      const querySnapshot = await getDocs(q);
-      
-      const records: HealthRecord[] = [];
-      querySnapshot.forEach((doc) => {
-        records.push({ id: doc.id, ...doc.data() } as HealthRecord);
-      });
-      
-      setHealthRecords(records);
-      
+      if (docRef.id) {
+        toast({
+          title: "Health Record Added",
+          description: `Treatment for ${data.animalName} has been registered`,
+        });
+        
+        // Reset form and close dialog
+        form.reset();
+        setOpenDialog(false);
+        
+        // Refresh health records
+        const q = query(collection(db, "health"), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        
+        const records: HealthRecord[] = [];
+        querySnapshot.forEach((doc) => {
+          records.push({ id: doc.id, ...doc.data() } as HealthRecord);
+        });
+        
+        setHealthRecords(records);
+      } else {
+        throw new Error("Failed to add health record");
+      }
     } catch (error) {
       console.error("Error adding health record:", error);
       toast({
@@ -178,6 +180,7 @@ export default function Health() {
         description: "Failed to register health record",
         variant: "destructive",
       });
+      throw error; // Re-throw to let the form handle the error state
     }
   };
 

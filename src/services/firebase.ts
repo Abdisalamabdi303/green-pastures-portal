@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, where, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Animal, HealthRecord, Vaccination } from '@/types';
 
@@ -7,11 +7,35 @@ export const animalServices = {
   // Add a new animal
   addAnimal: async (animalData: Animal) => {
     try {
-      const docRef = await addDoc(collection(db, 'animals'), {
+      const animalRef = doc(db, 'animals', animalData.id);
+      await setDoc(animalRef, {
         ...animalData,
         createdAt: Timestamp.now()
       });
-      return { id: docRef.id, ...animalData };
+
+      // Create an expense record for the animal purchase
+      if (animalData.purchasePrice && animalData.purchasePrice > 0) {
+        const expenseData = {
+          category: 'Animal Purchase',
+          amount: animalData.purchasePrice,
+          date: Timestamp.fromDate(new Date(animalData.purchaseDate || new Date())),
+          description: `Purchase of ${animalData.name} (${animalData.type})`,
+          paymentMethod: 'Cash',
+          animalRelated: true,
+          animalId: animalData.id,
+          animalName: animalData.name,
+          createdAt: Timestamp.now()
+        };
+
+        const expenseRef = await addDoc(collection(db, 'expenses'), expenseData);
+        
+        // Update the animal document with the expense reference
+        await updateDoc(animalRef, {
+          expenseId: expenseRef.id
+        });
+      }
+
+      return animalData;
     } catch (error) {
       console.error('Error adding animal:', error);
       throw error;
@@ -37,9 +61,47 @@ export const animalServices = {
   // Update an animal
   updateAnimal: async (id: string, animalData: Partial<Animal>) => {
     try {
-      const animalRef = doc(db, 'animals', id);
-      await updateDoc(animalRef, animalData);
-      return { id, ...animalData };
+      // If the ID is being changed
+      if (animalData.id && animalData.id !== id) {
+        // Create new document with new ID
+        const newAnimalRef = doc(db, 'animals', animalData.id);
+        await setDoc(newAnimalRef, {
+          ...animalData,
+          createdAt: Timestamp.now()
+        });
+
+        // Delete old document
+        const oldAnimalRef = doc(db, 'animals', id);
+        await deleteDoc(oldAnimalRef);
+
+        // Update related records with new animalId
+        const healthRecordsQuery = query(
+          collection(db, 'health_records'),
+          where('animalId', '==', id)
+        );
+        const healthRecordsSnapshot = await getDocs(healthRecordsQuery);
+        const healthRecordsUpdates = healthRecordsSnapshot.docs.map(doc => 
+          updateDoc(doc.ref, { animalId: animalData.id })
+        );
+        await Promise.all(healthRecordsUpdates);
+
+        const vaccinationsQuery = query(
+          collection(db, 'vaccinations'),
+          where('animalId', '==', id)
+        );
+        const vaccinationsSnapshot = await getDocs(vaccinationsQuery);
+        const vaccinationsUpdates = vaccinationsSnapshot.docs.map(doc => 
+          updateDoc(doc.ref, { animalId: animalData.id })
+        );
+        await Promise.all(vaccinationsUpdates);
+
+        return { ...animalData, id: animalData.id };
+      } else {
+        // Regular update without ID change
+        const animalRef = doc(db, 'animals', id);
+        await updateDoc(animalRef, animalData);
+        return { id, ...animalData };
+      }
     } catch (error) {
       console.error('Error updating animal:', error);
       throw error;
@@ -49,10 +111,53 @@ export const animalServices = {
   // Delete an animal
   deleteAnimal: async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'animals', id));
+      console.log('Starting deletion process for animal:', id);
+      
+      // Check if animal exists first
+      const animalRef = doc(db, 'animals', id);
+      const animalDoc = await getDoc(animalRef);
+      
+      if (!animalDoc.exists()) {
+        throw new Error(`Animal with ID ${id} not found`);
+      }
+
+      console.log('Animal found, proceeding with deletion');
+
+      // Delete the animal
+      await deleteDoc(animalRef);
+      console.log('Animal document deleted');
+
+      // Delete related health records
+      const healthRecordsQuery = query(
+        collection(db, 'health_records'),
+        where('animalId', '==', id)
+      );
+      const healthRecordsSnapshot = await getDocs(healthRecordsQuery);
+      console.log(`Found ${healthRecordsSnapshot.size} health records to delete`);
+      
+      const healthRecordsDeletions = healthRecordsSnapshot.docs.map(doc => 
+        deleteDoc(doc.ref)
+      );
+      await Promise.all(healthRecordsDeletions);
+      console.log('Health records deleted');
+
+      // Delete related vaccinations
+      const vaccinationsQuery = query(
+        collection(db, 'vaccinations'),
+        where('animalId', '==', id)
+      );
+      const vaccinationsSnapshot = await getDocs(vaccinationsQuery);
+      console.log(`Found ${vaccinationsSnapshot.size} vaccinations to delete`);
+      
+      const vaccinationsDeletions = vaccinationsSnapshot.docs.map(doc => 
+        deleteDoc(doc.ref)
+      );
+      await Promise.all(vaccinationsDeletions);
+      console.log('Vaccinations deleted');
+
       return id;
     } catch (error) {
-      console.error('Error deleting animal:', error);
+      console.error('Error in deleteAnimal:', error);
       throw error;
     }
   }
@@ -242,6 +347,51 @@ export const vaccinationServices = {
       return id;
     } catch (error) {
       console.error('Error deleting vaccination:', error);
+      throw error;
+    }
+  }
+};
+
+// Income Services
+export const incomeServices = {
+  // Add a new income
+  addIncome: async (incomeData: any) => {
+    try {
+      const docRef = await addDoc(collection(db, 'incomes'), {
+        ...incomeData,
+        createdAt: Timestamp.now(),
+        date: Timestamp.fromDate(new Date(incomeData.date))
+      });
+      return { id: docRef.id, ...incomeData };
+    } catch (error) {
+      console.error('Error adding income:', error);
+      throw error;
+    }
+  },
+
+  // Get all incomes
+  getIncomes: async () => {
+    try {
+      const q = query(collection(db, 'incomes'), orderBy('date', 'desc'));
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    } catch (error) {
+      console.error('Error fetching incomes:', error);
+      throw error;
+    }
+  },
+
+  // Delete an income
+  deleteIncome: async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'incomes', id));
+      return id;
+    } catch (error) {
+      console.error('Error deleting income:', error);
       throw error;
     }
   }

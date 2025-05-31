@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   collection, 
@@ -85,7 +84,8 @@ export function useExpenses() {
           createdAt: data.createdAt || null,
           paymentMethod: data.paymentMethod || '',
           animalName: data.animalName || '',
-          animalRelated: data.animalRelated || false
+          animalRelated: data.animalRelated || false,
+          animalId: data.animalId
         });
       });
       
@@ -102,28 +102,36 @@ export function useExpenses() {
     }
   };
 
-  const addExpense = async (data: ExpenseFormValues) => {
+  const addExpense = async (expense: Expense): Promise<boolean> => {
     try {
       const expenseData = {
-        ...data,
-        date: Timestamp.fromDate(new Date(data.date)),
+        ...expense,
+        date: expense.date instanceof Timestamp ? expense.date : Timestamp.fromDate(new Date(expense.date)),
         createdAt: Timestamp.now(),
       };
       
-      // If not animal related, remove animalName
-      if (!data.animalRelated) {
-        expenseData.animalName = undefined;
+      // If not animal related, remove animalName and animalId
+      if (!expense.animalRelated) {
+        delete expenseData.animalName;
+        delete expenseData.animalId;
       }
       
       const docRef = await addDoc(collection(db, "expenses"), expenseData);
       
+      if (!docRef.id) {
+        throw new Error("Failed to add expense");
+      }
+      
+      // Add the new expense to the local state
+      setExpenses(prev => [{
+        ...expenseData,
+        id: docRef.id
+      }, ...prev]);
+      
       toast({
         title: "Expense Added",
-        description: `${data.description} expense has been recorded`,
+        description: `${expense.description} expense has been recorded`,
       });
-      
-      // Refresh expense list to include the new expense with its Firestore ID
-      await fetchExpensesAndAnimals();
       
       return true;
     } catch (error) {

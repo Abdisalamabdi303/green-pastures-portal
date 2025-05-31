@@ -11,49 +11,58 @@ export interface Animal {
   id: string;
   name: string;
   type: string;
-  breed: string;
-  age: number;
-  weight: number;
-  status: string;
-  health: string;
-  notes: string;
-  createdAt: Timestamp;
+  breed?: string;
+  age?: number;
+  gender?: string;
+  weight?: number;
+  purchaseDate?: string;
+  purchasePrice?: number;
+  status: 'active' | 'sold' | 'deceased';
+  notes?: string;
+  createdAt: any; // Firestore Timestamp
+  health?: string;
+  photoUrl?: string;
+  isVaccinated?: boolean;
+  expenseId?: string;
 }
 
 export interface Expense {
   id: string;
   category: string;
   amount: number;
-  date: Timestamp | string;
+  date: any; // Firestore Timestamp
   description: string;
+  createdAt: any; // Firestore Timestamp
   paymentMethod: string;
   animalRelated: boolean;
+  animalId?: string;
   animalName?: string;
-  createdAt: Timestamp;
 }
 
 export interface HealthRecord {
   id: string;
   animalId: string;
   animalName: string;
-  condition: string;
-  status: 'critical' | 'stable' | 'recovered';
-  date: Timestamp | string;
+  animalType: string;
+  condition: 'healthy' | 'sick' | 'injured' | 'pregnant';
   treatment: string;
-  notes: string;
-  createdAt: Timestamp;
+  date: string | any; // Firestore Timestamp
+  cost: number;
+  notes?: string;
+  createdAt: any; // Firestore Timestamp
 }
 
 export interface Vaccination {
   id: string;
   animalId: string;
   animalName: string;
+  animalType: string;
   vaccineName: string;
-  date: Timestamp | string;
-  nextDueDate: Timestamp | string;
+  date: string | any; // Firestore Timestamp
+  nextDueDate: string | any; // Firestore Timestamp
   administered: boolean;
-  notes: string;
-  createdAt: Timestamp;
+  notes?: string;
+  createdAt: any; // Firestore Timestamp
 }
 
 export interface ChartData {

@@ -1,4 +1,3 @@
-
 import { 
   createContext, 
   useContext, 
@@ -65,15 +64,30 @@ const MOCK_USERS = [
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Simulating auth state for frontend-only development
+  // Check for existing auth state
   useEffect(() => {
-    console.log("Setting up mock auth state");
-    setLoading(false);
+    const checkAuthState = () => {
+      try {
+        // Check localStorage for existing auth
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          const userData = JSON.parse(storedUser);
+          setCurrentUser({ uid: userData.uid, email: userData.email } as User);
+          setUserData(userData);
+        }
+      } catch (error) {
+        console.error('Error checking auth state:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuthState();
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -85,6 +99,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const mockAdminData = MOCK_USERS[0];
         setCurrentUser({ uid: mockAdminData.uid, email: mockAdminData.email } as User);
         setUserData(mockAdminData);
+        // Store in localStorage
+        localStorage.setItem('user', JSON.stringify(mockAdminData));
         toast({
           title: "Login successful",
           description: "Welcome back to Green Pastures!",
@@ -95,6 +111,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const mockUserData = MOCK_USERS[1];
         setCurrentUser({ uid: mockUserData.uid, email: mockUserData.email } as User);
         setUserData(mockUserData);
+        // Store in localStorage
+        localStorage.setItem('user', JSON.stringify(mockUserData));
         toast({
           title: "Login successful",
           description: "Welcome back to Green Pastures!",
@@ -156,6 +174,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Frontend-only mock logout
       setCurrentUser(null);
       setUserData(null);
+      // Clear localStorage
+      localStorage.removeItem('user');
       toast({
         title: "Logged out",
         description: "You have been successfully logged out",

@@ -18,7 +18,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
     health: 'Good',
     weight: 0,
     gender: '',
-    status: 'Active',
+    status: 'active',
     purchaseDate: new Date().toISOString().split('T')[0],
     purchasePrice: 0,
     photoUrl: '',
@@ -46,10 +46,17 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
         ...formData,
         isVaccinated: value === 'Yes'
       });
+    } else if (type === 'number') {
+      // For number inputs, use the value directly if it's a valid number
+      const numValue = value === '' ? 0 : Number(value);
+      setFormData({
+        ...formData,
+        [name]: isNaN(numValue) ? 0 : numValue
+      });
     } else {
       setFormData({
         ...formData,
-        [name]: type === 'number' ? parseFloat(value) || 0 : value
+        [name]: value
       });
     }
   };
@@ -87,7 +94,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
       id: cleanId,
       photoUrl: photoPreview || undefined,
       createdAt: Timestamp.now(),
-      status: formData.status || 'Active',
+      status: formData.status || 'active',
       isVaccinated: formData.isVaccinated || false,
       notes: formData.notes || ''
     };
@@ -103,7 +110,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
       health: 'Good',
       weight: 0,
       gender: '',
-      status: 'Active',
+      status: 'active',
       purchaseDate: new Date().toISOString().split('T')[0],
       purchasePrice: 0,
       photoUrl: '',

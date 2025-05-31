@@ -74,31 +74,16 @@ const ExpensesPage = () => {
       });
   };
 
-  const handleAddExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleAddExpense = async (data) => {
     try {
-    const expenseData = {
-      ...formData,
-      paymentMethod: 'Cash',
-      animalRelated: false
-    };
-    
-      const addedExpense = await expenseServices.addExpense(expenseData);
+      const addedExpense = await expenseServices.addExpense(data);
       setExpenses(prev => [addedExpense, ...prev]);
-    
-    // Reset form
-    setFormData({
-      category: '',
-      amount: 0,
-      date: new Date().toISOString().split('T')[0],
-      description: ''
-    });
-    setIsAddExpenseOpen(false);
+      setIsAddExpenseOpen(false);
       toast.success('Expense added successfully');
     } catch (error) {
       console.error('Error adding expense:', error);
       toast.error('Failed to add expense');
+      throw error; // Re-throw to let the form handle the error state
     }
   };
 

@@ -10,7 +10,8 @@ import {
   Settings, 
   LogOut, 
   ChevronDown,
-  Compass
+  Compass,
+  Landmark
 } from 'lucide-react';
 import { User } from '@/types';
 import { cn } from '@/lib/utils';
@@ -94,6 +95,10 @@ const Navbar = () => {
               <Stethoscope className="h-5 w-5 mr-2" />
               Health
             </Link>
+            <Link to="/finance" className={getLinkClass('/finance')}>
+              <Landmark className="h-5 w-5 mr-2" />
+              Finance
+            </Link>
             <Link to="/settings" className={getLinkClass('/settings')}>
               <Settings className="h-5 w-5 mr-2" />
               Settings
@@ -171,6 +176,14 @@ const Navbar = () => {
             >
               <Stethoscope className="h-5 w-5 mr-2" />
               Health
+            </Link>
+            <Link
+              to="/finance"
+              className={getLinkClass('/finance')}
+              onClick={closeMenu}
+            >
+              <Landmark className="h-5 w-5 mr-2" />
+              Finance
             </Link>
             <Link
               to="/settings"

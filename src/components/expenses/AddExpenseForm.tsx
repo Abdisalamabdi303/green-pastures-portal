@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Animal } from "@/types";
+import { Timestamp } from "firebase/firestore";
 
 const expenseSchema = z.object({
   category: z.string().min(1, { message: "Category is required" }),
@@ -35,6 +36,8 @@ const AddExpenseForm = ({
   setIsAddExpenseOpen,
   animals = []
 }: AddExpenseFormProps) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
@@ -52,75 +55,53 @@ const AddExpenseForm = ({
 
   const onSubmit = async (data: ExpenseFormValues) => {
     try {
+      setIsSubmitting(true);
       await handleAddExpense(data);
       form.reset();
       setIsAddExpenseOpen(false);
     } catch (error) {
       console.error('Error submitting form:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
-      <DialogContent className="sm:max-w-[525px]">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Record New Expense</DialogTitle>
+          <DialogTitle>Add New Expense</DialogTitle>
           <DialogDescription>
-            Enter the details of your farm expense
+            Enter the details of the expense below.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
+            <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Category</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <Select 
-                        value={field.value} 
-                        onValueChange={field.onChange}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Feed">Feed</SelectItem>
-                          <SelectItem value="Medicine">Medicine</SelectItem>
-                          <SelectItem value="Supplies">Supplies</SelectItem>
-                          <SelectItem value="Labor">Labor</SelectItem>
-                          <SelectItem value="Utilities">Utilities</SelectItem>
-                          <SelectItem value="Transport">Transport</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Amount ($)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number"
-                        placeholder="Amount"
-                        {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            
+                    <SelectContent>
+                      <SelectItem value="Feed">Feed</SelectItem>
+                      <SelectItem value="Veterinary">Veterinary</SelectItem>
+                      <SelectItem value="Equipment">Equipment</SelectItem>
+                      <SelectItem value="Labor">Labor</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="description"
@@ -128,76 +109,89 @@ const AddExpenseForm = ({
                 <FormItem>
                   <FormLabel>Description</FormLabel>
                   <FormControl>
-                    <Input placeholder="Description" {...field} />
+                    <Input placeholder="Enter expense description" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date</FormLabel>
+
+            <FormField
+              control={form.control}
+              name="amount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Amount</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      placeholder="Enter amount" 
+                      {...field} 
+                      onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="paymentMethod"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Payment Method</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select payment method" />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="paymentMethod"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment Method</FormLabel>
-                    <FormControl>
-                      <Select 
-                        value={field.value} 
-                        onValueChange={field.onChange}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Method" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Cash">Cash</SelectItem>
-                          <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                          <SelectItem value="UPI">UPI</SelectItem>
-                          <SelectItem value="Cheque">Cheque</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            
+                    <SelectContent>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="Credit Card">Credit Card</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="animalRelated"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                   <FormControl>
-                    <Input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={field.value}
-                      className="h-4 w-4" 
-                      onChange={(e) => field.onChange(e.target.checked)}
+                      onChange={field.onChange}
                     />
                   </FormControl>
-                  <FormLabel className="text-sm font-normal">
-                    This expense is for a specific animal
-                  </FormLabel>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Animal Related</FormLabel>
+                  </div>
                 </FormItem>
               )}
             />
-            
+
             {watchAnimalRelated && (
               <FormField
                 control={form.control}
@@ -205,35 +199,37 @@ const AddExpenseForm = ({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Animal</FormLabel>
-                    <FormControl>
-                      <Select 
-                        value={field.value} 
-                        onValueChange={field.onChange}
-                      >
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select Animal" />
+                          <SelectValue placeholder="Select an animal" />
                         </SelectTrigger>
-                        <SelectContent>
-                          {animals.map((animal) => (
-                            <SelectItem key={animal.id} value={animal.name}>
-                              {animal.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
+                      </FormControl>
+                      <SelectContent>
+                        {animals.map((animal) => (
+                          <SelectItem key={animal.id} value={animal.name}>
+                            {animal.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             )}
-            
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsAddExpenseOpen(false)} type="button">
+
+            <div className="flex justify-end space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsAddExpenseOpen(false)}
+                disabled={isSubmitting}
+              >
                 Cancel
               </Button>
-              <Button type="submit" className="bg-farm-600 hover:bg-farm-700 text-white">
-                Save Expense
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : "Save Expense"}
               </Button>
             </div>
           </form>

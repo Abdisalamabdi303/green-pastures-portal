@@ -21,6 +21,7 @@ const AnimalsPage = () => {
   const [viewMode, setViewMode] = useState<'card' | 'list'>('list');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const navigate = useNavigate();
 
   // Fetch animals from Firestore
@@ -73,11 +74,22 @@ const AnimalsPage = () => {
       if (selectedAnimal) {
         // Editing existing animal
         const updatedAnimal = await animalServices.updateAnimal(selectedAnimal.id, newAnimal);
-        setAnimals(prevAnimals => 
-          prevAnimals.map(animal => 
-            animal.id === selectedAnimal.id ? { ...updatedAnimal, id: selectedAnimal.id } : animal
-          )
-        );
+        
+        // If ID was changed, we need to update the local state differently
+        if (updatedAnimal.id !== selectedAnimal.id) {
+          setAnimals(prevAnimals => 
+            prevAnimals.map(animal => 
+              animal.id === selectedAnimal.id ? updatedAnimal : animal
+            )
+          );
+        } else {
+          setAnimals(prevAnimals => 
+            prevAnimals.map(animal => 
+              animal.id === selectedAnimal.id ? { ...updatedAnimal, id: selectedAnimal.id } : animal
+            )
+          );
+        }
+        
         toast.success('Animal updated successfully');
       } else {
         // Adding new animal
@@ -100,14 +112,32 @@ const AnimalsPage = () => {
   };
 
   const handleDeleteAnimal = async (id: string) => {
-    if (confirm('Are you sure you want to delete this animal?')) {
+    const animalToDelete = animals.find(a => a.id === id);
+    if (!animalToDelete) {
+      console.error('Animal not found:', id);
+      toast.error('Animal not found');
+      return;
+    }
+
+    const confirmMessage = `Are you sure you want to delete this animal?\n\nID: ${animalToDelete.id}\nType: ${animalToDelete.type}\nBreed: ${animalToDelete.breed}\n\nThis action cannot be undone.`;
+    
+    if (window.confirm(confirmMessage)) {
       try {
-        await animalServices.deleteAnimal(id);
+        console.log('Starting deletion of animal:', id);
+        setIsDeleting(id);
+        
+        // Call the delete service
+        const result = await animalServices.deleteAnimal(id);
+        console.log('Delete result:', result);
+        
+        // Update local state
         setAnimals(prevAnimals => prevAnimals.filter(animal => animal.id !== id));
         toast.success('Animal deleted successfully');
       } catch (error) {
         console.error('Error deleting animal:', error);
-        toast.error('Failed to delete animal');
+        toast.error(`Failed to delete animal: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        setIsDeleting(null);
       }
     }
   };
@@ -180,6 +210,7 @@ const AnimalsPage = () => {
                   animals={paginatedAnimals}
                   onEdit={handleEditAnimal}
                   onDelete={handleDeleteAnimal}
+                  isDeleting={isDeleting}
                 />
               ) : (
                 <div className="overflow-x-auto">
@@ -187,6 +218,7 @@ const AnimalsPage = () => {
                     animals={paginatedAnimals} 
                     onEdit={handleEditAnimal}
                     onDelete={handleDeleteAnimal}
+                    isDeleting={isDeleting}
                   />
                 </div>
               )}
