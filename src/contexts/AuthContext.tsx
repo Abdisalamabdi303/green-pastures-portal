@@ -83,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error('Error checking auth state:', error);
       } finally {
-        setLoading(false);
+    setLoading(false);
       }
     };
 
@@ -149,6 +149,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: name
       };
       
+      // Store in localStorage
+      localStorage.setItem('user', JSON.stringify(newUser));
+      
       setCurrentUser({ uid: newUser.uid, email: newUser.email } as User);
       setUserData(newUser);
       
@@ -156,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Registration successful",
         description: "Your account has been created",
       });
-      navigate("/dashboard");
+      navigate("/");
     } catch (error: any) {
       console.error("Registration error:", error);
       toast({
@@ -164,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description: "Failed to create account",
         variant: "destructive",
       });
+      throw error;
     } finally {
       setLoading(false);
     }

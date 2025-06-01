@@ -11,7 +11,6 @@ import { HealthRecord } from '@/types';
 import { Timestamp } from 'firebase/firestore';
 
 const healthRecordSchema = z.object({
-  animalType: z.string().min(1, { message: "Animal type is required" }),
   animalId: z.string().min(1, { message: "Animal is required" }),
   condition: z.enum(["healthy", "sick", "injured", "pregnant"]),
   status: z.string().min(1, { message: "Status is required" }),
@@ -35,10 +34,9 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
   const form = useForm<HealthRecordFormValues>({
     resolver: zodResolver(healthRecordSchema),
     defaultValues: {
-      animalType: "",
       animalId: "",
-      condition: "",
-      status: "",
+      condition: "healthy",
+      status: "active",
       date: new Date().toISOString().split('T')[0],
       treatment: "",
       cost: 0,
@@ -46,26 +44,33 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
     },
   });
 
-  const watchAnimalType = form.watch("animalType");
-
-  // Filter animals by selected type
-  const filteredAnimals = animals.filter(animal => animal.type === watchAnimalType);
-
   const onSubmit = async (data: HealthRecordFormValues) => {
     try {
       setIsSubmitting(true);
       console.log('Form submission started with data:', data);
       
+      // Find the selected animal
       const animal = animals.find(a => a.id === data.animalId);
-      console.log('Found animal:', animal);
+      console.log('Selected animal:', animal);
       
+      if (!animal) {
+        throw new Error('Please select an animal');
+      }
+
+      // Ensure all fields are properly formatted
       const healthRecordData = {
-        ...data,
-        animalName: animal?.name || '',
-        animalType: animal?.type || '',
+        animalId: data.animalId,
+        animalName: animal.name,
+        animalType: animal.type,
+        condition: data.condition,
+        status: data.status,
         date: Timestamp.fromDate(new Date(data.date)),
+        treatment: data.treatment,
+        cost: Number(data.cost) || 0,
+        notes: data.notes || '',
         createdAt: Timestamp.now(),
       };
+
       console.log('Processed health record data:', healthRecordData);
       
       await onAddHealthRecord(healthRecordData);
@@ -75,17 +80,15 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
       onClose();
     } catch (error) {
       console.error('Error submitting form:', error);
+      // You might want to show an error message to the user here
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Get unique animal types
-  const animalTypes = [...new Set(animals.map(animal => animal.type))];
-
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] bg-white">
+      <DialogContent className="sm:max-w-[425px] bg-gray-50">
         <DialogHeader>
           <DialogTitle>Add Health Record</DialogTitle>
           <DialogDescription>
@@ -105,11 +108,11 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
                     defaultValue={field.value}
                   >
                     <FormControl>
-                      <SelectTrigger className="bg-white">
+                      <SelectTrigger className="bg-white border-gray-200">
                         <SelectValue placeholder="Select an animal" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="bg-white border border-gray-200">
                       {animals.map((animal) => (
                         <SelectItem key={animal.id} value={animal.id}>
                           {animal.id} - {animal.name}
@@ -130,11 +133,11 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
                   <FormLabel>Condition</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <SelectTrigger className="bg-white">
+                      <SelectTrigger className="bg-white border-gray-200">
                         <SelectValue placeholder="Select condition" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="bg-white border border-gray-200">
                       <SelectItem value="healthy">Healthy</SelectItem>
                       <SelectItem value="sick">Sick</SelectItem>
                       <SelectItem value="injured">Injured</SelectItem>
@@ -154,11 +157,11 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
                   <FormLabel>Status</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <SelectTrigger className="bg-white">
+                      <SelectTrigger className="bg-white border-gray-200">
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="bg-white border border-gray-200">
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="resolved">Resolved</SelectItem>
                       <SelectItem value="monitoring">Monitoring</SelectItem>
@@ -176,7 +179,7 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
                 <FormItem>
                   <FormLabel>Date</FormLabel>
                   <FormControl>
-                    <Input type="date" className="bg-white" {...field} />
+                    <Input type="date" className="bg-white border-gray-200" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -190,7 +193,7 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
                 <FormItem>
                   <FormLabel>Treatment</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter treatment details" className="bg-white" {...field} />
+                    <Input placeholder="Enter treatment details" className="bg-white border-gray-200" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -207,7 +210,7 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
                     <Input 
                       type="number" 
                       placeholder="Enter cost" 
-                      className="bg-white"
+                      className="bg-white border-gray-200"
                       {...field} 
                       onChange={(e) => field.onChange(parseFloat(e.target.value))}
                     />
@@ -226,7 +229,7 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
                   <FormControl>
                     <textarea
                       {...field}
-                      className="mt-1 focus:ring-farm-500 focus:border-farm-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md p-2 bg-white"
+                      className="mt-1 focus:ring-farm-500 focus:border-farm-500 block w-full shadow-sm sm:text-sm border-gray-200 rounded-md p-2 bg-white"
                       rows={3}
                     />
                   </FormControl>
@@ -244,7 +247,7 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting} className="bg-farm-600 hover:bg-farm-700 text-white">
                 {isSubmitting ? "Saving..." : "Save Health Record"}
               </Button>
             </div>

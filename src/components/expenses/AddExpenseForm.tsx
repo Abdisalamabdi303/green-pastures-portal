@@ -124,7 +124,7 @@ const AddExpenseForm = ({
                   <FormLabel>Amount</FormLabel>
                   <FormControl>
                     <Input 
-                      type="number" 
+                        type="number"
                       placeholder="Enter amount" 
                       {...field} 
                       onChange={(e) => field.onChange(parseFloat(e.target.value))}
@@ -221,12 +221,12 @@ const AddExpenseForm = ({
 
             <div className="flex justify-end space-x-2">
               <Button
-                type="button"
+                      type="button"
                 variant="outline"
-                onClick={() => setIsAddExpenseOpen(false)}
+                      onClick={() => setIsAddExpenseOpen(false)}
                 disabled={isSubmitting}
-              >
-                Cancel
+                    >
+                      Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Saving..." : "Save Expense"}

@@ -11,7 +11,8 @@ import {
   LogOut, 
   ChevronDown,
   Compass,
-  Landmark
+  Landmark,
+  Home
 } from 'lucide-react';
 import { User } from '@/types';
 import { cn } from '@/lib/utils';
@@ -39,8 +40,8 @@ const Navbar = () => {
 
   const getLinkClass = (path: string) => {
     return location.pathname === path
-      ? 'flex items-center px-4 py-2 bg-farm-600 text-white rounded-md'
-      : 'flex items-center px-4 py-2 text-gray-700 hover:bg-farm-100 hover:text-farm-600 rounded-md transition-colors';
+      ? 'flex items-center px-4 py-2.5 bg-farm-600 text-white rounded-md'
+      : 'flex items-center px-4 py-2.5 text-gray-700 hover:bg-farm-100 hover:text-farm-600 rounded-md transition-colors';
   };
 
   return (
@@ -50,7 +51,7 @@ const Navbar = () => {
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
               <Link 
-                to="/dashboard" 
+                to="/" 
                 className="group relative flex items-center py-2"
               >
                 <div className="flex items-center">
@@ -78,7 +79,11 @@ const Navbar = () => {
               </Link>
             </div>
           </div>
-          <div className="hidden md:ml-6 md:flex md:items-center md:space-x-4">
+          <div className="hidden md:ml-6 md:flex md:items-center md:space-x-2">
+            <Link to="/" className={getLinkClass('/')}>
+              <Home className="h-5 w-5 mr-2" />
+              Home
+            </Link>
             <Link to="/dashboard" className={getLinkClass('/dashboard')}>
               <LayoutDashboard className="h-5 w-5 mr-2" />
               Dashboard
@@ -91,13 +96,13 @@ const Navbar = () => {
               <Receipt className="h-5 w-5 mr-2" />
               Expenses
             </Link>
-            <Link to="/health" className={getLinkClass('/health')}>
-              <Stethoscope className="h-5 w-5 mr-2" />
-              Health
-            </Link>
             <Link to="/finance" className={getLinkClass('/finance')}>
               <Landmark className="h-5 w-5 mr-2" />
               Finance
+            </Link>
+            <Link to="/health" className={getLinkClass('/health')}>
+              <Stethoscope className="h-5 w-5 mr-2" />
+              Health
             </Link>
             <Link to="/settings" className={getLinkClass('/settings')}>
               <Settings className="h-5 w-5 mr-2" />
@@ -146,6 +151,14 @@ const Navbar = () => {
         <div className="md:hidden">
           <div className="pt-2 pb-3 space-y-1 sm:px-3">
             <Link
+              to="/"
+              className={getLinkClass('/')}
+              onClick={closeMenu}
+            >
+              <Home className="h-5 w-5 mr-2" />
+              Home
+            </Link>
+            <Link
               to="/dashboard"
               className={getLinkClass('/dashboard')}
               onClick={closeMenu}
@@ -170,20 +183,20 @@ const Navbar = () => {
               Expenses
             </Link>
             <Link
-              to="/health"
-              className={getLinkClass('/health')}
-              onClick={closeMenu}
-            >
-              <Stethoscope className="h-5 w-5 mr-2" />
-              Health
-            </Link>
-            <Link
               to="/finance"
               className={getLinkClass('/finance')}
               onClick={closeMenu}
             >
               <Landmark className="h-5 w-5 mr-2" />
               Finance
+            </Link>
+            <Link
+              to="/health"
+              className={getLinkClass('/health')}
+              onClick={closeMenu}
+            >
+              <Stethoscope className="h-5 w-5 mr-2" />
+              Health
             </Link>
             <Link
               to="/settings"
@@ -193,26 +206,19 @@ const Navbar = () => {
               <Settings className="h-5 w-5 mr-2" />
               Settings
             </Link>
+            {user && (
+              <button
+                onClick={() => {
+                  handleLogout();
+                  closeMenu();
+                }}
+                className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-farm-50 hover:text-farm-600"
+              >
+                <LogOut className="h-5 w-5 mr-2" />
+                Logout
+              </button>
+            )}
           </div>
-          {user && (
-            <div className="pt-4 pb-3 border-t border-gray-200">
-              <div className="flex items-center px-5">
-                <div className="ml-3">
-                  <div className="text-base font-medium text-gray-800">{user.name}</div>
-                  <div className="text-sm font-medium text-gray-500">{user.email}</div>
-                </div>
-              </div>
-              <div className="mt-3 space-y-1 px-2">
-                <button
-                  onClick={handleLogout}
-                  className="flex w-full items-center px-3 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-farm-600 rounded-md"
-                >
-                  <LogOut className="h-5 w-5 mr-2" />
-                  Logout
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </nav>

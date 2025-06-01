@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import Navbar from '../components/layout/Navbar';
+import { useAuth } from '@/contexts/AuthContext';
+import Navbar from '@/components/layout/Navbar';
 
 const RegisterPage = () => {
   const [name, setName] = useState('');
@@ -10,8 +11,9 @@ const RegisterPage = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { register } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
@@ -19,16 +21,21 @@ const RegisterPage = () => {
       setError('Passwords do not match');
       return;
     }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
     
-    setIsLoading(true);
-    
-    // Mock registration - in a real app this would call an API
-    setTimeout(() => {
-      // Store mock user data
-      localStorage.setItem('user', JSON.stringify({ name, email, role: 'user' }));
-      navigate('/dashboard');
+    try {
+      setIsLoading(true);
+      await register(email, password, name);
+      navigate('/');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create account');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (

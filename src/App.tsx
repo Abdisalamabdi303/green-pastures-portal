@@ -1,50 +1,33 @@
-import * as React from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
-import HomePage from './pages/HomePage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import DashboardPage from './pages/DashboardPage';
-import AnimalsPage from './pages/AnimalsPage';
-import ExpensesPage from './pages/ExpensesPage';
-import HealthPage from './pages/HealthPage';
-import FinancePage from './pages/Finance';
-import SettingsPage from './pages/SettingsPage';
-import NotFoundPage from './pages/NotFoundPage';
+import LoginPage from '@/pages/LoginPage';
+import RegisterPage from '@/pages/RegisterPage';
+import HomePage from '@/pages/HomePage';
+import DashboardPage from '@/pages/DashboardPage';
+import AnimalsPage from '@/pages/AnimalsPage';
+import ExpensesPage from '@/pages/ExpensesPage';
+import HealthPage from '@/pages/HealthPage';
+import SettingsPage from '@/pages/SettingsPage';
+import FinancePage from '@/pages/FinancePage';
+import PrivateRoute from '@/components/PrivateRoute';
 
-// Create a client
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-      staleTime: 5 * 60 * 1000, // 5 minutes
-    },
-  },
-});
-
-const App: React.FC = () => {
+function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <div className="app-container">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/animals" element={<AnimalsPage />} />
-            <Route path="/expenses" element={<ExpensesPage />} />
-            <Route path="/health" element={<HealthPage />} />
-            <Route path="/finance" element={<FinancePage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </div>
-      </AuthProvider>
-    </QueryClientProvider>
+    <AuthProvider>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
+        <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+        <Route path="/animals" element={<PrivateRoute><AnimalsPage /></PrivateRoute>} />
+        <Route path="/expenses" element={<PrivateRoute><ExpensesPage /></PrivateRoute>} />
+        <Route path="/health" element={<PrivateRoute><HealthPage /></PrivateRoute>} />
+        <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
+        <Route path="/finance" element={<PrivateRoute><FinancePage /></PrivateRoute>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AuthProvider>
   );
-};
+}
 
 export default App;

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import Navbar from '../components/layout/Navbar';
+import { useAuth } from '@/contexts/AuthContext';
+import Navbar from '@/components/layout/Navbar';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -8,26 +9,20 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
     
-    // Mock login - in a real app this would call an API
-    setTimeout(() => {
-      if (email === 'admin@example.com' && password === 'password') {
-        // Store mock auth token
-        localStorage.setItem('user', JSON.stringify({ name: 'Admin User', email, role: 'admin' }));
-        navigate('/dashboard');
-      } else if (email === 'user@example.com' && password === 'password') {
-        localStorage.setItem('user', JSON.stringify({ name: 'Regular User', email, role: 'user' }));
-        navigate('/dashboard');
-      } else {
-        setError('Invalid email or password');
-      }
+    try {
+      await login(email, password);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sign in');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (

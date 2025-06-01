@@ -1,159 +1,216 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { healthServices, vaccinationServices } from '@/services/firebase';
+import { useState, useEffect } from 'react';
+import { collection, query, orderBy, limit, startAfter, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { HealthRecord, Vaccination } from '@/types';
 
 const ITEMS_PER_PAGE = 10;
 
-export const useHealthData = (page: number = 1) => {
-  const queryClient = useQueryClient();
+export const useHealthData = (currentPage: number) => {
+  const [healthData, setHealthData] = useState<{ records: HealthRecord[]; totalPages: number } | null>(null);
+  const [vaccinationData, setVaccinationData] = useState<{ vaccinations: Vaccination[]; totalPages: number } | null>(null);
+  const [isLoadingHealth, setIsLoadingHealth] = useState(true);
+  const [isLoadingVaccinations, setIsLoadingVaccinations] = useState(true);
+  const [healthError, setHealthError] = useState<Error | null>(null);
+  const [vaccinationError, setVaccinationError] = useState<Error | null>(null);
 
-  // Health Records Query
-  const {
-    data: healthData,
-    isLoading: isLoadingHealth,
-    error: healthError
-  } = useQuery({
-    queryKey: ['healthRecords', page],
-    queryFn: async () => {
-      const records = await healthServices.getHealthRecords();
-      const start = (page - 1) * ITEMS_PER_PAGE;
-      const end = start + ITEMS_PER_PAGE;
-      return {
-        records: records.slice(start, end),
-        total: records.length,
-        totalPages: Math.ceil(records.length / ITEMS_PER_PAGE)
-      };
-    }
-  });
-
-  // Vaccinations Query
-  const {
-    data: vaccinationData,
-    isLoading: isLoadingVaccinations,
-    error: vaccinationError
-  } = useQuery({
-    queryKey: ['vaccinations', page],
-    queryFn: async () => {
-      const vaccinations = await vaccinationServices.getVaccinations();
-      const start = (page - 1) * ITEMS_PER_PAGE;
-      const end = start + ITEMS_PER_PAGE;
-      return {
-        vaccinations: vaccinations.slice(start, end),
-        total: vaccinations.length,
-        totalPages: Math.ceil(vaccinations.length / ITEMS_PER_PAGE)
-      };
-    }
-  });
-
-  // Health Record Mutations
-  const addHealthRecord = useMutation({
-    mutationFn: (data: Omit<HealthRecord, 'id' | 'createdAt'>) => 
-      healthServices.addHealthRecord(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['healthRecords'] });
-      console.log('Health record added successfully');
-    },
-    onError: (error) => {
-      console.error('Failed to add health record:', error);
-    }
-  });
-
-  const updateHealthRecord = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<HealthRecord> }) =>
-      healthServices.updateHealthRecord(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['healthRecords'] });
-      console.log('Health record updated successfully');
-    },
-    onError: (error) => {
-      console.error('Failed to update health record:', error);
-    }
-  });
-
-  const deleteHealthRecord = useMutation({
-    mutationFn: (id: string) => healthServices.deleteHealthRecord(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['healthRecords'] });
-      console.log('Health record deleted successfully');
-    },
-    onError: (error) => {
-      console.error('Failed to delete health record:', error);
-    }
-  });
-
-  // Vaccination Mutations
-  const addVaccination = useMutation({
-    mutationFn: (data: Omit<Vaccination, 'id' | 'createdAt'>) =>
-      vaccinationServices.addVaccination(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vaccinations'] });
-      console.log('Vaccination record added successfully');
-    },
-    onError: (error) => {
-      console.error('Failed to add vaccination record:', error);
-    }
-  });
-
-  const updateVaccination = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Vaccination> }) =>
-      vaccinationServices.updateVaccination(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vaccinations'] });
-      console.log('Vaccination record updated successfully');
-    },
-    onError: (error) => {
-      console.error('Failed to update vaccination record:', error);
-    }
-  });
-
-  const deleteVaccination = useMutation({
-    mutationFn: (id: string) => vaccinationServices.deleteVaccination(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vaccinations'] });
-      console.log('Vaccination record deleted successfully');
-    },
-    onError: (error) => {
-      console.error('Failed to delete vaccination record:', error);
-    }
-  });
-
-  // Batch Operations
-  const batchAddVaccinations = useMutation({
-    mutationFn: async (vaccinations: Omit<Vaccination, 'id' | 'createdAt'>[]) => {
-      const results = await Promise.all(
-        vaccinations.map(vacc => vaccinationServices.addVaccination(vacc))
+  // Fetch health records
+  const fetchHealthRecords = async () => {
+    try {
+      setIsLoadingHealth(true);
+      setHealthError(null);
+      
+      const healthRef = collection(db, 'healthRecords');
+      const q = query(
+        healthRef,
+        orderBy('date', 'desc'),
+        limit(ITEMS_PER_PAGE)
       );
-      return results;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vaccinations'] });
-      console.log('Batch vaccinations added successfully');
-    },
-    onError: (error) => {
-      console.error('Failed to add batch vaccinations:', error);
+      
+      const snapshot = await getDocs(q);
+      const records = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as HealthRecord[];
+
+      // Get total count for pagination
+      const totalSnapshot = await getDocs(healthRef);
+      const totalPages = Math.ceil(totalSnapshot.size / ITEMS_PER_PAGE);
+
+      setHealthData({ records, totalPages });
+    } catch (error) {
+      console.error('Error fetching health records:', error);
+      setHealthError(error instanceof Error ? error : new Error('Failed to fetch health records'));
+    } finally {
+      setIsLoadingHealth(false);
     }
-  });
+  };
+
+  // Fetch vaccinations
+  const fetchVaccinations = async () => {
+    try {
+      setIsLoadingVaccinations(true);
+      setVaccinationError(null);
+      
+      const vaccinationRef = collection(db, 'vaccinations');
+      const q = query(
+        vaccinationRef,
+        orderBy('date', 'desc'),
+        limit(ITEMS_PER_PAGE)
+      );
+      
+      const snapshot = await getDocs(q);
+      const vaccinations = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Vaccination[];
+
+      // Get total count for pagination
+      const totalSnapshot = await getDocs(vaccinationRef);
+      const totalPages = Math.ceil(totalSnapshot.size / ITEMS_PER_PAGE);
+
+      setVaccinationData({ vaccinations, totalPages });
+    } catch (error) {
+      console.error('Error fetching vaccinations:', error);
+      setVaccinationError(error instanceof Error ? error : new Error('Failed to fetch vaccinations'));
+    } finally {
+      setIsLoadingVaccinations(false);
+    }
+  };
+
+  // Add health record
+  const addHealthRecord = async (records: Omit<HealthRecord, 'id' | 'createdAt'>[]) => {
+    try {
+      const healthRef = collection(db, 'healthRecords');
+      const batchRecords = records.map(record => ({
+        ...record,
+        createdAt: Timestamp.now()
+      }));
+
+      for (const record of batchRecords) {
+        await addDoc(healthRef, record);
+      }
+
+      // Refresh data after adding
+      await fetchHealthRecords();
+    } catch (error) {
+      console.error('Error adding health record:', error);
+      throw error;
+    }
+  };
+
+  // Update health record
+  const updateHealthRecord = async ({ id, data }: { id: string; data: Partial<HealthRecord> }) => {
+    try {
+      const healthRef = doc(db, 'healthRecords', id);
+      await updateDoc(healthRef, data);
+      
+      // Refresh data after updating
+      await fetchHealthRecords();
+    } catch (error) {
+      console.error('Error updating health record:', error);
+      throw error;
+    }
+  };
+
+  // Delete health record
+  const deleteHealthRecord = async (id: string) => {
+    try {
+      const healthRef = doc(db, 'healthRecords', id);
+      await deleteDoc(healthRef);
+      
+      // Refresh data after deleting
+      await fetchHealthRecords();
+    } catch (error) {
+      console.error('Error deleting health record:', error);
+      throw error;
+    }
+  };
+
+  // Add vaccination
+  const addVaccination = async (vaccination: Omit<Vaccination, 'id' | 'createdAt'>) => {
+    try {
+      const vaccinationRef = collection(db, 'vaccinations');
+      await addDoc(vaccinationRef, {
+        ...vaccination,
+        createdAt: Timestamp.now()
+      });
+      
+      // Refresh data after adding
+      await fetchVaccinations();
+    } catch (error) {
+      console.error('Error adding vaccination:', error);
+      throw error;
+    }
+  };
+
+  // Update vaccination
+  const updateVaccination = async ({ id, data }: { id: string; data: Partial<Vaccination> }) => {
+    try {
+      const vaccinationRef = doc(db, 'vaccinations', id);
+      await updateDoc(vaccinationRef, data);
+      
+      // Refresh data after updating
+      await fetchVaccinations();
+    } catch (error) {
+      console.error('Error updating vaccination:', error);
+      throw error;
+    }
+  };
+
+  // Delete vaccination
+  const deleteVaccination = async (id: string) => {
+    try {
+      const vaccinationRef = doc(db, 'vaccinations', id);
+      await deleteDoc(vaccinationRef);
+      
+      // Refresh data after deleting
+      await fetchVaccinations();
+    } catch (error) {
+      console.error('Error deleting vaccination:', error);
+      throw error;
+    }
+  };
+
+  // Batch add vaccinations
+  const batchAddVaccinations = async (vaccinations: Omit<Vaccination, 'id' | 'createdAt'>[]) => {
+    try {
+      const vaccinationRef = collection(db, 'vaccinations');
+      const batchVaccinations = vaccinations.map(vaccination => ({
+        ...vaccination,
+        createdAt: Timestamp.now()
+      }));
+
+      for (const vaccination of batchVaccinations) {
+        await addDoc(vaccinationRef, vaccination);
+      }
+      
+      // Refresh data after adding
+      await fetchVaccinations();
+    } catch (error) {
+      console.error('Error adding batch vaccinations:', error);
+      throw error;
+    }
+  };
+
+  // Fetch data when component mounts or currentPage changes
+  useEffect(() => {
+    fetchHealthRecords();
+    fetchVaccinations();
+  }, [currentPage]);
 
   return {
-    // Queries
     healthData,
     vaccinationData,
     isLoadingHealth,
     isLoadingVaccinations,
     healthError,
     vaccinationError,
-    
-    // Health Record Mutations
     addHealthRecord,
     updateHealthRecord,
     deleteHealthRecord,
-    
-    // Vaccination Mutations
     addVaccination,
     updateVaccination,
     deleteVaccination,
-    
-    // Batch Operations
     batchAddVaccinations
   };
 }; 

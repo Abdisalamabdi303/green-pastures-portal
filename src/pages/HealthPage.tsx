@@ -8,12 +8,14 @@ import { HealthFilters } from '@/components/health/HealthFilters';
 import { useHealthData } from '@/hooks/useHealthData';
 import { useAnimals } from '@/hooks/useAnimals';
 import { Timestamp } from 'firebase/firestore';
+import { BatchHealthRecordForm } from '@/components/health/BatchHealthRecordForm';
 
 const HealthPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [openHealthForm, setOpenHealthForm] = useState(false);
   const [openVaccinationForm, setOpenVaccinationForm] = useState(false);
   const [openBatchVaccinationForm, setOpenBatchVaccinationForm] = useState(false);
+  const [openBatchHealthForm, setOpenBatchHealthForm] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
     dateRange: { start: '', end: '' },
@@ -47,7 +49,7 @@ const HealthPage = () => {
   const handleAddHealthRecord = async (data: Omit<HealthRecord, 'id' | 'createdAt'>) => {
     try {
       console.log('HealthPage: Adding health record:', data);
-      await addHealthRecord.mutateAsync(data);
+      await addHealthRecord([data]); // Wrap single record in array
       setOpenHealthForm(false);
     } catch (error) {
       console.error('Error adding health record:', error);
@@ -57,7 +59,7 @@ const HealthPage = () => {
   const handleAddVaccination = async (data: Omit<Vaccination, 'id' | 'createdAt'>) => {
     try {
       console.log('HealthPage: Adding vaccination:', data);
-      await addVaccination.mutateAsync(data);
+      await addVaccination(data);
       setOpenVaccinationForm(false);
     } catch (error) {
       console.error('Error adding vaccination:', error);
@@ -66,22 +68,96 @@ const HealthPage = () => {
 
   const handleAddBatchVaccinations = async (vaccinations: Omit<Vaccination, 'id' | 'createdAt'>[]) => {
     try {
+      console.log('HealthPage: Starting batch vaccination submission');
+      console.log('Number of vaccinations to add:', vaccinations.length);
+      
+      // Validate vaccinations
+      vaccinations.forEach((vaccination, index) => {
+        console.log(`Validating vaccination ${index}:`, vaccination);
+        
+        // Check for required fields
+        const requiredFields = ['animalId', 'animalName', 'animalType', 'vaccineName', 'date', 'nextDueDate'];
+        const missingFields = requiredFields.filter(field => !vaccination[field as keyof typeof vaccination]);
+        
+        if (missingFields.length > 0) {
+          console.error('Missing required fields:', missingFields);
+          throw new Error(`Invalid vaccination data at index ${index}: Missing fields ${missingFields.join(', ')}`);
+        }
+
+        // Validate dates
+        if (!(vaccination.date instanceof Timestamp) || !(vaccination.nextDueDate instanceof Timestamp)) {
+          console.error('Invalid date format:', { date: vaccination.date, nextDueDate: vaccination.nextDueDate });
+          throw new Error(`Invalid vaccination data at index ${index}: Invalid date format`);
+        }
+      });
+
+      // Process vaccinations
       const batchVaccinations = vaccinations.map(vaccination => ({
         ...vaccination,
-        date: Timestamp.fromDate(new Date(vaccination.date)),
-        nextDueDate: Timestamp.fromDate(new Date(vaccination.nextDueDate)),
+        date: vaccination.date instanceof Timestamp ? vaccination.date : Timestamp.fromDate(new Date(vaccination.date)),
+        nextDueDate: vaccination.nextDueDate instanceof Timestamp ? vaccination.nextDueDate : Timestamp.fromDate(new Date(vaccination.nextDueDate)),
         createdAt: Timestamp.now(),
       }));
-      await batchAddVaccinations.mutateAsync(batchVaccinations);
+
+      console.log('Processed batch vaccinations:', batchVaccinations);
+      
+      // Submit to database
+      await batchAddVaccinations(batchVaccinations);
+      console.log('Batch vaccinations added successfully');
+      
       setOpenBatchVaccinationForm(false);
     } catch (error) {
       console.error('Error adding batch vaccinations:', error);
     }
   };
 
+  const handleAddBatchHealthRecords = async (records: Omit<HealthRecord, 'id' | 'createdAt'>[]) => {
+    try {
+      console.log('HealthPage: Starting batch health record submission');
+      console.log('Number of records to add:', records.length);
+      
+      // Validate records
+      records.forEach((record, index) => {
+        console.log(`Validating record ${index}:`, record);
+        
+        // Check for required fields
+        const requiredFields = ['animalId', 'animalName', 'animalType', 'condition', 'treatment', 'cost', 'date'];
+        const missingFields = requiredFields.filter(field => !record[field as keyof typeof record]);
+        
+        if (missingFields.length > 0) {
+          console.error('Missing required fields:', missingFields);
+          throw new Error(`Invalid health record data at index ${index}: Missing fields ${missingFields.join(', ')}`);
+        }
+
+        // Validate dates
+        if (!(record.date instanceof Timestamp)) {
+          console.error('Invalid date format:', { date: record.date });
+          throw new Error(`Invalid health record data at index ${index}: Invalid date format`);
+        }
+      });
+
+      // Process records
+      const batchRecords = records.map(record => ({
+        ...record,
+        date: record.date instanceof Timestamp ? record.date : Timestamp.fromDate(new Date(record.date)),
+        createdAt: Timestamp.now(),
+      }));
+
+      console.log('Processed batch health records:', batchRecords);
+      
+      // Submit to database
+      await addHealthRecord(batchRecords);
+      console.log('Batch health records added successfully');
+      
+      setOpenBatchHealthForm(false);
+    } catch (error) {
+      console.error('Error adding batch health records:', error);
+    }
+  };
+
   const handleUpdateHealthRecord = async (id: string, data: Partial<HealthRecord>) => {
     try {
-      await updateHealthRecord.mutateAsync({ id, data });
+      await updateHealthRecord({ id, data });
     } catch (error) {
       console.error('Error updating health record:', error);
     }
@@ -89,7 +165,7 @@ const HealthPage = () => {
 
   const handleUpdateVaccination = async (id: string, data: Partial<Vaccination>) => {
     try {
-      await updateVaccination.mutateAsync({ id, data });
+      await updateVaccination({ id, data });
     } catch (error) {
       console.error('Error updating vaccination:', error);
     }
@@ -98,7 +174,7 @@ const HealthPage = () => {
   const handleDeleteHealthRecord = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this health record?')) {
       try {
-        await deleteHealthRecord.mutateAsync(id);
+        await deleteHealthRecord(id);
       } catch (error) {
         console.error('Error deleting health record:', error);
       }
@@ -108,7 +184,7 @@ const HealthPage = () => {
   const handleDeleteVaccination = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this vaccination record?')) {
       try {
-        await deleteVaccination.mutateAsync(id);
+        await deleteVaccination(id);
       } catch (error) {
         console.error('Error deleting vaccination:', error);
       }
@@ -217,6 +293,13 @@ const HealthPage = () => {
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-farm-600 hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500"
             >
               Add Health Record
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpenBatchHealthForm(true)}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-farm-600 hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500"
+            >
+              Batch Health Record
             </button>
             <button
               type="button"
@@ -364,8 +447,12 @@ const HealthPage = () => {
                     {filteredVaccinations.map((vaccination) => (
                       <tr key={vaccination.id}>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{vaccination.animalName}</div>
-                          <div className="text-sm text-gray-500">{vaccination.animalId}</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {vaccination.animalId}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {vaccination.animalType}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {vaccination.vaccineName}
@@ -421,11 +508,11 @@ const HealthPage = () => {
               Previous
             </button>
             <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-              Page {currentPage} of {Math.max(healthData?.totalPages || 1, vaccinationData?.totalPages || 1)}
+              Page {currentPage} of {Math.max(1, vaccinationData?.totalPages || 1)}
             </span>
             <button
               onClick={() => setCurrentPage(prev => prev + 1)}
-              disabled={currentPage >= Math.max(healthData?.totalPages || 1, vaccinationData?.totalPages || 1)}
+              disabled={currentPage >= Math.max(1, vaccinationData?.totalPages || 1)}
               className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
             >
               Next
@@ -441,6 +528,14 @@ const HealthPage = () => {
             animals={animals}
           />
         )}
+        {openBatchHealthForm && (
+          <BatchHealthRecordForm
+            onAddBatchHealthRecords={handleAddBatchHealthRecords}
+            onClose={() => setOpenBatchHealthForm(false)}
+            animals={animals}
+            healthData={healthData}
+          />
+        )}
         {openVaccinationForm && (
           <AddVaccinationForm
             onAddVaccination={handleAddVaccination}
@@ -453,6 +548,7 @@ const HealthPage = () => {
             onAddBatchVaccinations={handleAddBatchVaccinations}
             onClose={() => setOpenBatchVaccinationForm(false)}
             animals={animals}
+            vaccinationData={vaccinationData}
           />
         )}
       </main>

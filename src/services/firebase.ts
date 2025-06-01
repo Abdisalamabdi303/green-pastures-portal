@@ -213,17 +213,28 @@ export const healthServices = {
   // Add a new health record
   addHealthRecord: async (recordData: Omit<HealthRecord, 'id' | 'createdAt'>) => {
     try {
-      const docRef = await addDoc(collection(db, 'health_records'), {
-        ...recordData,
-        createdAt: Timestamp.now(),
+      // Ensure all required fields are present and properly formatted
+      const healthRecord = {
+        animalId: recordData.animalId,
+        animalName: recordData.animalName || '',
+        animalType: recordData.animalType || '',
+        condition: recordData.condition,
+        status: recordData.status,
         date: typeof recordData.date === 'string' 
           ? Timestamp.fromDate(new Date(recordData.date))
-          : recordData.date
-      });
+          : recordData.date,
+        treatment: recordData.treatment,
+        cost: recordData.cost || 0,
+        notes: recordData.notes || '',
+        createdAt: Timestamp.now()
+      };
+
+      console.log('Submitting health record to Firestore:', healthRecord);
+      
+      const docRef = await addDoc(collection(db, 'health_records'), healthRecord);
       return { 
         id: docRef.id, 
-        ...recordData,
-        createdAt: Timestamp.now()
+        ...healthRecord
       };
     } catch (error) {
       console.error('Error adding health record:', error);

@@ -150,7 +150,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
                     value={formData.id || ''} 
                     onChange={handleFormChange} 
                     placeholder="Enter animal ID" 
-                    required
+                    required 
                   />
                  
                   <div className="grid grid-cols-2 gap-4">

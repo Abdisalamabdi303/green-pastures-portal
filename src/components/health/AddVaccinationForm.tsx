@@ -82,7 +82,7 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] bg-white">
+      <DialogContent className="sm:max-w-[425px] bg-gray-50">
         <DialogHeader>
           <DialogTitle>Add Vaccination</DialogTitle>
           <DialogDescription>
@@ -102,11 +102,11 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
                     defaultValue={field.value}
                   >
                     <FormControl>
-                      <SelectTrigger className="bg-white">
+                      <SelectTrigger className="bg-white border-gray-200">
                         <SelectValue placeholder="Select an animal" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="bg-white border border-gray-200">
                       {animals.map((animal) => (
                         <SelectItem key={animal.id} value={animal.id}>
                           {animal.id} - {animal.name}
@@ -126,7 +126,7 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
                 <FormItem>
                   <FormLabel>Vaccine Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter vaccine name" className="bg-white" {...field} />
+                    <Input placeholder="Enter vaccine name" className="bg-white border-gray-200" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -141,7 +141,7 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
                   <FormItem>
                     <FormLabel>Date</FormLabel>
                     <FormControl>
-                      <Input type="date" className="bg-white" {...field} />
+                      <Input type="date" className="bg-white border-gray-200" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -154,7 +154,7 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
                   <FormItem>
                     <FormLabel>Next Due Date</FormLabel>
                     <FormControl>
-                      <Input type="date" className="bg-white" {...field} />
+                      <Input type="date" className="bg-white border-gray-200" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -166,7 +166,7 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
               control={form.control}
               name="administered"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-white">
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-gray-200 p-4 bg-white">
                   <FormControl>
                     <input
                       type="checkbox"
@@ -190,7 +190,7 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
                   <FormControl>
                     <textarea
                       {...field}
-                      className="mt-1 focus:ring-farm-500 focus:border-farm-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md p-2 bg-white"
+                      className="mt-1 focus:ring-farm-500 focus:border-farm-500 block w-full shadow-sm sm:text-sm border-gray-200 rounded-md p-2 bg-white"
                       rows={3}
                     />
                   </FormControl>
@@ -208,7 +208,7 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting} className="bg-farm-600 hover:bg-farm-700 text-white">
                 {isSubmitting ? "Saving..." : "Save Vaccination"}
               </Button>
             </div>

@@ -18,8 +18,8 @@ const AnimalCard = ({ animal, onEdit, onDelete, isDeleting }: AnimalCardProps) =
             alt={`${animal.type} ${animal.breed}`} 
             className="w-full h-full object-cover"
           />
-        </div>
-      )}
+          </div>
+        )}
       
       <div className="p-4">
         <div className="flex justify-between items-start">
