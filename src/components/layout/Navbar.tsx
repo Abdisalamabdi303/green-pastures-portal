@@ -45,9 +45,9 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200">
+    <nav className="bg-white shadow-sm border-b border-gray-200 justify-evenly">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+        <div className="flex justify-evenly h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
               <Link 
@@ -79,9 +79,9 @@ const Navbar = () => {
               </Link>
             </div>
           </div>
-          <div className="hidden md:ml-6 md:flex md:items-center md:space-x-2">
+          <div className="hidden md:ml-6 md:flex md:items-center md:space-x-1">
             <Link to="/" className={getLinkClass('/')}>
-              <Home className="h-5 w-5 mr-2" />
+              <Home className="h-5 w-5 mr-2"/>
               Home
             </Link>
             <Link to="/dashboard" className={getLinkClass('/dashboard')}>
@@ -96,13 +96,14 @@ const Navbar = () => {
               <Receipt className="h-5 w-5 mr-2" />
               Expenses
             </Link>
-            <Link to="/finance" className={getLinkClass('/finance')}>
-              <Landmark className="h-5 w-5 mr-2" />
-              Finance
-            </Link>
+            
             <Link to="/health" className={getLinkClass('/health')}>
               <Stethoscope className="h-5 w-5 mr-2" />
               Health
+            </Link>
+            <Link to="/finance" className={getLinkClass('/finance')}>
+              <Landmark className="h-5 w-5 mr-2" />
+              Finance
             </Link>
             <Link to="/settings" className={getLinkClass('/settings')}>
               <Settings className="h-5 w-5 mr-2" />
