@@ -57,7 +57,7 @@ export function useExpenseFilters(expenses: Expense[]) {
     // Find highest expense category
     const highestExpense = categoryData.length > 0 
       ? categoryData.reduce((prev, current) => prev.amount > current.amount ? prev : current)
-      : { category: '', amount: 0 };
+      : { name: '', amount: 0 };
     
     // Get monthly data
     const monthlyMap: Record<string, number> = {};

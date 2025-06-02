@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { 
   collection, 
@@ -82,10 +81,10 @@ export function useOptimizedExpenses() {
           weight: animal.weight || 0,
           gender: animal.gender || '',
           status: animal.status || '',
-          description: animal.description,
           imageUrl: animal.imageUrl,
           photoUrl: animal.photoUrl,
-          isVaccinated: animal.isVaccinated || false
+          isVaccinated: animal.isVaccinated || false,
+          createdAt: animal.createdAt || Timestamp.now()
         };
       });
       

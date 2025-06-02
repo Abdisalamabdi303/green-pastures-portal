@@ -31,8 +31,8 @@ const DashboardPage = () => {
               
               {/* Charts */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <ExpenseChart data={stats.recentExpenses} />
-                <AnimalTypesChart data={stats.animalsByType} />
+                <ExpenseChart expenses={stats.recentExpenses} />
+                <AnimalTypesChart animals={stats.animalsByType} />
               </div>
             </div>
           )}
