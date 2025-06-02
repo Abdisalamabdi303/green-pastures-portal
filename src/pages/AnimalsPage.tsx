@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/layout/Navbar';
 import { User, Animal } from '../types';
@@ -11,6 +11,10 @@ import { animalServices } from '../services/firebase';
 import { toast } from 'sonner';
 
 const ITEMS_PER_PAGE = 10;
+const CACHE_DURATION = 1000 * 60; // 1 minute
+
+// Create cache Map outside component to persist between renders
+const animalsCache = new Map<string, { data: any; timestamp: number }>();
 
 const AnimalsPage = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -19,127 +23,198 @@ const AnimalsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddAnimalOpen, setIsAddAnimalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('list');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [totalPages, setTotalPages] = useState(1);
   const navigate = useNavigate();
 
-  // Fetch animals from Firestore
-  const fetchAnimals = async () => {
-    try {
-      setLoading(true);
-      const animalsList = await animalServices.getAnimals();
-      setAnimals(animalsList);
-      console.log('Fetched animals:', animalsList);
-    } catch (error) {
-      console.error('Error fetching animals:', error);
-      toast.error('Failed to load animals from database');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) {
-      navigate('/login');
+  // Fetch animals from Firestore with caching
+  const fetchAnimals = useCallback(async (page: number, search: string) => {
+    // Check cache first
+    const cacheKey = `${page}-${search}`;
+    const cachedData = animalsCache.get(cacheKey);
+    const now = Date.now();
+    
+    if (cachedData && now - cachedData.timestamp < CACHE_DURATION) {
+      setAnimals(cachedData.data.animals || []);
+      setTotalPages(Math.ceil((cachedData.data.total || 0) / ITEMS_PER_PAGE));
       return;
     }
 
-    setUser(JSON.parse(storedUser));
-    fetchAnimals();
-  }, [navigate]);
+    // If no cache, show loading state and fetch
+    setLoading(true);
+    
+    try {
+      const result = await animalServices.getAnimals(page, ITEMS_PER_PAGE, search);
+      
+      if (!result || !result.animals) {
+        setAnimals([]);
+        setTotalPages(1);
+        return;
+      }
+      
+      // Update cache
+      animalsCache.set(cacheKey, {
+        data: result,
+        timestamp: now
+      });
+      
+      setAnimals(result.animals);
+      setTotalPages(Math.ceil(result.total / ITEMS_PER_PAGE));
+    } catch (error) {
+      console.error('Error fetching animals:', error);
+      toast.error('Failed to load animals from database');
+      setAnimals([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const filteredAnimals = animals.filter(animal =>
-    animal.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    animal.breed?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    animal.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    animal.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Initial data fetch
+  useEffect(() => {
+    const initializeData = async () => {
+      const storedUser = localStorage.getItem('user');
+      if (!storedUser) {
+        navigate('/login');
+        return;
+      }
 
-  // Pagination
-  const totalPages = Math.ceil(filteredAnimals.length / ITEMS_PER_PAGE);
-  const paginatedAnimals = filteredAnimals.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+      const userData = JSON.parse(storedUser);
+      setUser(userData);
+      
+      // Check cache for initial data
+      const cacheKey = '1-';
+      const cachedData = animalsCache.get(cacheKey);
+      const now = Date.now();
+      
+      if (cachedData && now - cachedData.timestamp < CACHE_DURATION) {
+        // Optimistically show cached data
+        setAnimals(cachedData.data.animals || []);
+        setTotalPages(Math.ceil((cachedData.data.total || 0) / ITEMS_PER_PAGE));
+        
+        // Then fetch fresh data in background
+        fetchAnimals(1, '');
+      } else {
+        // If no cache, fetch immediately
+        fetchAnimals(1, '');
+      }
+    };
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    window.scrollTo(0, 0);
-  };
+    initializeData();
+  }, [navigate, fetchAnimals]);
+
+  // Handle search and page changes with debounce
+  useEffect(() => {
+    if (!user) return;
+
+    const timeoutId = setTimeout(() => {
+      // Check cache first
+      const cacheKey = `${currentPage}-${searchTerm}`;
+      const cachedData = animalsCache.get(cacheKey);
+      const now = Date.now();
+      
+      if (cachedData && now - cachedData.timestamp < CACHE_DURATION) {
+        // Optimistically show cached data
+        setAnimals(cachedData.data.animals || []);
+        setTotalPages(Math.ceil((cachedData.data.total || 0) / ITEMS_PER_PAGE));
+        
+        // Then fetch fresh data in background
+        fetchAnimals(currentPage, searchTerm);
+      } else {
+        // If no cache, fetch immediately
+        fetchAnimals(currentPage, searchTerm);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [currentPage, searchTerm, user, fetchAnimals]);
 
   const handleAddAnimal = async (newAnimal: Animal) => {
     try {
       if (selectedAnimal) {
-        // Editing existing animal
+        // Optimistic update for editing
+        setAnimals(prevAnimals => 
+          prevAnimals.map(animal => 
+            animal.id === selectedAnimal.id ? { ...newAnimal, id: selectedAnimal.id } : animal
+          )
+        );
+        
         const updatedAnimal = await animalServices.updateAnimal(selectedAnimal.id, newAnimal);
-        
-        // If ID was changed, we need to update the local state differently
-        if (updatedAnimal.id !== selectedAnimal.id) {
-          setAnimals(prevAnimals => 
-            prevAnimals.map(animal => 
-              animal.id === selectedAnimal.id ? updatedAnimal : animal
-            )
-          );
-        } else {
-          setAnimals(prevAnimals => 
-            prevAnimals.map(animal => 
-              animal.id === selectedAnimal.id ? { ...updatedAnimal, id: selectedAnimal.id } : animal
-            )
-          );
-        }
-        
         toast.success('Animal updated successfully');
       } else {
-        // Adding new animal
+        // Optimistic update for adding
+        setAnimals(prevAnimals => {
+          if (currentPage === 1) {
+            return [newAnimal, ...prevAnimals.slice(0, ITEMS_PER_PAGE - 1)];
+          }
+          return prevAnimals;
+        });
+        
+        if (currentPage !== 1) {
+          setCurrentPage(1);
+        }
+        
         const addedAnimal = await animalServices.addAnimal(newAnimal);
-        setAnimals(prevAnimals => [...prevAnimals, addedAnimal]);
         toast.success('Animal added successfully');
       }
+      
+      // Clear cache after mutation
+      animalsCache.clear();
       
       setSelectedAnimal(null);
       setIsAddAnimalOpen(false);
     } catch (error) {
       console.error('Error saving animal:', error);
       toast.error('Failed to save animal');
+      // Revert optimistic update on error
+      fetchAnimals(currentPage, searchTerm);
     }
-  };
-  
-  const handleEditAnimal = (animal: Animal) => {
-    setSelectedAnimal(animal);
-    setIsAddAnimalOpen(true);
   };
 
   const handleDeleteAnimal = async (id: string) => {
     const animalToDelete = animals.find(a => a.id === id);
     if (!animalToDelete) {
-      console.error('Animal not found:', id);
       toast.error('Animal not found');
       return;
     }
 
-    const confirmMessage = `Are you sure you want to delete this animal?\n\nID: ${animalToDelete.id}\nType: ${animalToDelete.type}\nBreed: ${animalToDelete.breed}\n\nThis action cannot be undone.`;
-    
-    if (window.confirm(confirmMessage)) {
+    if (window.confirm(`Are you sure you want to delete this animal?\n\nID: ${animalToDelete.id}\nType: ${animalToDelete.type}\nBreed: ${animalToDelete.breed}\n\nThis action cannot be undone.`)) {
       try {
-        console.log('Starting deletion of animal:', id);
         setIsDeleting(id);
         
-        // Call the delete service
-        const result = await animalServices.deleteAnimal(id);
-        console.log('Delete result:', result);
-        
-        // Update local state
+        // Optimistic update for deletion
         setAnimals(prevAnimals => prevAnimals.filter(animal => animal.id !== id));
+        
+        await animalServices.deleteAnimal(id);
+        
+        // Clear cache after mutation
+        animalsCache.clear();
+        
         toast.success('Animal deleted successfully');
       } catch (error) {
         console.error('Error deleting animal:', error);
         toast.error(`Failed to delete animal: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        
+        // Revert optimistic update on error
+        fetchAnimals(currentPage, searchTerm);
       } finally {
         setIsDeleting(null);
       }
     }
+  };
+
+  // No need to filter animals since we're using server-side filtering
+  const paginatedAnimals = animals;
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo(0, 0);
+  };
+
+  const handleEditAnimal = (animal: Animal) => {
+    setSelectedAnimal(animal);
+    setIsAddAnimalOpen(true);
   };
   
   if (!user) {
@@ -255,9 +330,9 @@ const AnimalsPage = () => {
                       <p className="text-sm text-gray-700">
                         Showing <span className="font-medium">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{' '}
                         <span className="font-medium">
-                          {Math.min(currentPage * ITEMS_PER_PAGE, filteredAnimals.length)}
+                          {Math.min(currentPage * ITEMS_PER_PAGE, animals.length)}
                         </span>{' '}
-                        of <span className="font-medium">{filteredAnimals.length}</span> results
+                        of <span className="font-medium">{animals.length}</span> results
                       </p>
                     </div>
                     <div>

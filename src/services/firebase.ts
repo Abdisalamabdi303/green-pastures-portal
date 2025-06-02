@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, where, setDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, where, setDoc, getDoc, limit as firestoreLimit, startAfter } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Animal, HealthRecord, Vaccination } from '@/types';
 
@@ -19,11 +19,11 @@ export const animalServices = {
           category: 'Animal Purchase',
           amount: animalData.purchasePrice,
           date: Timestamp.fromDate(new Date(animalData.purchaseDate || new Date())),
-          description: `Purchase of ${animalData.name} (${animalData.type})`,
+          description: `Purchase of ${animalData.type || 'Animal'} (${animalData.breed || 'Unknown Breed'})`,
           paymentMethod: 'Cash',
           animalRelated: true,
           animalId: animalData.id,
-          animalName: animalData.name,
+          animalName: animalData.name || animalData.id, // Fallback to ID if name is not provided
           createdAt: Timestamp.now()
         };
 
@@ -42,16 +42,66 @@ export const animalServices = {
     }
   },
 
-  // Get all animals
-  getAnimals: async () => {
+  // Get all animals with pagination and search
+  getAnimals: async (page = 1, limit = 10, searchTerm = '') => {
     try {
-      const q = query(collection(db, 'animals'), orderBy('createdAt', 'desc'));
+      console.log('Fetching animals with params:', { page, limit, searchTerm });
+      
+      // First, get the total count with a separate query
+      const countQuery = query(collection(db, 'animals'));
+      const countSnapshot = await getDocs(countQuery);
+      const total = countSnapshot.size;
+      
+      // Then get the paginated data
+      let q = query(
+        collection(db, 'animals'),
+        orderBy('createdAt', 'desc'),
+        firestoreLimit(limit)
+      );
+      
+      // If not on first page, we need to get the last document from the previous page
+      if (page > 1) {
+        const previousPageQuery = query(
+          collection(db, 'animals'),
+          orderBy('createdAt', 'desc'),
+          firestoreLimit((page - 1) * limit)
+        );
+        const previousPageSnapshot = await getDocs(previousPageQuery);
+        const lastVisible = previousPageSnapshot.docs[previousPageSnapshot.docs.length - 1];
+        
+        if (lastVisible) {
+          q = query(
+            collection(db, 'animals'),
+            orderBy('createdAt', 'desc'),
+            startAfter(lastVisible),
+            firestoreLimit(limit)
+          );
+        }
+      }
+      
+      // Add search conditions if searchTerm is provided
+      if (searchTerm) {
+        q = query(
+          q,
+          where('searchTerms', 'array-contains', searchTerm.toLowerCase())
+        );
+      }
+      
       const querySnapshot = await getDocs(q);
       
-      return querySnapshot.docs.map(doc => ({
+      const animals = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Animal[];
+      
+      console.log('Fetched animals:', { total, page, limit, animalsCount: animals.length });
+      
+      return {
+        animals,
+        total,
+        page,
+        limit
+      };
     } catch (error) {
       console.error('Error fetching animals:', error);
       throw error;
