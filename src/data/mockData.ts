@@ -14,9 +14,9 @@ export const mockAnimals: Animal[] = [
     purchasePrice: 25000,
     weight: 600,
     gender: "Female",
-    status: "Active",
-    description: "Dairy cow with high milk production",
+    status: "active",
     isVaccinated: true,
+    createdAt: null
   },
   {
     id: "2",
@@ -29,9 +29,9 @@ export const mockAnimals: Animal[] = [
     purchasePrice: 8000,
     weight: 180,
     gender: "Male",
-    status: "Active",
-    description: "Breeding boar",
+    status: "active",
     isVaccinated: true,
+    createdAt: null
   },
   {
     id: "3",
@@ -44,9 +44,9 @@ export const mockAnimals: Animal[] = [
     purchasePrice: 500,
     weight: 2.5,
     gender: "Female",
-    status: "Active",
-    description: "Egg layer",
+    status: "active",
     isVaccinated: true,
+    createdAt: null
   },
   {
     id: "4",
@@ -59,9 +59,9 @@ export const mockAnimals: Animal[] = [
     purchasePrice: 7500,
     weight: 75,
     gender: "Male",
-    status: "Active",
-    description: "Meat goat",
+    status: "active",
     isVaccinated: true,
+    createdAt: null
   },
   {
     id: "5",
@@ -74,9 +74,9 @@ export const mockAnimals: Animal[] = [
     purchasePrice: 6000,
     weight: 65,
     gender: "Female",
-    status: "Active",
-    description: "Wool producer",
+    status: "active",
     isVaccinated: true,
+    createdAt: null
   },
 ];
 

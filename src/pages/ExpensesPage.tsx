@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/layout/Navbar';
@@ -18,12 +19,6 @@ const ExpensesPage = () => {
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState({
-    category: '',
-    amount: 0,
-    date: new Date().toISOString().split('T')[0],
-    description: ''
-  });
   
   const {
     selectedYear,
@@ -64,15 +59,6 @@ const ExpensesPage = () => {
     setUser(JSON.parse(storedUser));
     fetchExpenses();
   }, [navigate]);
-
-  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
-    
-      setFormData({
-        ...formData,
-      [name]: type === 'number' ? parseFloat(value) || 0 : value
-      });
-  };
 
   const handleAddExpense = async (data) => {
     try {
@@ -128,6 +114,13 @@ const ExpensesPage = () => {
     );
   });
 
+  // Convert categoryData to match ChartData type
+  const chartCategoryData = categoryData.map(item => ({
+    name: item.name,
+    value: item.amount,
+    amount: item.amount
+  }));
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -152,7 +145,7 @@ const ExpensesPage = () => {
             averageExpense={averageExpense}
             highestExpense={highestExpense}
             monthlyData={monthlyData}
-            categoryData={categoryData}
+            categoryData={chartCategoryData}
             getCategoryIcon={getCategoryIconElement}
           />
           
@@ -183,8 +176,6 @@ const ExpensesPage = () => {
       {/* Add Expense Modal */}
       <AddExpenseForm 
         handleAddExpense={handleAddExpense}
-        formData={formData}
-        handleFormChange={handleFormChange}
         isAddExpenseOpen={isAddExpenseOpen}
         setIsAddExpenseOpen={setIsAddExpenseOpen}
       />
