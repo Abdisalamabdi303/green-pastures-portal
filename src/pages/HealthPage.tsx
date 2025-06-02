@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/layout/Navbar';
 import { HealthRecord, Vaccination } from '@/types';
 import AddHealthRecordForm from '@/components/health/AddHealthRecordForm';
@@ -9,9 +10,18 @@ import { useHealthData } from '@/hooks/useHealthData';
 import { useAnimals } from '@/hooks/useAnimals';
 import { Timestamp } from 'firebase/firestore';
 import { BatchHealthRecordForm } from '@/components/health/BatchHealthRecordForm';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Plus, Edit, Trash2, AlertCircle, Filter, Calendar, Syringe, Activity } from 'lucide-react';
+import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const HealthPage = () => {
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
+  const [activeTab, setActiveTab] = useState('health');
   const [openHealthForm, setOpenHealthForm] = useState(false);
   const [openVaccinationForm, setOpenVaccinationForm] = useState(false);
   const [openBatchVaccinationForm, setOpenBatchVaccinationForm] = useState(false);
@@ -23,6 +33,9 @@ const HealthPage = () => {
     condition: '',
     vaccinationStatus: ''
   });
+  const [isAddingHealth, setIsAddingHealth] = useState(false);
+  const [isAddingVaccination, setIsAddingVaccination] = useState(false);
+  const [isBatchAddingVaccinations, setIsBatchAddingVaccinations] = useState(false);
 
   const { animals, isLoading: isLoadingAnimals, error: animalsError } = useAnimals();
   const {
@@ -46,68 +59,82 @@ const HealthPage = () => {
     setCurrentPage(1); // Reset to first page when filters change
   };
 
-  const handleAddHealthRecord = async (data: Omit<HealthRecord, 'id' | 'createdAt'>) => {
+  const handleAddHealthRecord = async (records: Omit<HealthRecord, 'id' | 'createdAt'>[]) => {
     try {
-      console.log('HealthPage: Adding health record:', data);
-      await addHealthRecord([data]); // Wrap single record in array
-      setOpenHealthForm(false);
+      setIsAddingHealth(true);
+      await addHealthRecord(records);
+      toast.success('Health records added successfully');
     } catch (error) {
-      console.error('Error adding health record:', error);
+      toast.error('Failed to add health records');
+      console.error('Error adding health records:', error);
+    } finally {
+      setIsAddingHealth(false);
     }
   };
 
-  const handleAddVaccination = async (data: Omit<Vaccination, 'id' | 'createdAt'>) => {
+  const handleAddVaccination = async (vaccination: Omit<Vaccination, 'id' | 'createdAt'>) => {
     try {
-      console.log('HealthPage: Adding vaccination:', data);
-      await addVaccination(data);
-      setOpenVaccinationForm(false);
+      setIsAddingVaccination(true);
+      await addVaccination(vaccination);
+      toast.success('Vaccination added successfully');
     } catch (error) {
+      toast.error('Failed to add vaccination');
       console.error('Error adding vaccination:', error);
+    } finally {
+      setIsAddingVaccination(false);
     }
   };
 
-  const handleAddBatchVaccinations = async (vaccinations: Omit<Vaccination, 'id' | 'createdAt'>[]) => {
+  const handleBatchAddVaccinations = async (vaccinations: Omit<Vaccination, 'id' | 'createdAt'>[]) => {
     try {
-      console.log('HealthPage: Starting batch vaccination submission');
-      console.log('Number of vaccinations to add:', vaccinations.length);
-      
-      // Validate vaccinations
-      vaccinations.forEach((vaccination, index) => {
-        console.log(`Validating vaccination ${index}:`, vaccination);
-        
-        // Check for required fields
-        const requiredFields = ['animalId', 'animalName', 'animalType', 'vaccineName', 'date', 'nextDueDate'];
-        const missingFields = requiredFields.filter(field => !vaccination[field as keyof typeof vaccination]);
-        
-        if (missingFields.length > 0) {
-          console.error('Missing required fields:', missingFields);
-          throw new Error(`Invalid vaccination data at index ${index}: Missing fields ${missingFields.join(', ')}`);
-        }
-
-        // Validate dates
-        if (!(vaccination.date instanceof Timestamp) || !(vaccination.nextDueDate instanceof Timestamp)) {
-          console.error('Invalid date format:', { date: vaccination.date, nextDueDate: vaccination.nextDueDate });
-          throw new Error(`Invalid vaccination data at index ${index}: Invalid date format`);
-        }
-      });
-
-      // Process vaccinations
-      const batchVaccinations = vaccinations.map(vaccination => ({
-        ...vaccination,
-        date: vaccination.date instanceof Timestamp ? vaccination.date : Timestamp.fromDate(new Date(vaccination.date)),
-        nextDueDate: vaccination.nextDueDate instanceof Timestamp ? vaccination.nextDueDate : Timestamp.fromDate(new Date(vaccination.nextDueDate)),
-        createdAt: Timestamp.now(),
-      }));
-
-      console.log('Processed batch vaccinations:', batchVaccinations);
-      
-      // Submit to database
-      await batchAddVaccinations(batchVaccinations);
-      console.log('Batch vaccinations added successfully');
-      
-      setOpenBatchVaccinationForm(false);
+      setIsBatchAddingVaccinations(true);
+      await batchAddVaccinations(vaccinations);
+      toast.success('Vaccinations added successfully');
     } catch (error) {
-      console.error('Error adding batch vaccinations:', error);
+      toast.error('Failed to add vaccinations');
+      console.error('Error adding vaccinations:', error);
+    } finally {
+      setIsBatchAddingVaccinations(false);
+    }
+  };
+
+  const handleUpdateHealthRecord = async ({ id, data }: { id: string; data: Partial<HealthRecord> }) => {
+    try {
+      await updateHealthRecord({ id, data });
+      toast.success('Health record updated successfully');
+    } catch (error) {
+      toast.error('Failed to update health record');
+      console.error('Error updating health record:', error);
+    }
+  };
+
+  const handleDeleteHealthRecord = async (id: string) => {
+    try {
+      await deleteHealthRecord(id);
+      toast.success('Health record deleted successfully');
+    } catch (error) {
+      toast.error('Failed to delete health record');
+      console.error('Error deleting health record:', error);
+    }
+  };
+
+  const handleUpdateVaccination = async ({ id, data }: { id: string; data: Partial<Vaccination> }) => {
+    try {
+      await updateVaccination({ id, data });
+      toast.success('Vaccination updated successfully');
+    } catch (error) {
+      toast.error('Failed to update vaccination');
+      console.error('Error updating vaccination:', error);
+    }
+  };
+
+  const handleDeleteVaccination = async (id: string) => {
+    try {
+      await deleteVaccination(id);
+      toast.success('Vaccination deleted successfully');
+    } catch (error) {
+      toast.error('Failed to delete vaccination');
+      console.error('Error deleting vaccination:', error);
     }
   };
 
@@ -152,43 +179,18 @@ const HealthPage = () => {
       setOpenBatchHealthForm(false);
     } catch (error) {
       console.error('Error adding batch health records:', error);
+      toast.error('Failed to add batch health records');
     }
   };
 
-  const handleUpdateHealthRecord = async (id: string, data: Partial<HealthRecord>) => {
-    try {
-      await updateHealthRecord({ id, data });
-    } catch (error) {
-      console.error('Error updating health record:', error);
-    }
+  const handleEditHealthRecord = (record: HealthRecord) => {
+    setOpenHealthForm(true);
+    // You can pass the record data to the form if needed
   };
 
-  const handleUpdateVaccination = async (id: string, data: Partial<Vaccination>) => {
-    try {
-      await updateVaccination({ id, data });
-    } catch (error) {
-      console.error('Error updating vaccination:', error);
-    }
-  };
-
-  const handleDeleteHealthRecord = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this health record?')) {
-      try {
-        await deleteHealthRecord(id);
-      } catch (error) {
-        console.error('Error deleting health record:', error);
-      }
-    }
-  };
-
-  const handleDeleteVaccination = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this vaccination record?')) {
-      try {
-        await deleteVaccination(id);
-      } catch (error) {
-        console.error('Error deleting vaccination:', error);
-      }
-    }
+  const handleEditVaccination = (vaccination: Vaccination) => {
+    setOpenVaccinationForm(true);
+    // You can pass the vaccination data to the form if needed
   };
 
   const filteredHealthRecords = healthData?.records.filter(record => {
@@ -256,9 +258,7 @@ const HealthPage = () => {
           <div className="bg-red-50 border-l-4 border-red-400 p-4">
             <div className="flex">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
+                <AlertCircle className="h-5 w-5 text-red-400" />
               </div>
               <div className="ml-3">
                 <h3 className="text-sm font-medium text-red-800">
@@ -286,216 +286,229 @@ const HealthPage = () => {
               Health Management
             </h2>
           </div>
-          <div className="mt-4 flex md:mt-0 md:ml-4 space-x-3">
-            <button
-              type="button"
-              onClick={() => setOpenHealthForm(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-farm-600 hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500"
-            >
-              Add Health Record
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpenBatchHealthForm(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-farm-600 hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500"
-            >
-              Batch Health Record
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpenVaccinationForm(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-farm-600 hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500"
-            >
-              Add Vaccination
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpenBatchVaccinationForm(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-farm-600 hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500"
-            >
-              Batch Vaccination
-            </button>
-          </div>
         </div>
 
-        <HealthFilters onFilterChange={handleFilterChange} />
-
-        {/* Health Records Section */}
-        <div className="bg-white shadow rounded-lg mb-6">
-          <div className="px-4 py-5 sm:px-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">
-              Health Records
-            </h3>
+        <div className="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow mb-6">
+          <div className="flex items-center mb-4">
+            <Filter className="h-4 w-4 mr-2 text-farm-600" />
+            <span className="text-sm font-medium text-gray-700">Filters</span>
           </div>
-          <div className="border-t border-gray-200">
-            {isLoadingHealth ? (
-              <div className="p-4 text-center">Loading...</div>
-            ) : filteredHealthRecords.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">No health records found</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Animal
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Condition
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Treatment
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Cost
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredHealthRecords.map((record) => (
-                      <tr key={record.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{record.animalName}</div>
-                          <div className="text-sm text-gray-500">{record.animalId}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            record.condition === 'healthy' ? 'bg-green-100 text-green-800' :
-                            record.condition === 'sick' ? 'bg-red-100 text-red-800' :
-                            record.condition === 'injured' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-blue-100 text-blue-800'
-                          }`}>
-                            {record.condition}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {record.treatment}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(record.date).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          ${record.cost.toFixed(2)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => handleUpdateHealthRecord(record.id, { ...record, condition: 'healthy' })}
-                            className="text-farm-600 hover:text-farm-900 mr-4"
-                          >
-                            Mark Healthy
-                          </button>
-                          <button
-                            onClick={() => handleDeleteHealthRecord(record.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          <HealthFilters onFilterChange={handleFilterChange} />
         </div>
 
-        {/* Vaccinations Section */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5 sm:px-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">
-              Vaccinations
-            </h3>
-          </div>
-          <div className="border-t border-gray-200">
-            {isLoadingVaccinations ? (
-              <div className="p-4 text-center">Loading...</div>
-            ) : filteredVaccinations.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">No vaccination records found</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Animal
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Vaccine
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Next Due
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredVaccinations.map((vaccination) => (
-                      <tr key={vaccination.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {vaccination.animalId}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {vaccination.animalType}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {vaccination.vaccineName}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(vaccination.date).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(vaccination.nextDueDate).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            new Date(vaccination.nextDueDate) > new Date() ? 'bg-green-100 text-green-800' :
-                            new Date(vaccination.nextDueDate) < new Date() ? 'bg-red-100 text-red-800' :
-                            'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {new Date(vaccination.nextDueDate) > new Date() ? 'Up to Date' :
-                             new Date(vaccination.nextDueDate) < new Date() ? 'Overdue' :
-                             'Due'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => handleUpdateVaccination(vaccination.id, { ...vaccination, administered: true })}
-                            className="text-farm-600 hover:text-farm-900 mr-4"
-                          >
-                            Mark Administered
-                          </button>
-                          <button
-                            onClick={() => handleDeleteVaccination(vaccination.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xl font-bold">Health Records</CardTitle>
+            <div className="flex items-center space-x-2">
+              {activeTab === 'health' ? (
+                <>
+                  <Button
+                    onClick={() => setOpenHealthForm(true)}
+                    disabled={isAddingHealth}
+                    className="bg-farm-600 hover:bg-farm-700 text-white"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Record
+                  </Button>
+                  <Button
+                    onClick={() => setOpenBatchHealthForm(true)}
+                    className="bg-farm-600 hover:bg-farm-700 text-white"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Batch Record
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    onClick={() => setOpenVaccinationForm(true)}
+                    disabled={isAddingVaccination}
+                    className="bg-farm-600 hover:bg-farm-700 text-white"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Vaccination
+                  </Button>
+                  <Button
+                    onClick={() => setOpenBatchVaccinationForm(true)}
+                    disabled={isBatchAddingVaccinations}
+                    className="bg-farm-600 hover:bg-farm-700 text-white"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Batch Vaccination
+                  </Button>
+                </>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4 bg-gray-100 p-1 rounded-lg">
+                <TabsTrigger 
+                  value="health" 
+                  className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-farm-600"
+                >
+                  <Activity className="h-4 w-4" />
+                  <span>Health Records</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="vaccinations" 
+                  className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-farm-600"
+                >
+                  <Syringe className="h-4 w-4" />
+                  <span>Vaccinations</span>
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="health">
+                {healthError ? (
+                  <div className="flex items-center space-x-2 text-red-500">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>{healthError.message}</span>
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Animal ID</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Condition</TableHead>
+                          <TableHead>Treatment</TableHead>
+                          <TableHead className="text-right">Cost</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {isLoadingHealth ? (
+                          Array(5).fill(0).map((_, index) => (
+                            <HealthRecordSkeleton key={index} />
+                          ))
+                        ) : filteredHealthRecords.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center text-gray-500 py-8">
+                              No health records found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredHealthRecords.map((record) => (
+                            <TableRow key={record.id} className="hover:bg-gray-50">
+                              <TableCell className="font-medium">
+                                {record.date.toDate().toLocaleDateString()}
+                              </TableCell>
+                              <TableCell>{record.animalId}</TableCell>
+                              <TableCell>{record.animalType}</TableCell>
+                              <TableCell>{record.condition}</TableCell>
+                              <TableCell>{record.treatment}</TableCell>
+                              <TableCell className="text-right font-medium">
+                                ${record.cost.toFixed(2)}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex justify-end space-x-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditHealthRecord(record)}
+                                    className="text-farm-600 hover:text-farm-700 hover:bg-farm-50"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteHealthRecord(record.id)}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="vaccinations">
+                {vaccinationError ? (
+                  <div className="flex items-center space-x-2 text-red-500">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>{vaccinationError.message}</span>
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Animal ID</TableHead>
+                          <TableHead>Vaccine</TableHead>
+                          <TableHead>Next Due</TableHead>
+                          <TableHead className="text-right">Cost</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {isLoadingVaccinations ? (
+                          Array(5).fill(0).map((_, index) => (
+                            <VaccinationSkeleton key={index} />
+                          ))
+                        ) : filteredVaccinations.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                              No vaccination records found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredVaccinations.map((vaccination) => (
+                            <TableRow key={vaccination.id} className="hover:bg-gray-50">
+                              <TableCell className="font-medium">
+                                {vaccination.date.toDate().toLocaleDateString()}
+                              </TableCell>
+                              <TableCell>{vaccination.animalId}</TableCell>
+                              <TableCell>{vaccination.vaccineName}</TableCell>
+                              <TableCell>
+                                <span className={new Date(vaccination.nextDueDate) <= new Date() ? 'text-red-600' : ''}>
+                                  {vaccination.nextDueDate.toDate().toLocaleDateString()}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                ${(vaccination.cost || 0).toFixed(2)}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex justify-end space-x-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditVaccination(vaccination)}
+                                    className="text-farm-600 hover:text-farm-700 hover:bg-farm-50"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteVaccination(vaccination.id)}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
 
         {/* Pagination */}
         <div className="mt-4 flex justify-center">
@@ -508,11 +521,11 @@ const HealthPage = () => {
               Previous
             </button>
             <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-              Page {currentPage} of {Math.max(1, vaccinationData?.totalPages || 1)}
+              Page {currentPage} of {Math.max(1, activeTab === 'health' ? healthData?.totalPages : vaccinationData?.totalPages || 1)}
             </span>
             <button
               onClick={() => setCurrentPage(prev => prev + 1)}
-              disabled={currentPage >= Math.max(1, vaccinationData?.totalPages || 1)}
+              disabled={currentPage >= Math.max(1, activeTab === 'health' ? healthData?.totalPages : vaccinationData?.totalPages || 1)}
               className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
             >
               Next
@@ -545,7 +558,7 @@ const HealthPage = () => {
         )}
         {openBatchVaccinationForm && (
           <BatchVaccinationForm
-            onAddBatchVaccinations={handleAddBatchVaccinations}
+            onAddBatchVaccinations={handleBatchAddVaccinations}
             onClose={() => setOpenBatchVaccinationForm(false)}
             animals={animals}
             vaccinationData={vaccinationData}
@@ -555,5 +568,28 @@ const HealthPage = () => {
     </div>
   );
 };
+
+const HealthRecordSkeleton = () => (
+  <TableRow>
+    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+    <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+    <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+    <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+    <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+  </TableRow>
+);
+
+const VaccinationSkeleton = () => (
+  <TableRow>
+    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+    <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+    <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+    <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+  </TableRow>
+);
 
 export default HealthPage; 

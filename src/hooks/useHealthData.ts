@@ -1,24 +1,39 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { collection, query, orderBy, limit, startAfter, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { HealthRecord, Vaccination } from '@/types';
 
 const ITEMS_PER_PAGE = 10;
+const CACHE_DURATION = 1000 * 60; // 1 minute
+
+// Create cache Maps outside hook to persist between renders
+const healthCache = new Map<string, { data: any; timestamp: number }>();
+const vaccinationCache = new Map<string, { data: any; timestamp: number }>();
 
 export const useHealthData = (currentPage: number) => {
   const [healthData, setHealthData] = useState<{ records: HealthRecord[]; totalPages: number } | null>(null);
   const [vaccinationData, setVaccinationData] = useState<{ vaccinations: Vaccination[]; totalPages: number } | null>(null);
-  const [isLoadingHealth, setIsLoadingHealth] = useState(true);
-  const [isLoadingVaccinations, setIsLoadingVaccinations] = useState(true);
+  const [isLoadingHealth, setIsLoadingHealth] = useState(false);
+  const [isLoadingVaccinations, setIsLoadingVaccinations] = useState(false);
   const [healthError, setHealthError] = useState<Error | null>(null);
   const [vaccinationError, setVaccinationError] = useState<Error | null>(null);
 
-  // Fetch health records
-  const fetchHealthRecords = async () => {
+  // Fetch health records with caching
+  const fetchHealthRecords = useCallback(async () => {
+    // Check cache first
+    const cacheKey = `health-${currentPage}`;
+    const cachedData = healthCache.get(cacheKey);
+    const now = Date.now();
+    
+    if (cachedData && now - cachedData.timestamp < CACHE_DURATION) {
+      setHealthData(cachedData.data);
+      return;
+    }
+
+    setIsLoadingHealth(true);
+    setHealthError(null);
+    
     try {
-      setIsLoadingHealth(true);
-      setHealthError(null);
-      
       const healthRef = collection(db, 'healthRecords');
       const q = query(
         healthRef,
@@ -36,21 +51,39 @@ export const useHealthData = (currentPage: number) => {
       const totalSnapshot = await getDocs(healthRef);
       const totalPages = Math.ceil(totalSnapshot.size / ITEMS_PER_PAGE);
 
-      setHealthData({ records, totalPages });
+      const newData = { records, totalPages };
+      
+      // Update cache
+      healthCache.set(cacheKey, {
+        data: newData,
+        timestamp: now
+      });
+
+      setHealthData(newData);
     } catch (error) {
       console.error('Error fetching health records:', error);
       setHealthError(error instanceof Error ? error : new Error('Failed to fetch health records'));
     } finally {
       setIsLoadingHealth(false);
     }
-  };
+  }, [currentPage]);
 
-  // Fetch vaccinations
-  const fetchVaccinations = async () => {
+  // Fetch vaccinations with caching
+  const fetchVaccinations = useCallback(async () => {
+    // Check cache first
+    const cacheKey = `vaccination-${currentPage}`;
+    const cachedData = vaccinationCache.get(cacheKey);
+    const now = Date.now();
+    
+    if (cachedData && now - cachedData.timestamp < CACHE_DURATION) {
+      setVaccinationData(cachedData.data);
+      return;
+    }
+
+    setIsLoadingVaccinations(true);
+    setVaccinationError(null);
+    
     try {
-      setIsLoadingVaccinations(true);
-      setVaccinationError(null);
-      
       const vaccinationRef = collection(db, 'vaccinations');
       const q = query(
         vaccinationRef,
@@ -68,16 +101,24 @@ export const useHealthData = (currentPage: number) => {
       const totalSnapshot = await getDocs(vaccinationRef);
       const totalPages = Math.ceil(totalSnapshot.size / ITEMS_PER_PAGE);
 
-      setVaccinationData({ vaccinations, totalPages });
+      const newData = { vaccinations, totalPages };
+      
+      // Update cache
+      vaccinationCache.set(cacheKey, {
+        data: newData,
+        timestamp: now
+      });
+
+      setVaccinationData(newData);
     } catch (error) {
       console.error('Error fetching vaccinations:', error);
       setVaccinationError(error instanceof Error ? error : new Error('Failed to fetch vaccinations'));
     } finally {
       setIsLoadingVaccinations(false);
     }
-  };
+  }, [currentPage]);
 
-  // Add health record
+  // Add health record with optimistic update and expense tracking
   const addHealthRecord = async (records: Omit<HealthRecord, 'id' | 'createdAt'>[]) => {
     try {
       const healthRef = collection(db, 'healthRecords');
@@ -86,94 +127,292 @@ export const useHealthData = (currentPage: number) => {
         createdAt: Timestamp.now()
       }));
 
+      // Optimistic update
+      const optimisticRecords = batchRecords.map(record => ({
+        ...record,
+        id: `temp-${Date.now()}-${Math.random()}`
+      })) as HealthRecord[];
+
+      setHealthData(prev => {
+        if (!prev) return { records: optimisticRecords, totalPages: 1 };
+        return {
+          records: [...optimisticRecords, ...prev.records.slice(0, ITEMS_PER_PAGE - optimisticRecords.length)],
+          totalPages: prev.totalPages
+        };
+      });
+
+      // Add health costs to expenses
+      for (const record of batchRecords) {
+        if (record.cost > 0) {
+          await addDoc(collection(db, 'expenses'), {
+            category: 'Health',
+            description: `Health treatment for ${record.animalName}: ${record.condition}`,
+            amount: record.cost,
+            date: record.date,
+            paymentMethod: 'Cash',
+            animalRelated: true,
+            animalName: record.animalName,
+            animalId: record.animalId,
+            createdAt: Timestamp.now()
+          });
+        }
+      }
+
+      // Actual update
       for (const record of batchRecords) {
         await addDoc(healthRef, record);
       }
 
-      // Refresh data after adding
-      await fetchHealthRecords();
+      // Update cache instead of clearing
+      const cacheKey = `health-${currentPage}`;
+      healthCache.set(cacheKey, {
+        data: {
+          records: [...optimisticRecords, ...(healthData?.records || [])],
+          totalPages: healthData?.totalPages || 1
+        },
+        timestamp: Date.now()
+      });
+
     } catch (error) {
       console.error('Error adding health record:', error);
+      // Revert optimistic update on error
+      await fetchHealthRecords();
       throw error;
     }
   };
 
-  // Update health record
+  // Update health record with optimistic update and expense tracking
   const updateHealthRecord = async ({ id, data }: { id: string; data: Partial<HealthRecord> }) => {
     try {
+      const oldRecord = healthData?.records.find(r => r.id === id);
+      
+      // Optimistic update
+      setHealthData(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          records: prev.records.map(record => 
+            record.id === id ? { ...record, ...data } : record
+          )
+        };
+      });
+
+      // If cost changed, update expense
+      if (data.cost !== undefined && oldRecord && data.cost !== oldRecord.cost) {
+        const expensesRef = collection(db, 'expenses');
+        const q = query(
+          expensesRef,
+          where('description', '==', `Health treatment for ${oldRecord.animalName}: ${oldRecord.condition}`),
+          where('date', '==', oldRecord.date)
+        );
+        const expenseSnapshot = await getDocs(q);
+        
+        if (!expenseSnapshot.empty) {
+          const expenseDoc = expenseSnapshot.docs[0];
+          await updateDoc(doc(db, 'expenses', expenseDoc.id), {
+            amount: data.cost
+          });
+        }
+      }
+
+      // Actual update
       const healthRef = doc(db, 'healthRecords', id);
       await updateDoc(healthRef, data);
-      
-      // Refresh data after updating
-      await fetchHealthRecords();
+
+      // Update cache
+      const cacheKey = `health-${currentPage}`;
+      healthCache.set(cacheKey, {
+        data: healthData,
+        timestamp: Date.now()
+      });
+
     } catch (error) {
       console.error('Error updating health record:', error);
+      // Revert optimistic update on error
+      await fetchHealthRecords();
       throw error;
     }
   };
 
-  // Delete health record
-  const deleteHealthRecord = async (id: string) => {
+  // Delete health record with optimistic update and expense cleanup
+  const deleteHealthRecord = useCallback(async (id: string) => {
     try {
-      const healthRef = doc(db, 'healthRecords', id);
-      await deleteDoc(healthRef);
-      
-      // Refresh data after deleting
-      await fetchHealthRecords();
+      // Optimistic update
+      setHealthData(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          records: prev.records.filter(record => record.id !== id),
+          totalRecords: prev.totalRecords - 1,
+          totalPages: Math.ceil((prev.totalRecords - 1) / ITEMS_PER_PAGE)
+        };
+      });
+
+      // Update cache
+      const cacheKey = `health_records_${currentPage}`;
+      const cachedData = healthCache.get(cacheKey);
+      if (cachedData) {
+        healthCache.set(cacheKey, {
+          ...cachedData,
+          records: cachedData.records.filter(record => record.id !== id),
+          totalRecords: cachedData.totalRecords - 1,
+          totalPages: Math.ceil((cachedData.totalRecords - 1) / ITEMS_PER_PAGE)
+        });
+      }
+
+      // Delete from database
+      await deleteDoc(doc(db, 'healthRecords', id));
     } catch (error) {
       console.error('Error deleting health record:', error);
+      // Revert optimistic update on error
+      setHealthData(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          records: [...prev.records],
+          totalRecords: prev.totalRecords,
+          totalPages: prev.totalPages
+        };
+      });
       throw error;
     }
-  };
+  }, [currentPage]);
 
-  // Add vaccination
+  // Add vaccination with optimistic update
   const addVaccination = async (vaccination: Omit<Vaccination, 'id' | 'createdAt'>) => {
     try {
+      // Optimistic update
+      const optimisticVaccination = {
+        ...vaccination,
+        id: `temp-${Date.now()}-${Math.random()}`,
+        createdAt: Timestamp.now()
+      } as Vaccination;
+
+      setVaccinationData(prev => {
+        if (!prev) return { vaccinations: [optimisticVaccination], totalPages: 1 };
+        return {
+          vaccinations: [optimisticVaccination, ...prev.vaccinations.slice(0, ITEMS_PER_PAGE - 1)],
+          totalPages: prev.totalPages
+        };
+      });
+
+      // Clear cache
+      vaccinationCache.clear();
+
+      // Actual update
       const vaccinationRef = collection(db, 'vaccinations');
       await addDoc(vaccinationRef, {
         ...vaccination,
         createdAt: Timestamp.now()
       });
       
-      // Refresh data after adding
+      // Refresh data
       await fetchVaccinations();
     } catch (error) {
       console.error('Error adding vaccination:', error);
+      // Revert optimistic update on error
+      await fetchVaccinations();
       throw error;
     }
   };
 
-  // Update vaccination
+  // Update vaccination with optimistic update
   const updateVaccination = async ({ id, data }: { id: string; data: Partial<Vaccination> }) => {
     try {
+      // Optimistic update
+      setVaccinationData(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          vaccinations: prev.vaccinations.map(vaccination => 
+            vaccination.id === id ? { ...vaccination, ...data } : vaccination
+          )
+        };
+      });
+
+      // Clear cache
+      vaccinationCache.clear();
+
+      // Actual update
       const vaccinationRef = doc(db, 'vaccinations', id);
       await updateDoc(vaccinationRef, data);
       
-      // Refresh data after updating
+      // Refresh data
       await fetchVaccinations();
     } catch (error) {
       console.error('Error updating vaccination:', error);
+      // Revert optimistic update on error
+      await fetchVaccinations();
       throw error;
     }
   };
 
-  // Delete vaccination
-  const deleteVaccination = async (id: string) => {
+  // Delete vaccination with optimistic update
+  const deleteVaccination = useCallback(async (id: string) => {
     try {
-      const vaccinationRef = doc(db, 'vaccinations', id);
-      await deleteDoc(vaccinationRef);
-      
-      // Refresh data after deleting
-      await fetchVaccinations();
+      // Optimistic update
+      setVaccinationData(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          vaccinations: prev.vaccinations.filter(vaccination => vaccination.id !== id),
+          totalRecords: prev.totalRecords - 1,
+          totalPages: Math.ceil((prev.totalRecords - 1) / ITEMS_PER_PAGE)
+        };
+      });
+
+      // Update cache
+      const cacheKey = `vaccinations_${currentPage}`;
+      const cachedData = vaccinationCache.get(cacheKey);
+      if (cachedData) {
+        vaccinationCache.set(cacheKey, {
+          ...cachedData,
+          vaccinations: cachedData.vaccinations.filter(vaccination => vaccination.id !== id),
+          totalRecords: cachedData.totalRecords - 1,
+          totalPages: Math.ceil((cachedData.totalRecords - 1) / ITEMS_PER_PAGE)
+        });
+      }
+
+      // Delete from database
+      await deleteDoc(doc(db, 'vaccinations', id));
     } catch (error) {
       console.error('Error deleting vaccination:', error);
+      // Revert optimistic update on error
+      setVaccinationData(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          vaccinations: [...prev.vaccinations],
+          totalRecords: prev.totalRecords,
+          totalPages: prev.totalPages
+        };
+      });
       throw error;
     }
-  };
+  }, [currentPage]);
 
-  // Batch add vaccinations
+  // Batch add vaccinations with optimistic update
   const batchAddVaccinations = async (vaccinations: Omit<Vaccination, 'id' | 'createdAt'>[]) => {
     try {
+      // Optimistic update
+      const optimisticVaccinations = vaccinations.map(vaccination => ({
+        ...vaccination,
+        id: `temp-${Date.now()}-${Math.random()}`,
+        createdAt: Timestamp.now()
+      })) as Vaccination[];
+
+      setVaccinationData(prev => {
+        if (!prev) return { vaccinations: optimisticVaccinations, totalPages: 1 };
+        return {
+          vaccinations: [...optimisticVaccinations, ...prev.vaccinations.slice(0, ITEMS_PER_PAGE - optimisticVaccinations.length)],
+          totalPages: prev.totalPages
+        };
+      });
+
+      // Clear cache
+      vaccinationCache.clear();
+
+      // Actual update
       const vaccinationRef = collection(db, 'vaccinations');
       const batchVaccinations = vaccinations.map(vaccination => ({
         ...vaccination,
@@ -184,19 +423,42 @@ export const useHealthData = (currentPage: number) => {
         await addDoc(vaccinationRef, vaccination);
       }
       
-      // Refresh data after adding
+      // Refresh data
       await fetchVaccinations();
     } catch (error) {
       console.error('Error adding batch vaccinations:', error);
+      // Revert optimistic update on error
+      await fetchVaccinations();
       throw error;
     }
   };
 
-  // Fetch data when component mounts or currentPage changes
+  // Initial data fetch
   useEffect(() => {
-    fetchHealthRecords();
-    fetchVaccinations();
-  }, [currentPage]);
+    const initializeData = async () => {
+      // Check cache for initial data
+      const healthCacheKey = 'health-1';
+      const vaccinationCacheKey = 'vaccination-1';
+      
+      const healthCachedData = healthCache.get(healthCacheKey);
+      const vaccinationCachedData = vaccinationCache.get(vaccinationCacheKey);
+      const now = Date.now();
+      
+      if (healthCachedData && now - healthCachedData.timestamp < CACHE_DURATION) {
+        setHealthData(healthCachedData.data);
+      } else {
+        await fetchHealthRecords();
+      }
+      
+      if (vaccinationCachedData && now - vaccinationCachedData.timestamp < CACHE_DURATION) {
+        setVaccinationData(vaccinationCachedData.data);
+      } else {
+        await fetchVaccinations();
+      }
+    };
+
+    initializeData();
+  }, [fetchHealthRecords, fetchVaccinations]);
 
   return {
     healthData,

@@ -1,56 +1,84 @@
-
-import { useState } from 'react';
-import { Filter } from 'lucide-react';
+import React from 'react';
+import { Expense } from '@/types';
 
 interface ExpenseFiltersProps {
   selectedYear: number;
   setSelectedYear: (year: number) => void;
   selectedMonth: number;
   setSelectedMonth: (month: number) => void;
-  expenses: any[];
+  expenses: Expense[];
 }
 
-const ExpenseFilters = ({ selectedYear, setSelectedYear, selectedMonth, setSelectedMonth, expenses }: ExpenseFiltersProps) => {
+const months = [
+  'All Months',
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+export const ExpenseFilters: React.FC<ExpenseFiltersProps> = ({
+  selectedYear,
+  setSelectedYear,
+  selectedMonth,
+  setSelectedMonth,
+  expenses
+}) => {
+  // Get unique years from expenses
+  const years = Array.from(
+    new Set(
+      expenses
+        .map(expense => {
+          if (expense.date) {
+            if (typeof expense.date === 'object' && 'toDate' in expense.date && typeof expense.date.toDate === 'function') {
+              return expense.date.toDate().getFullYear();
+            } else if (typeof expense.date === 'string') {
+              return new Date(expense.date).getFullYear();
+            }
+          }
+          return null;
+        })
+        .filter((year): year is number => year !== null)
+    )
+  ).sort((a, b) => b - a); // Sort years in descending order
+
+  // Add current year if not in the list
+  const currentYear = new Date().getFullYear();
+  if (!years.includes(currentYear)) {
+    years.unshift(currentYear);
+  }
+
   return (
-    <div className="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow mb-4 flex flex-wrap gap-4 items-center border border-gray-100">
-      <div className="flex items-center">
-        <Filter className="h-4 w-4 mr-2 text-farm-600" />
-        <span className="text-sm font-medium text-gray-700">Filters:</span>
-      </div>
-      
-      <div>
-        <label htmlFor="year-select" className="block text-sm font-medium text-gray-700 mb-1">
-          Year
+    <div className="flex gap-4 items-center">
+      <div className="flex items-center gap-2">
+        <label htmlFor="year" className="text-sm font-medium text-gray-700">
+          Year:
         </label>
         <select
-          id="year-select"
-          className="border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-farm-500 focus:border-farm-500 bg-white"
+          id="year"
           value={selectedYear}
-          onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+          onChange={(e) => setSelectedYear(Number(e.target.value))}
+          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
         >
-          {Array.from(new Set(expenses.map(expense => new Date(expense.date).getFullYear())))
-            .sort((a, b) => b - a)
-            .map(year => (
-              <option key={year} value={year}>{year}</option>
-            ))
-          }
+          {years.map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
         </select>
       </div>
-      
-      <div>
-        <label htmlFor="month-select" className="block text-sm font-medium text-gray-700 mb-1">
-          Month
+
+      <div className="flex items-center gap-2">
+        <label htmlFor="month" className="text-sm font-medium text-gray-700">
+          Month:
         </label>
         <select
-          id="month-select"
-          className="border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-farm-500 focus:border-farm-500 bg-white"
+          id="month"
           value={selectedMonth}
-          onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+          onChange={(e) => setSelectedMonth(Number(e.target.value))}
+          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
         >
-          <option value={-1}>All Months</option>
-          {Array.from({ length: 12 }, (_, i) => i).map(month => (
-            <option key={month} value={month}>
-              {new Date(2000, month, 1).toLocaleString('default', { month: 'long' })}
+          {months.map((month, index) => (
+            <option key={month} value={index - 1}>
+              {month}
             </option>
           ))}
         </select>
@@ -58,5 +86,3 @@ const ExpenseFilters = ({ selectedYear, setSelectedYear, selectedMonth, setSelec
     </div>
   );
 };
-
-export default ExpenseFilters;

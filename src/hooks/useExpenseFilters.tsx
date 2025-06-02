@@ -1,10 +1,11 @@
-
 import { useState, useEffect } from 'react';
 import { Expense } from '@/types';
 
 export function useExpenseFilters(expenses: Expense[]) {
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  // Initialize with current date values
+  const currentDate = new Date();
+  const [selectedYear, setSelectedYear] = useState<number>(currentDate.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number>(currentDate.getMonth());
   const [searchTerm, setSearchTerm] = useState('');
   
   // For visualizations and analytics
