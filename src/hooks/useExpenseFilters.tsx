@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Expense } from '@/types';
 
 export function useExpenseFilters(expenses: Expense[]) {
@@ -7,24 +8,10 @@ export function useExpenseFilters(expenses: Expense[]) {
   const [selectedYear, setSelectedYear] = useState<number>(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(currentDate.getMonth());
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // For visualizations and analytics
-  const [categoryData, setCategoryData] = useState<Array<{name: string; amount: number}>>([]);
-  const [monthlyData, setMonthlyData] = useState<{date: string; amount: number}[]>([]);
-  const [totalExpense, setTotalExpense] = useState<number>(0);
-  const [averageExpense, setAverageExpense] = useState<number>(0);
-  const [highestExpense, setHighestExpense] = useState<{category: string; amount: number}>({category: '', amount: 0});
 
-  useEffect(() => {
-    if (expenses.length > 0) {
-      // Process data for visualizations
-      processExpenseData();
-    }
-  }, [expenses, selectedYear, selectedMonth]);
-
-  const processExpenseData = () => {
-    // Filter expenses for the selected year and month
-    const filteredExpenses = expenses.filter(expense => {
+  // Memoize filtered expenses to avoid recalculating on every render
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter(expense => {
       // Handle Firebase Timestamp or string date
       let expenseDate;
       if (expense.date) {
@@ -32,22 +19,26 @@ export function useExpenseFilters(expenses: Expense[]) {
           expenseDate = expense.date.toDate();
         } else if (typeof expense.date === 'string') {
           expenseDate = new Date(expense.date);
+        } else if (expense.date instanceof Date) {
+          expenseDate = expense.date;
         } else {
-          return false; // Skip this expense if we can't determine the date
+          return false;
         }
         
         return expenseDate.getFullYear() === selectedYear && 
                (selectedMonth === -1 || expenseDate.getMonth() === selectedMonth);
       }
-      return false; // Skip if no date
+      return false;
     });
-    
+  }, [expenses, selectedYear, selectedMonth]);
+
+  // Memoize analytics data to avoid recalculating on every render
+  const analytics = useMemo(() => {
     // Calculate total expense
-    const total = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-    setTotalExpense(total);
+    const totalExpense = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
     
     // Calculate average expense
-    setAverageExpense(filteredExpenses.length > 0 ? total / filteredExpenses.length : 0);
+    const averageExpense = filteredExpenses.length > 0 ? totalExpense / filteredExpenses.length : 0;
     
     // Get expense by category
     const categoryMap: Record<string, number> = {};
@@ -58,37 +49,29 @@ export function useExpenseFilters(expenses: Expense[]) {
     });
     
     // Convert to array for charts
-    const categoryChartData = Object.keys(categoryMap).map(category => ({
+    const categoryData = Object.keys(categoryMap).map(category => ({
       name: category,
       amount: categoryMap[category]
     }));
     
-    setCategoryData(categoryChartData);
-    
     // Find highest expense category
-    if (categoryChartData.length > 0) {
-      const highest = categoryChartData.reduce((prev, current) => 
-        prev.amount > current.amount ? prev : current
-      );
-      
-      setHighestExpense({
-        category: highest.name,
-        amount: highest.amount
-      });
-    }
+    const highestExpense = categoryData.length > 0 
+      ? categoryData.reduce((prev, current) => prev.amount > current.amount ? prev : current)
+      : { category: '', amount: 0 };
     
     // Get monthly data
     const monthlyMap: Record<string, number> = {};
     filteredExpenses.forEach(expense => {
-      // Handle Firebase Timestamp
       let date;
       if (expense.date) {
         if (typeof expense.date === 'object' && 'toDate' in expense.date && typeof expense.date.toDate === 'function') {
           date = expense.date.toDate();
         } else if (typeof expense.date === 'string') {
           date = new Date(expense.date);
+        } else if (expense.date instanceof Date) {
+          date = expense.date;
         } else {
-          return; // Skip this expense if we can't determine the date
+          return;
         }
         
         const monthYear = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
@@ -97,28 +80,50 @@ export function useExpenseFilters(expenses: Expense[]) {
     });
     
     // Convert to array for charts and sort by date
-    const monthlyChartData = Object.keys(monthlyMap)
+    const monthlyData = Object.keys(monthlyMap)
       .map(date => ({
         date,
         amount: monthlyMap[date]
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
-    
-    setMonthlyData(monthlyChartData);
-  };
+
+    return {
+      totalExpense,
+      averageExpense,
+      categoryData,
+      monthlyData,
+      highestExpense: {
+        category: highestExpense.name || '',
+        amount: highestExpense.amount
+      }
+    };
+  }, [filteredExpenses]);
+
+  // Memoize callbacks to prevent unnecessary re-renders
+  const setSelectedYearCallback = useCallback((year: number) => {
+    setSelectedYear(year);
+  }, []);
+
+  const setSelectedMonthCallback = useCallback((month: number) => {
+    setSelectedMonth(month);
+  }, []);
+
+  const setSearchTermCallback = useCallback((term: string) => {
+    setSearchTerm(term);
+  }, []);
 
   return {
     selectedYear,
-    setSelectedYear,
+    setSelectedYear: setSelectedYearCallback,
     selectedMonth,
-    setSelectedMonth,
+    setSelectedMonth: setSelectedMonthCallback,
     searchTerm,
-    setSearchTerm,
-    categoryData,
-    monthlyData,
-    totalExpense,
-    averageExpense,
-    highestExpense,
-    processExpenseData
+    setSearchTerm: setSearchTermCallback,
+    categoryData: analytics.categoryData,
+    monthlyData: analytics.monthlyData,
+    totalExpense: analytics.totalExpense,
+    averageExpense: analytics.averageExpense,
+    highestExpense: analytics.highestExpense,
+    filteredExpenses
   };
 }
