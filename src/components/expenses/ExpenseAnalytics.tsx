@@ -1,16 +1,15 @@
-
 import { BarChart3 } from 'lucide-react';
 import ExpenseChart from '../dashboard/ExpenseChart';
-import ExpenseFilters from './ExpenseFilters';
+import { ExpenseFilters } from './ExpenseFilters';
 import ExpenseSummaryCards from './ExpenseSummaryCards';
-import { ChartData } from '@/types';
+import { ChartData, Expense } from '@/types';
 
 interface ExpenseAnalyticsProps {
   selectedYear: number;
   setSelectedYear: (year: number) => void;
   selectedMonth: number;
   setSelectedMonth: (month: number) => void;
-  expenses: any[];
+  expenses: Expense[];
   totalExpense: number;
   averageExpense: number;
   highestExpense: {

@@ -1,4 +1,3 @@
-
 import { Bird, DollarSign, TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -7,6 +6,15 @@ interface StatCardsProps {
   dailyExpenses: number;
   monthlyProfit: number;
 }
+
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount);
+};
 
 export default function StatCards({ totalAnimals, dailyExpenses, monthlyProfit }: StatCardsProps) {
   return (
@@ -17,7 +25,7 @@ export default function StatCards({ totalAnimals, dailyExpenses, monthlyProfit }
           <Bird className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{totalAnimals}</div>
+          <div className="text-2xl font-bold">{totalAnimals.toLocaleString()}</div>
           <p className="text-xs text-muted-foreground">
             Registered in the system
           </p>
@@ -30,7 +38,7 @@ export default function StatCards({ totalAnimals, dailyExpenses, monthlyProfit }
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">₹{dailyExpenses.toLocaleString()}</div>
+          <div className="text-2xl font-bold">{formatCurrency(dailyExpenses)}</div>
           <p className="text-xs text-muted-foreground">
             For all operations today
           </p>
@@ -48,7 +56,7 @@ export default function StatCards({ totalAnimals, dailyExpenses, monthlyProfit }
         </CardHeader>
         <CardContent>
           <div className={`text-2xl font-bold ${monthlyProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            ₹{Math.abs(monthlyProfit).toLocaleString()}
+            {formatCurrency(Math.abs(monthlyProfit))}
           </div>
           <p className="text-xs text-muted-foreground">
             {monthlyProfit >= 0 ? 'Profit' : 'Loss'} this month

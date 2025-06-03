@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   LineChart, 
@@ -19,7 +18,7 @@ import { ChartData } from "@/types";
 import { Wheat, ShoppingBasket, TrendingUp } from "lucide-react";
 
 interface ExpenseChartProps {
-  recentExpenses: {
+  recentExpenses?: {
     date: string;
     amount: number;
   }[];
@@ -33,9 +32,35 @@ interface ExpenseChartProps {
 // Farm-themed color palette
 const COLORS = ['#94cf43', '#c9ea9e', '#619c11', '#49760d', '#304f08'];
 
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount);
+};
+
+const formatDate = (dateStr: string) => {
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+      return 'Invalid Date';
+    }
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Invalid Date';
+  }
+};
+
 export default function ExpenseChart({ 
-  recentExpenses, 
-  categoryData, 
+  recentExpenses = [], 
+  categoryData = [], 
   chartType = 'line',
   title = "Recent Expenses",
   description = "Daily expenses for the past week",
@@ -52,6 +77,18 @@ export default function ExpenseChart({
         return <TrendingUp className="h-4 w-4 text-muted-foreground" />;
     }
   };
+
+  // Format data for charts
+  const formattedExpenses = recentExpenses?.map(expense => {
+    const formattedDate = formatDate(expense.date);
+    return {
+      ...expense,
+      formattedDate,
+      formattedAmount: formatCurrency(expense.amount),
+      // Keep original date for sorting
+      originalDate: new Date(expense.date).getTime()
+    };
+  }).sort((a, b) => a.originalDate - b.originalDate) || [];
   
   if (loading) {
     return (
@@ -117,14 +154,24 @@ export default function ExpenseChart({
         <ResponsiveContainer width="100%" height="100%">
           {chartType === 'line' ? (
             <LineChart
-              data={recentExpenses}
+              data={formattedExpenses}
               margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="date" tick={{ fill: '#666' }} />
-              <YAxis tick={{ fill: '#666' }} />
+              <XAxis 
+                dataKey="formattedDate" 
+                tick={{ fill: '#666' }}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+              />
+              <YAxis 
+                tick={{ fill: '#666' }}
+                tickFormatter={(value) => formatCurrency(value)}
+              />
               <Tooltip 
-                formatter={(value) => [`₹${value}`, 'Amount']}
+                formatter={(value) => [formatCurrency(value as number), 'Amount']}
+                labelFormatter={(label) => label}
                 contentStyle={{ 
                   backgroundColor: 'white', 
                   border: '1px solid #e0e0e0',
@@ -165,7 +212,7 @@ export default function ExpenseChart({
                 ))}
               </Pie>
               <Tooltip 
-                formatter={(value) => [`₹${value}`, 'Amount']}
+                formatter={(value) => [formatCurrency(value as number), 'Amount']}
                 contentStyle={{ 
                   backgroundColor: 'white', 
                   border: '1px solid #e0e0e0',
@@ -177,14 +224,24 @@ export default function ExpenseChart({
             </PieChart>
           ) : (
             <BarChart
-              data={recentExpenses}
+              data={formattedExpenses}
               margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="date" tick={{ fill: '#666' }} />
-              <YAxis tick={{ fill: '#666' }} />
+              <XAxis 
+                dataKey="formattedDate" 
+                tick={{ fill: '#666' }}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+              />
+              <YAxis 
+                tick={{ fill: '#666' }}
+                tickFormatter={(value) => formatCurrency(value)}
+              />
               <Tooltip 
-                formatter={(value) => [`₹${value}`, 'Amount']}
+                formatter={(value) => [formatCurrency(value as number), 'Amount']}
+                labelFormatter={(label) => label}
                 contentStyle={{ 
                   backgroundColor: 'white', 
                   border: '1px solid #e0e0e0',
@@ -198,7 +255,6 @@ export default function ExpenseChart({
                 fill="#94cf43" 
                 name="Expense Amount" 
                 radius={[4, 4, 0, 0]}
-                barSize={30}
               />
             </BarChart>
           )}
