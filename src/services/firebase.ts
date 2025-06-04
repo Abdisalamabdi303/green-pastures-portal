@@ -8,10 +8,15 @@ export const animalServices = {
   addAnimal: async (animalData: Animal) => {
     try {
       const animalRef = doc(db, 'animals', animalData.id);
-      await setDoc(animalRef, {
+      const animalToAdd = {
         ...animalData,
-        createdAt: Timestamp.now()
-      });
+        createdAt: Timestamp.now(),
+        status: animalData.status || 'active',
+        health: animalData.health || 'Good',
+        isVaccinated: animalData.isVaccinated || false
+      };
+      
+      await setDoc(animalRef, animalToAdd);
 
       // Create an expense record for the animal purchase
       if (animalData.purchasePrice && animalData.purchasePrice > 0) {
@@ -23,7 +28,7 @@ export const animalServices = {
           paymentMethod: 'Cash',
           animalRelated: true,
           animalId: animalData.id,
-          animalName: animalData.name || animalData.id, // Fallback to ID if name is not provided
+          animalName: animalData.name || animalData.id,
           createdAt: Timestamp.now()
         };
 
@@ -35,7 +40,7 @@ export const animalServices = {
         });
       }
 
-      return animalData;
+      return animalToAdd;
     } catch (error) {
       console.error('Error adding animal:', error);
       throw error;
@@ -51,14 +56,6 @@ export const animalServices = {
         orderBy('createdAt', 'desc')
       );
 
-      // Add search conditions if searchTerm is provided
-      if (searchTerm) {
-        baseQuery = query(
-          baseQuery,
-          where('searchTerms', 'array-contains', searchTerm.toLowerCase())
-        );
-      }
-
       // Get total count and paginated data in parallel
       const [countSnapshot, dataSnapshot] = await Promise.all([
         getCountFromServer(baseQuery),
@@ -66,10 +63,20 @@ export const animalServices = {
       ]);
 
       const total = countSnapshot.data().count;
-      const animals = dataSnapshot.docs.map(doc => ({
+      let animals = dataSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Animal[];
+
+      // Filter animals based on search term if provided
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        animals = animals.filter(animal => 
+          animal.id.toLowerCase().includes(searchLower) ||
+          animal.type?.toLowerCase().includes(searchLower) ||
+          animal.breed?.toLowerCase().includes(searchLower)
+        );
+      }
 
       return {
         animals,

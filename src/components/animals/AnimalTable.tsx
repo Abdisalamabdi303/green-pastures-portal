@@ -1,4 +1,3 @@
-
 import React, { memo, useCallback, useMemo } from 'react';
 import { Animal } from '@/types';
 import AnimalTableHeader from './AnimalTableHeader';
@@ -11,7 +10,7 @@ interface AnimalTableProps {
   isDeleting: string | null;
 }
 
-const AnimalTable = memo(({ animals, onEdit, onDelete, isDeleting }: AnimalTableProps) => {
+const AnimalTable = ({ animals, onEdit, onDelete, isDeleting }: AnimalTableProps) => {
   const handleEdit = useCallback((animal: Animal) => {
     onEdit(animal);
   }, [onEdit]);
@@ -38,12 +37,17 @@ const AnimalTable = memo(({ animals, onEdit, onDelete, isDeleting }: AnimalTable
         <AnimalTableHeader />
         <tbody className="bg-white divide-y divide-gray-200">
           {tableRows}
+          {animals.length === 0 && (
+            <tr>
+              <td colSpan={10} className="px-6 py-4 text-center text-sm text-gray-500">
+                No animals found
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
   );
-});
+};
 
-AnimalTable.displayName = 'AnimalTable';
-
-export default AnimalTable;
+export default memo(AnimalTable);

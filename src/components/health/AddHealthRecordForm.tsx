@@ -88,7 +88,7 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] bg-gray-50">
+      <DialogContent className="sm:max-w-[425px] bg-white">
         <DialogHeader>
           <DialogTitle>Add Health Record</DialogTitle>
           <DialogDescription>
@@ -248,7 +248,7 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting} className="bg-farm-600 hover:bg-farm-700 text-white">
-                {isSubmitting ? "Saving..." : "Save Health Record"}
+                {isSubmitting ? "Saving..." : "Save Record"}
               </Button>
             </div>
           </form>

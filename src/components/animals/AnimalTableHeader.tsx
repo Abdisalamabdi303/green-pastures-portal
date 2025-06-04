@@ -1,7 +1,6 @@
-
 import React from 'react';
 
-const AnimalTableHeader = React.memo(() => {
+const AnimalTableHeader = () => {
   return (
     <thead className="bg-gray-50">
       <tr>
@@ -38,8 +37,6 @@ const AnimalTableHeader = React.memo(() => {
       </tr>
     </thead>
   );
-});
-
-AnimalTableHeader.displayName = 'AnimalTableHeader';
+};
 
 export default AnimalTableHeader;

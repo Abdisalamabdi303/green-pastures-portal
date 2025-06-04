@@ -82,21 +82,44 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
       return;
     }
 
+    if (!photoPreview) {
+      alert('Animal photo is required');
+      return;
+    }
+
+    if (!formData.gender) {
+      alert('Gender is required');
+      return;
+    }
+
+    if (!formData.purchasePrice || formData.purchasePrice <= 0) {
+      alert('Purchase price is required and must be greater than 0');
+      return;
+    }
+
     // Remove any whitespace from ID
     const cleanId = formData.id.trim();
+    
     if (!cleanId) {
       alert('Animal ID cannot be empty');
       return;
     }
     
     const newAnimal: Animal = {
-      ...formData as Animal,
       id: cleanId,
-      photoUrl: photoPreview || undefined,
-      createdAt: Timestamp.now(),
+      type: formData.type || '',
+      breed: formData.breed,
+      age: formData.age || 0,
+      health: formData.health || 'Good',
+      weight: formData.weight || 0,
+      gender: formData.gender,
       status: formData.status || 'active',
+      purchaseDate: formData.purchaseDate,
+      purchasePrice: formData.purchasePrice,
+      photoUrl: photoPreview,
       isVaccinated: formData.isVaccinated || false,
-      notes: formData.notes || ''
+      notes: formData.notes || '',
+      createdAt: Timestamp.now()
     };
     
     onAddAnimal(newAnimal);
@@ -159,7 +182,6 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
                       name="type" 
                       value={formData.type || ''} 
                       onChange={handleFormChange} 
-                      required 
                       options={["Cow", "Goat", "Sheep", "Camel"]} 
                     />
                     <InputField 
@@ -168,7 +190,6 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
                       type="text" 
                       value={formData.breed || ''} 
                       onChange={handleFormChange} 
-                     
                     />
                   </div>
                   
@@ -181,7 +202,6 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
                       step={0.1} 
                       value={formData.age || 0} 
                       onChange={handleFormChange} 
-                      required 
                     />
                     <InputField 
                       label="Weight (kg)" 
@@ -191,7 +211,6 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
                       step={0.1} 
                       value={formData.weight || 0} 
                       onChange={handleFormChange} 
-                      required 
                     />
                   </div>
 
@@ -229,7 +248,6 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
                     name="isVaccinated"
                     value={formData.isVaccinated === true ? 'Yes' : 'No'}
                     onChange={handleFormChange}
-                    required
                     options={["Yes", "No"]}
                   />
                   

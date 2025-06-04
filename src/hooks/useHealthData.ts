@@ -141,19 +141,24 @@ export const useHealthData = (currentPage: number) => {
         };
       });
 
-      // Add health costs to expenses
-      for (const record of batchRecords) {
-        if (record.cost > 0) {
+      // Add health costs to expenses - combine costs for batch records
+      if (batchRecords.length > 0) {
+        const totalCost = batchRecords.reduce((sum, record) => sum + (record.cost || 0), 0);
+        if (totalCost > 0) {
+          // Create a single expense for the batch
+          const firstRecord = batchRecords[0];
+          const animalNames = batchRecords.map(r => r.animalName).join(', ');
           await addDoc(collection(db, 'expenses'), {
             category: 'Health',
-            description: `Health treatment for ${record.animalName}: ${record.condition}`,
-            amount: record.cost,
-            date: record.date,
+            description: `Batch health treatment for ${animalNames}: ${firstRecord.condition}`,
+            amount: totalCost,
+            date: firstRecord.date,
             paymentMethod: 'Cash',
             animalRelated: true,
-            animalName: record.animalName,
-            animalId: record.animalId,
-            createdAt: Timestamp.now()
+            animalName: animalNames,
+            animalId: batchRecords.map(r => r.animalId).join(','),
+            createdAt: Timestamp.now(),
+            isBatchRecord: true
           });
         }
       }

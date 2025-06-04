@@ -43,7 +43,7 @@ function ExpenseAnalytics({
 }: ExpenseAnalyticsProps) {
   // Calculate monthly totals directly from expenses
   const monthlyStats = useMemo(() => {
-    if (!selectedDate) return { total: 0, average: 0, highest: { category: 'N/A', amount: 0 } };
+    if (!selectedDate) return { total: 0, dailyTotal: 0, highest: { category: 'N/A', amount: 0 } };
     
     // Filter expenses for the selected month
     const monthlyExpenses = expenses.filter(expense => {
@@ -56,16 +56,20 @@ function ExpenseAnalytics({
     // Calculate total for the month
     const total = monthlyExpenses.reduce((sum, expense) => sum + expense.amount, 0);
     
-    // Calculate average per day based on actual days in month
-    const daysInMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
-    const average = total / daysInMonth;
+    // Calculate total for the selected day
+    const dailyTotal = monthlyExpenses.filter(expense => {
+      const expenseDate = expense.date instanceof Date 
+        ? expense.date 
+        : expense.date?.toDate?.() || new Date(expense.date);
+      return format(expenseDate, 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
+    }).reduce((sum, expense) => sum + expense.amount, 0);
     
     // Find highest expense
     const highest = monthlyExpenses.length > 0 
       ? monthlyExpenses.reduce((max, expense) => expense.amount > max.amount ? expense : max, monthlyExpenses[0])
       : { category: 'N/A', amount: 0 };
 
-    return { total, average, highest };
+    return { total, dailyTotal, highest };
   }, [expenses, selectedDate]);
 
   // Filter monthly data for charts - include all days with actual data
@@ -154,8 +158,8 @@ function ExpenseAnalytics({
               <p className="text-lg font-semibold text-gray-900">{formatCurrency(monthlyStats.total)}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-500">Average per Day</p>
-              <p className="text-lg font-semibold text-gray-900">{formatCurrency(monthlyStats.average)}</p>
+              <p className="text-xs text-gray-500">Daily Total</p>
+              <p className="text-lg font-semibold text-gray-900">{formatCurrency(monthlyStats.dailyTotal)}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500">Highest Expense</p>

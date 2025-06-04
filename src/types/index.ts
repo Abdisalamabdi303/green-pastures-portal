@@ -9,7 +9,7 @@ export interface User {
 
 export interface Animal {
   id: string;
-  name: string;
+  name?: string;
   type: string;
   breed?: string;
   age?: number;

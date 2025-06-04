@@ -17,8 +17,6 @@ const expenseSchema = z.object({
   amount: z.number().min(0, { message: "Amount must be a positive number" }),
   date: z.string(),
   paymentMethod: z.string().min(1, { message: "Payment method is required" }),
-  animalRelated: z.boolean().default(false),
-  animalName: z.string().optional(),
 });
 
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
@@ -27,14 +25,12 @@ interface AddExpenseFormProps {
   handleAddExpense: (data: ExpenseFormValues) => Promise<void>;
   isAddExpenseOpen: boolean;
   setIsAddExpenseOpen: (isOpen: boolean) => void;
-  animals?: Animal[];
 }
 
 const AddExpenseForm = ({ 
   handleAddExpense, 
   isAddExpenseOpen, 
   setIsAddExpenseOpen,
-  animals = []
 }: AddExpenseFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -46,12 +42,8 @@ const AddExpenseForm = ({
       amount: 0,
       date: new Date().toISOString().split('T')[0],
       paymentMethod: "Cash",
-      animalRelated: false,
-      animalName: "",
     },
   });
-
-  const watchAnimalRelated = form.watch("animalRelated");
 
   const onSubmit = async (data: ExpenseFormValues) => {
     try {
@@ -68,7 +60,7 @@ const AddExpenseForm = ({
 
   return (
     <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] bg-white">
         <DialogHeader>
           <DialogTitle>Add New Expense</DialogTitle>
           <DialogDescription>
@@ -85,11 +77,11 @@ const AddExpenseForm = ({
                   <FormLabel>Category</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-white border-gray-200">
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="bg-white border border-gray-200">
                       <SelectItem value="Feed">Feed</SelectItem>
                       <SelectItem value="Veterinary">Veterinary</SelectItem>
                       <SelectItem value="Equipment">Equipment</SelectItem>
@@ -109,7 +101,7 @@ const AddExpenseForm = ({
                 <FormItem>
                   <FormLabel>Description</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter expense description" {...field} />
+                    <Input placeholder="Enter expense description" className="bg-white border-gray-200" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -124,8 +116,9 @@ const AddExpenseForm = ({
                   <FormLabel>Amount</FormLabel>
                   <FormControl>
                     <Input 
-                        type="number"
+                      type="number"
                       placeholder="Enter amount" 
+                      className="bg-white border-gray-200"
                       {...field} 
                       onChange={(e) => field.onChange(parseFloat(e.target.value))}
                     />
@@ -142,7 +135,7 @@ const AddExpenseForm = ({
                 <FormItem>
                   <FormLabel>Date</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <Input type="date" className="bg-white border-gray-200" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -157,11 +150,11 @@ const AddExpenseForm = ({
                   <FormLabel>Payment Method</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-white border-gray-200">
                         <SelectValue placeholder="Select payment method" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="bg-white border border-gray-200">
                       <SelectItem value="Cash">Cash</SelectItem>
                       <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
                       <SelectItem value="Credit Card">Credit Card</SelectItem>
@@ -173,62 +166,16 @@ const AddExpenseForm = ({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="animalRelated"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                  <FormControl>
-                    <input
-                      type="checkbox"
-                      checked={field.value}
-                      onChange={field.onChange}
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>Animal Related</FormLabel>
-                  </div>
-                </FormItem>
-              )}
-            />
-
-            {watchAnimalRelated && (
-              <FormField
-                control={form.control}
-                name="animalName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Animal</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an animal" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {animals.map((animal) => (
-                          <SelectItem key={animal.id} value={animal.name}>
-                            {animal.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
             <div className="flex justify-end space-x-2">
               <Button
-                      type="button"
+                type="button"
                 variant="outline"
-                      onClick={() => setIsAddExpenseOpen(false)}
+                onClick={() => setIsAddExpenseOpen(false)}
                 disabled={isSubmitting}
-                    >
-                      Cancel
+              >
+                Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting} className="bg-farm-600 hover:bg-farm-700 text-white">
                 {isSubmitting ? "Saving..." : "Save Expense"}
               </Button>
             </div>

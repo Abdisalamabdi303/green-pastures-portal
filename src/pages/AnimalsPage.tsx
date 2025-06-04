@@ -199,40 +199,80 @@ const AnimalsPage = () => {
   // Memoized handlers
   const handleAddAnimal = useCallback(async (newAnimal: Animal) => {
     try {
+      // Optimistically update UI
       if (selectedAnimal) {
-        await animalServices.updateAnimal(selectedAnimal.id, newAnimal);
-        toast.success('Animal updated successfully');
+        setAnimals(prev => prev.map(animal => 
+          animal.id === selectedAnimal.id ? newAnimal : animal
+        ));
       } else {
-        await animalServices.addAnimal(newAnimal);
-        toast.success('Animal added successfully');
+        setAnimals(prev => [newAnimal, ...prev]);
       }
-      animalsCache.clear();
       setSelectedAnimal(null);
       setIsAddAnimalOpen(false);
+
+      // Then perform the actual server operation
+      if (selectedAnimal) {
+        await animalServices.updateAnimal(selectedAnimal.id, newAnimal);
+        toast({
+          title: "Success",
+          description: "Animal updated successfully"
+        });
+      } else {
+        await animalServices.addAnimal(newAnimal);
+        toast({
+          title: "Success",
+          description: "Animal added successfully"
+        });
+      }
+      animalsCache.clear();
       fetchAnimals(1, searchTerm);
     } catch (error) {
+      // Revert optimistic update on error
       console.error('Error saving animal:', error);
-      toast.error('Failed to save animal');
+      toast({
+        title: "Error",
+        description: "Failed to save animal",
+        variant: "destructive"
+      });
+      // Refresh the data to ensure UI is in sync with server
+      fetchAnimals(1, searchTerm);
     }
   }, [selectedAnimal, searchTerm, fetchAnimals, toast]);
 
   const handleDeleteAnimal = useCallback(async (id: string) => {
     const animalToDelete = animals.find(a => a.id === id);
     if (!animalToDelete) {
-      toast.error('Animal not found');
+      toast({
+        title: "Error",
+        description: "Animal not found",
+        variant: "destructive"
+      });
       return;
     }
 
     if (window.confirm(`Are you sure you want to delete this animal?\n\nID: ${animalToDelete.id}\nType: ${animalToDelete.type}\nBreed: ${animalToDelete.breed}\n\nThis action cannot be undone.`)) {
       try {
+        // Optimistically update UI
         setIsDeleting(id);
+        setAnimals(prev => prev.filter(animal => animal.id !== id));
+
+        // Then perform the actual server operation
         await animalServices.deleteAnimal(id);
         animalsCache.clear();
-        toast.success('Animal deleted successfully');
-        fetchAnimals(1, searchTerm);
+        toast({
+          title: "Success",
+          description: "Animal deleted successfully"
+        });
       } catch (error) {
+        // Revert optimistic update on error
         console.error('Error deleting animal:', error);
-        toast.error(`Failed to delete animal: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        toast({
+          title: "Error",
+          description: `Failed to delete animal: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          variant: "destructive"
+        });
+        // Refresh the data to ensure UI is in sync with server
+        fetchAnimals(1, searchTerm);
       } finally {
         setIsDeleting(null);
       }
@@ -248,8 +288,8 @@ const AnimalsPage = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-farm-600 mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-500">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farm-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
         </div>
       </div>
     );
@@ -262,130 +302,160 @@ const AnimalsPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <h2 className="text-2xl font-bold text-gray-800">Manage Animals</h2>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setViewMode('card')}
-                className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm transition ${
-                  viewMode === 'card'
-                    ? 'bg-farm-600 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                <LayoutGrid className="w-4 h-4" />
-                Cards
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm transition ${
-                  viewMode === 'list'
-                    ? 'bg-farm-600 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                <List className="w-4 h-4" />
-                List
-              </button>
+      <div className="container mx-auto px-4 py-8">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Animals</h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Manage your farm animals and their records
+              </p>
             </div>
-          </div>
-
-          <div className="mt-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <Input
-                  placeholder="Search animals..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full"
-                  icon={<Search className="h-4 w-4" />}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Select value={filter} onValueChange={setFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="sold">Sold</SelectItem>
-                    <SelectItem value="deceased">Deceased</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="date">Date Added</SelectItem>
-                    <SelectItem value="name">Name</SelectItem>
-                    <SelectItem value="type">Type</SelectItem>
-                    <SelectItem value="value">Value</SelectItem>
-                  </SelectContent>
-                </Select>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => setIsAddAnimalOpen(true)}
+                className="bg-farm-600 hover:bg-farm-700 text-white px-4 py-2 rounded-md flex items-center gap-2"
+              >
+                <Plus className="h-5 w-5" />
+                Add Animal
+              </Button>
+              <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-gray-200">
                 <Button
-                  variant="outline"
-                  onClick={() => setSortOrder(order => order === 'asc' ? 'desc' : 'asc')}
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  size="icon"
+                  onClick={() => setViewMode('list')}
+                  className={viewMode === 'list' ? 'bg-gray-100' : ''}
                 >
-                  <Filter className="h-4 w-4" />
+                  <List className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant={viewMode === 'card' ? 'default' : 'ghost'}
+                  size="icon"
+                  onClick={() => setViewMode('card')}
+                  className={viewMode === 'card' ? 'bg-gray-100' : ''}
+                >
+                  <LayoutGrid className="h-5 w-5" />
                 </Button>
               </div>
             </div>
           </div>
 
+          {/* Search and Filters Section */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search animals..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-white border-gray-200"
+                />
+              </div>
+              <Select value={filter} onValueChange={setFilter}>
+                <SelectTrigger className="bg-white border-gray-200">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border border-gray-200">
+                  <SelectItem value="all">All Animals</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="sold">Sold</SelectItem>
+                  <SelectItem value="deceased">Deceased</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="bg-white border-gray-200">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border border-gray-200">
+                  <SelectItem value="date">Date Added</SelectItem>
+                  <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="type">Type</SelectItem>
+                  <SelectItem value="value">Value</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                className="bg-white border-gray-200"
+              >
+                {sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div 
+          className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
+          onScroll={handleScroll}
+          style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto' }}
+        >
           {loading && currentPage === 1 ? (
             <LoadingSkeleton />
           ) : (
-            <div 
-              className="mt-8" 
-              style={{ height: '600px', overflow: 'auto' }}
-              onScroll={handleScroll}
-            >
-              <Suspense fallback={<LoadingSkeleton />}>
-                {viewMode === 'card' ? (
-                  <AnimalCardGrid
-                    animals={processedAnimals}
-                    onEdit={handleEditAnimal}
-                    onDelete={handleDeleteAnimal}
-                    isDeleting={isDeleting}
-                  />
-                ) : (
-                  <div className="overflow-x-auto">
-                    <AnimalTable 
-                      animals={processedAnimals} 
-                      onEdit={handleEditAnimal}
-                      onDelete={handleDeleteAnimal}
-                      isDeleting={isDeleting}
-                    />
-                  </div>
-                )}
-              </Suspense>
-              {loading && currentPage > 1 && (
-                <div className="text-center py-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-farm-600 mx-auto"></div>
-                </div>
+            <Suspense fallback={<LoadingSkeleton />}>
+              {viewMode === 'list' ? (
+                <AnimalTable
+                  animals={processedAnimals}
+                  onEdit={setSelectedAnimal}
+                  onDelete={handleDeleteAnimal}
+                  isDeleting={isDeleting}
+                />
+              ) : (
+                <AnimalCardGrid
+                  animals={processedAnimals}
+                  onEdit={setSelectedAnimal}
+                  onDelete={handleDeleteAnimal}
+                  isDeleting={isDeleting}
+                />
               )}
+            </Suspense>
+          )}
+          
+          {!loading && processedAnimals.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-gray-500">No animals found</p>
             </div>
           )}
-        </section>
-      </main>
+        </div>
 
+        {/* Pagination */}
+        {!loading && totalPages > 1 && (
+          <div className="mt-4 flex justify-center items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="bg-white border-gray-200"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-gray-600">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="bg-white border-gray-200"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Add/Edit Animal Modal */}
       {isAddAnimalOpen && (
-        <Suspense fallback={<LoadingSkeleton />}>
-          <AddAnimalForm
-            animalToEdit={selectedAnimal}
-            onAddAnimal={handleAddAnimal}
-            onClose={() => {
-              setIsAddAnimalOpen(false);
-              setSelectedAnimal(null);
-            }}
-          />
-        </Suspense>
+        <AddAnimalForm
+          onAddAnimal={handleAddAnimal}
+          isAddAnimalOpen={isAddAnimalOpen}
+          setIsAddAnimalOpen={setIsAddAnimalOpen}
+          animalToEdit={selectedAnimal}
+        />
       )}
     </div>
   );
