@@ -323,19 +323,21 @@ const AnimalsPage = () => {
               <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-gray-200">
                 <Button
                   variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  size="icon"
+                  size="sm"
                   onClick={() => setViewMode('list')}
-                  className={viewMode === 'list' ? 'bg-gray-100' : ''}
+                  className={`flex items-center gap-2 ${viewMode === 'list' ? 'bg-gray-100' : ''}`}
                 >
-                  <List className="h-5 w-5" />
+                  <List className="h-4 w-4" />
+                  <span className="text-sm">List</span>
                 </Button>
                 <Button
                   variant={viewMode === 'card' ? 'default' : 'ghost'}
-                  size="icon"
+                  size="sm"
                   onClick={() => setViewMode('card')}
-                  className={viewMode === 'card' ? 'bg-gray-100' : ''}
+                  className={`flex items-center gap-2 ${viewMode === 'card' ? 'bg-gray-100' : ''}`}
                 >
-                  <LayoutGrid className="h-5 w-5" />
+                  <LayoutGrid className="h-4 w-4" />
+                  <span className="text-sm">Grid</span>
                 </Button>
               </div>
             </div>
@@ -343,7 +345,7 @@ const AnimalsPage = () => {
 
           {/* Search and Filters Section */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -354,17 +356,6 @@ const AnimalsPage = () => {
                   className="pl-10 bg-white border-gray-200"
                 />
               </div>
-              <Select value={filter} onValueChange={setFilter}>
-                <SelectTrigger className="bg-white border-gray-200">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent className="bg-white border border-gray-200">
-                  <SelectItem value="all">All Animals</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="sold">Sold</SelectItem>
-                  <SelectItem value="deceased">Deceased</SelectItem>
-                </SelectContent>
-              </Select>
               <Select value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger className="bg-white border-gray-200">
                   <SelectValue placeholder="Sort by" />
