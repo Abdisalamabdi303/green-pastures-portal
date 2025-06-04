@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import { Expense } from '@/types';
 
 interface ExpenseFiltersProps {
@@ -15,36 +15,40 @@ const months = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-export const ExpenseFilters: React.FC<ExpenseFiltersProps> = ({
+export const ExpenseFilters = memo(({
   selectedYear,
   setSelectedYear,
   selectedMonth,
   setSelectedMonth,
   expenses
-}) => {
-  // Get unique years from expenses
-  const years = Array.from(
-    new Set(
-      expenses
-        .map(expense => {
-          if (expense.date) {
-            if (typeof expense.date === 'object' && 'toDate' in expense.date && typeof expense.date.toDate === 'function') {
-              return expense.date.toDate().getFullYear();
-            } else if (typeof expense.date === 'string') {
-              return new Date(expense.date).getFullYear();
+}: ExpenseFiltersProps) => {
+  // Memoize the years calculation
+  const years = useMemo(() => {
+    const uniqueYears = Array.from(
+      new Set(
+        expenses
+          .map(expense => {
+            if (expense.date) {
+              if (typeof expense.date === 'object' && 'toDate' in expense.date && typeof expense.date.toDate === 'function') {
+                return expense.date.toDate().getFullYear();
+              } else if (typeof expense.date === 'string') {
+                return new Date(expense.date).getFullYear();
+              }
             }
-          }
-          return null;
-        })
-        .filter((year): year is number => year !== null)
-    )
-  ).sort((a, b) => b - a); // Sort years in descending order
+            return null;
+          })
+          .filter((year): year is number => year !== null)
+      )
+    ).sort((a, b) => b - a); // Sort years in descending order
 
-  // Add current year if not in the list
-  const currentYear = new Date().getFullYear();
-  if (!years.includes(currentYear)) {
-    years.unshift(currentYear);
-  }
+    // Add current year if not in the list
+    const currentYear = new Date().getFullYear();
+    if (!uniqueYears.includes(currentYear)) {
+      uniqueYears.unshift(currentYear);
+    }
+
+    return uniqueYears;
+  }, [expenses]);
 
   return (
     <div className="flex gap-4 items-center">
@@ -85,4 +89,6 @@ export const ExpenseFilters: React.FC<ExpenseFiltersProps> = ({
       </div>
     </div>
   );
-};
+});
+
+ExpenseFilters.displayName = 'ExpenseFilters';

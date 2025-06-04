@@ -1,3 +1,4 @@
+import React, { memo } from 'react';
 import { Receipt, TrendingUp, Wallet, ArrowUpRight } from 'lucide-react';
 import { ChartData } from '@/types';
 import { formatCurrency } from '@/utils/format';
@@ -14,7 +15,7 @@ interface ExpenseSummaryCardsProps {
   getCategoryIcon: (category: string) => JSX.Element;
 }
 
-const ExpenseSummaryCards = ({ 
+const ExpenseSummaryCards = memo(({ 
   totalExpense, 
   averageExpense, 
   highestExpense, 
@@ -88,6 +89,8 @@ const ExpenseSummaryCards = ({
       </div>
     </div>
   );
-};
+});
+
+ExpenseSummaryCards.displayName = 'ExpenseSummaryCards';
 
 export default ExpenseSummaryCards;

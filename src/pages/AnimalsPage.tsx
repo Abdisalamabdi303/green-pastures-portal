@@ -1,48 +1,94 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Plus, Search, Filter, ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react';
+import { animalServices } from '@/services/firebase';
+import { Animal } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { formatCurrency } from '@/utils/format';
+import { format } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/use-toast';
 import Navbar from '../components/layout/Navbar';
-import { User, Animal } from '../types';
-import AnimalTable from '../components/animals/AnimalTable';
-import AnimalCardGrid from '../components/animals/AnimalCardGrid';
-import AddAnimalForm from '../components/animals/AddAnimalForm';
-import AnimalSearchBar from '../components/animals/AnimalSearchBar';
-import { LayoutGrid, List, ChevronLeft, ChevronRight } from 'lucide-react';
-import { animalServices } from '../services/firebase';
-import { toast } from 'sonner';
 
-const ITEMS_PER_PAGE = 10;
-const CACHE_DURATION = 1000 * 60; // 1 minute
+// Lazy load components
+const AnimalTable = lazy(() => import('../components/animals/AnimalTable'));
+const AnimalCardGrid = lazy(() => import('../components/animals/AnimalCardGrid'));
+const AddAnimalForm = lazy(() => import('../components/animals/AddAnimalForm'));
+
+const ITEMS_PER_PAGE = 20;
+const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
+const SEARCH_DEBOUNCE = 300; // 300ms
 
 // Create cache Map outside component to persist between renders
 const animalsCache = new Map<string, { data: any; timestamp: number }>();
 
+// Loading skeleton component
+const LoadingSkeleton = () => (
+  <div className="space-y-4">
+    {[...Array(ITEMS_PER_PAGE)].map((_, i) => (
+      <Card key={i} className="animate-pulse">
+        <CardContent className="p-4">
+          <div className="flex items-center space-x-4">
+            <Skeleton className="h-12 w-12 rounded-full" />
+            <div className="space-y-2 flex-1">
+              <Skeleton className="h-4 w-1/4" />
+              <Skeleton className="h-4 w-1/2" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+);
+
 const AnimalsPage = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const { currentUser, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddAnimalOpen, setIsAddAnimalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('list');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(1);
-  const navigate = useNavigate();
+  const [filter, setFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [hasMore, setHasMore] = useState(true);
 
-  // Fetch animals from Firestore with caching
-  const fetchAnimals = useCallback(async (page: number, search: string) => {
-    // Check cache first
-    const cacheKey = `${page}-${search}`;
+  // Memoized cache key generator
+  const getCacheKey = useCallback((page: number, search: string) => 
+    `${page}-${search}-${filter}-${sortBy}-${sortOrder}`, 
+    [filter, sortBy, sortOrder]
+  );
+
+  // Memoized fetch function with infinite scroll support
+  const fetchAnimals = useCallback(async (page: number, search: string, append: boolean = false) => {
+    if (!currentUser) return;
+
+    const cacheKey = getCacheKey(page, search);
     const cachedData = animalsCache.get(cacheKey);
     const now = Date.now();
     
     if (cachedData && now - cachedData.timestamp < CACHE_DURATION) {
-      setAnimals(cachedData.data.animals || []);
+      if (append) {
+        setAnimals(prev => [...prev, ...cachedData.data.animals]);
+      } else {
+        setAnimals(cachedData.data.animals);
+      }
       setTotalPages(Math.ceil((cachedData.data.total || 0) / ITEMS_PER_PAGE));
+      setHasMore(cachedData.data.hasMore);
+      setLoading(false);
       return;
     }
 
-    // If no cache, show loading state and fetch
     setLoading(true);
     
     try {
@@ -51,128 +97,126 @@ const AnimalsPage = () => {
       if (!result || !result.animals) {
         setAnimals([]);
         setTotalPages(1);
+        setHasMore(false);
         return;
       }
       
-      // Update cache
       animalsCache.set(cacheKey, {
         data: result,
         timestamp: now
       });
       
-      setAnimals(result.animals);
+      if (append) {
+        setAnimals(prev => [...prev, ...result.animals]);
+      } else {
+        setAnimals(result.animals);
+      }
       setTotalPages(Math.ceil(result.total / ITEMS_PER_PAGE));
+      setHasMore(result.hasMore);
     } catch (error) {
       console.error('Error fetching animals:', error);
-      toast.error('Failed to load animals from database');
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch animals. Please try again.',
+        variant: 'destructive'
+      });
       setAnimals([]);
+      setHasMore(false);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast, currentUser, getCacheKey]);
+
+  // Memoized filtered and sorted animals
+  const processedAnimals = useMemo(() => {
+    let filtered = [...animals];
+
+    if (filter !== 'all') {
+      filtered = filtered.filter(animal => animal.status === filter);
+    }
+
+    return filtered.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'date':
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          break;
+        case 'name':
+          comparison = (a.name || '').localeCompare(b.name || '');
+          break;
+        case 'type':
+          comparison = (a.type || '').localeCompare(b.type || '');
+          break;
+        case 'value':
+          comparison = (a.purchasePrice || 0) - (b.purchasePrice || 0);
+          break;
+        default:
+          comparison = 0;
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+  }, [animals, filter, sortBy, sortOrder]);
+
+  // Handle scroll for infinite loading
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop <= clientHeight * 1.5 && !loading && hasMore) {
+      setCurrentPage(prev => prev + 1);
+    }
+  }, [loading, hasMore]);
 
   // Initial data fetch
   useEffect(() => {
-    const initializeData = async () => {
-      const storedUser = localStorage.getItem('user');
-      if (!storedUser) {
-        navigate('/login');
-        return;
-      }
+    if (authLoading) return;
 
-      const userData = JSON.parse(storedUser);
-      setUser(userData);
-      
-      // Check cache for initial data
-      const cacheKey = '1-';
-      const cachedData = animalsCache.get(cacheKey);
-      const now = Date.now();
-      
-      if (cachedData && now - cachedData.timestamp < CACHE_DURATION) {
-        // Optimistically show cached data
-        setAnimals(cachedData.data.animals || []);
-        setTotalPages(Math.ceil((cachedData.data.total || 0) / ITEMS_PER_PAGE));
-        
-        // Then fetch fresh data in background
-        fetchAnimals(1, '');
-      } else {
-        // If no cache, fetch immediately
-        fetchAnimals(1, '');
-      }
-    };
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
 
-    initializeData();
-  }, [navigate, fetchAnimals]);
+    fetchAnimals(1, '');
+  }, [navigate, fetchAnimals, currentUser, authLoading]);
 
   // Handle search and page changes with debounce
   useEffect(() => {
-    if (!user) return;
+    if (!currentUser || authLoading) return;
 
     const timeoutId = setTimeout(() => {
-      // Check cache first
-      const cacheKey = `${currentPage}-${searchTerm}`;
-      const cachedData = animalsCache.get(cacheKey);
-      const now = Date.now();
-      
-      if (cachedData && now - cachedData.timestamp < CACHE_DURATION) {
-        // Optimistically show cached data
-        setAnimals(cachedData.data.animals || []);
-        setTotalPages(Math.ceil((cachedData.data.total || 0) / ITEMS_PER_PAGE));
-        
-        // Then fetch fresh data in background
-        fetchAnimals(currentPage, searchTerm);
-      } else {
-        // If no cache, fetch immediately
-        fetchAnimals(currentPage, searchTerm);
-      }
-    }, 300);
+      setCurrentPage(1);
+      fetchAnimals(1, searchTerm);
+    }, SEARCH_DEBOUNCE);
 
     return () => clearTimeout(timeoutId);
-  }, [currentPage, searchTerm, user, fetchAnimals]);
+  }, [searchTerm, currentUser, fetchAnimals, authLoading]);
 
-  const handleAddAnimal = async (newAnimal: Animal) => {
+  // Load more data when page changes
+  useEffect(() => {
+    if (currentPage > 1) {
+      fetchAnimals(currentPage, searchTerm, true);
+    }
+  }, [currentPage, searchTerm, fetchAnimals]);
+
+  // Memoized handlers
+  const handleAddAnimal = useCallback(async (newAnimal: Animal) => {
     try {
       if (selectedAnimal) {
-        // Optimistic update for editing
-        setAnimals(prevAnimals => 
-          prevAnimals.map(animal => 
-            animal.id === selectedAnimal.id ? { ...newAnimal, id: selectedAnimal.id } : animal
-          )
-        );
-        
-        const updatedAnimal = await animalServices.updateAnimal(selectedAnimal.id, newAnimal);
+        await animalServices.updateAnimal(selectedAnimal.id, newAnimal);
         toast.success('Animal updated successfully');
       } else {
-        // Optimistic update for adding
-        setAnimals(prevAnimals => {
-          if (currentPage === 1) {
-            return [newAnimal, ...prevAnimals.slice(0, ITEMS_PER_PAGE - 1)];
-          }
-          return prevAnimals;
-        });
-        
-        if (currentPage !== 1) {
-          setCurrentPage(1);
-        }
-        
-        const addedAnimal = await animalServices.addAnimal(newAnimal);
+        await animalServices.addAnimal(newAnimal);
         toast.success('Animal added successfully');
       }
-      
-      // Clear cache after mutation
       animalsCache.clear();
-      
       setSelectedAnimal(null);
       setIsAddAnimalOpen(false);
+      fetchAnimals(1, searchTerm);
     } catch (error) {
       console.error('Error saving animal:', error);
       toast.error('Failed to save animal');
-      // Revert optimistic update on error
-      fetchAnimals(currentPage, searchTerm);
     }
-  };
+  }, [selectedAnimal, searchTerm, fetchAnimals, toast]);
 
-  const handleDeleteAnimal = async (id: string) => {
+  const handleDeleteAnimal = useCallback(async (id: string) => {
     const animalToDelete = animals.find(a => a.id === id);
     if (!animalToDelete) {
       toast.error('Animal not found');
@@ -182,43 +226,37 @@ const AnimalsPage = () => {
     if (window.confirm(`Are you sure you want to delete this animal?\n\nID: ${animalToDelete.id}\nType: ${animalToDelete.type}\nBreed: ${animalToDelete.breed}\n\nThis action cannot be undone.`)) {
       try {
         setIsDeleting(id);
-        
-        // Optimistic update for deletion
-        setAnimals(prevAnimals => prevAnimals.filter(animal => animal.id !== id));
-        
         await animalServices.deleteAnimal(id);
-        
-        // Clear cache after mutation
         animalsCache.clear();
-        
         toast.success('Animal deleted successfully');
+        fetchAnimals(1, searchTerm);
       } catch (error) {
         console.error('Error deleting animal:', error);
         toast.error(`Failed to delete animal: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        
-        // Revert optimistic update on error
-        fetchAnimals(currentPage, searchTerm);
       } finally {
         setIsDeleting(null);
       }
     }
-  };
+  }, [animals, searchTerm, fetchAnimals, toast]);
 
-  // No need to filter animals since we're using server-side filtering
-  const paginatedAnimals = animals;
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    window.scrollTo(0, 0);
-  };
-
-  const handleEditAnimal = (animal: Animal) => {
+  const handleEditAnimal = useCallback((animal: Animal) => {
     setSelectedAnimal(animal);
     setIsAddAnimalOpen(true);
-  };
-  
-  if (!user) {
-    return <div className="p-8 text-center text-gray-700 text-lg">Loading...</div>;
+  }, []);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-farm-600 mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return null;
   }
 
   return (
@@ -230,7 +268,6 @@ const AnimalsPage = () => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h2 className="text-2xl font-bold text-gray-800">Manage Animals</h2>
 
-            {/* View Mode Toggle */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setViewMode('card')}
@@ -257,120 +294,80 @@ const AnimalsPage = () => {
             </div>
           </div>
 
-          {/* Search Bar & Add Button */}
           <div className="mt-6">
-            <AnimalSearchBar
-              searchTerm={searchTerm}
-              onSearchChange={(value) => {
-                setSearchTerm(value);
-                setCurrentPage(1); // Reset to first page on search
-              }}
-              onAddClick={() => {
-                setSelectedAnimal(null);
-                setIsAddAnimalOpen(true);
-              }}
-            />
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <Input
+                  placeholder="Search animals..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full"
+                  icon={<Search className="h-4 w-4" />}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Select value={filter} onValueChange={setFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="sold">Sold</SelectItem>
+                    <SelectItem value="deceased">Deceased</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date">Date Added</SelectItem>
+                    <SelectItem value="name">Name</SelectItem>
+                    <SelectItem value="type">Type</SelectItem>
+                    <SelectItem value="value">Value</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  onClick={() => setSortOrder(order => order === 'asc' ? 'desc' : 'asc')}
+                >
+                  <Filter className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
 
-          {/* Loading State */}
-          {loading ? (
-            <div className="text-center py-10">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-farm-600 mx-auto"></div>
-              <p className="mt-2 text-sm text-gray-500">Loading animals...</p>
-            </div>
+          {loading && currentPage === 1 ? (
+            <LoadingSkeleton />
           ) : (
-            <div className="mt-8">
-              {viewMode === 'card' ? (
-                <AnimalCardGrid
-                  animals={paginatedAnimals}
-                  onEdit={handleEditAnimal}
-                  onDelete={handleDeleteAnimal}
-                  isDeleting={isDeleting}
-                />
-              ) : (
-                <div className="overflow-x-auto">
-                  <AnimalTable 
-                    animals={paginatedAnimals} 
+            <div 
+              className="mt-8" 
+              style={{ height: '600px', overflow: 'auto' }}
+              onScroll={handleScroll}
+            >
+              <Suspense fallback={<LoadingSkeleton />}>
+                {viewMode === 'card' ? (
+                  <AnimalCardGrid
+                    animals={processedAnimals}
                     onEdit={handleEditAnimal}
                     onDelete={handleDeleteAnimal}
                     isDeleting={isDeleting}
                   />
-                </div>
-              )}
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="mt-6 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
-                  <div className="flex flex-1 justify-between sm:hidden">
-                    <button
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={currentPage === 1}
-                      className={`relative inline-flex items-center rounded-md px-4 py-2 text-sm font-medium ${
-                        currentPage === 1
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-white text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      Previous
-                    </button>
-                    <button
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                      className={`relative ml-3 inline-flex items-center rounded-md px-4 py-2 text-sm font-medium ${
-                        currentPage === totalPages
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-white text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      Next
-                    </button>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <AnimalTable 
+                      animals={processedAnimals} 
+                      onEdit={handleEditAnimal}
+                      onDelete={handleDeleteAnimal}
+                      isDeleting={isDeleting}
+                    />
                   </div>
-                  <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm text-gray-700">
-                        Showing <span className="font-medium">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{' '}
-                        <span className="font-medium">
-                          {Math.min(currentPage * ITEMS_PER_PAGE, animals.length)}
-                        </span>{' '}
-                        of <span className="font-medium">{animals.length}</span> results
-                      </p>
-                    </div>
-                    <div>
-                      <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                        <button
-                          onClick={() => handlePageChange(currentPage - 1)}
-                          disabled={currentPage === 1}
-                          className={`relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 ${
-                            currentPage === 1 ? 'cursor-not-allowed' : 'hover:text-gray-500'
-                          }`}
-                        >
-                          <ChevronLeft className="h-5 w-5" />
-                        </button>
-                        {[...Array(totalPages)].map((_, i) => (
-                          <button
-                            key={i + 1}
-                            onClick={() => handlePageChange(i + 1)}
-                            className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
-                              currentPage === i + 1
-                                ? 'z-10 bg-farm-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-farm-600'
-                                : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0'
-                            }`}
-                          >
-                            {i + 1}
-                          </button>
-                        ))}
-                        <button
-                          onClick={() => handlePageChange(currentPage + 1)}
-                          disabled={currentPage === totalPages}
-                          className={`relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 ${
-                            currentPage === totalPages ? 'cursor-not-allowed' : 'hover:text-gray-500'
-                          }`}
-                        >
-                          <ChevronRight className="h-5 w-5" />
-                        </button>
-                      </nav>
-                    </div>
-                  </div>
+                )}
+              </Suspense>
+              {loading && currentPage > 1 && (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-farm-600 mx-auto"></div>
                 </div>
               )}
             </div>
@@ -378,16 +375,17 @@ const AnimalsPage = () => {
         </section>
       </main>
 
-      {/* Modal */}
       {isAddAnimalOpen && (
-        <AddAnimalForm
-          animalToEdit={selectedAnimal}
-          onAddAnimal={handleAddAnimal}
-          onClose={() => {
-            setIsAddAnimalOpen(false);
-            setSelectedAnimal(null);
-          }}
-        />
+        <Suspense fallback={<LoadingSkeleton />}>
+          <AddAnimalForm
+            animalToEdit={selectedAnimal}
+            onAddAnimal={handleAddAnimal}
+            onClose={() => {
+              setIsAddAnimalOpen(false);
+              setSelectedAnimal(null);
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );

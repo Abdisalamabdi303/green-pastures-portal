@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, where, setDoc, getDoc, limit as firestoreLimit, startAfter } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, where, setDoc, getDoc, limit as firestoreLimit, startAfter, getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Animal, HealthRecord, Vaccination } from '@/types';
 
@@ -45,62 +45,38 @@ export const animalServices = {
   // Get all animals with pagination and search
   getAnimals: async (page = 1, limit = 10, searchTerm = '') => {
     try {
-      console.log('Fetching animals with params:', { page, limit, searchTerm });
-      
-      // First, get the total count with a separate query
-      const countQuery = query(collection(db, 'animals'));
-      const countSnapshot = await getDocs(countQuery);
-      const total = countSnapshot.size;
-      
-      // Then get the paginated data
-      let q = query(
+      // Build the base query
+      let baseQuery = query(
         collection(db, 'animals'),
-        orderBy('createdAt', 'desc'),
-        firestoreLimit(limit)
+        orderBy('createdAt', 'desc')
       );
-      
-      // If not on first page, we need to get the last document from the previous page
-      if (page > 1) {
-        const previousPageQuery = query(
-          collection(db, 'animals'),
-          orderBy('createdAt', 'desc'),
-          firestoreLimit((page - 1) * limit)
-        );
-        const previousPageSnapshot = await getDocs(previousPageQuery);
-        const lastVisible = previousPageSnapshot.docs[previousPageSnapshot.docs.length - 1];
-        
-        if (lastVisible) {
-          q = query(
-            collection(db, 'animals'),
-            orderBy('createdAt', 'desc'),
-            startAfter(lastVisible),
-            firestoreLimit(limit)
-          );
-        }
-      }
-      
+
       // Add search conditions if searchTerm is provided
       if (searchTerm) {
-        q = query(
-          q,
+        baseQuery = query(
+          baseQuery,
           where('searchTerms', 'array-contains', searchTerm.toLowerCase())
         );
       }
-      
-      const querySnapshot = await getDocs(q);
-      
-      const animals = querySnapshot.docs.map(doc => ({
+
+      // Get total count and paginated data in parallel
+      const [countSnapshot, dataSnapshot] = await Promise.all([
+        getCountFromServer(baseQuery),
+        getDocs(query(baseQuery, firestoreLimit(limit)))
+      ]);
+
+      const total = countSnapshot.data().count;
+      const animals = dataSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Animal[];
-      
-      console.log('Fetched animals:', { total, page, limit, animalsCount: animals.length });
-      
+
       return {
         animals,
         total,
         page,
-        limit
+        limit,
+        totalPages: Math.ceil(total / limit)
       };
     } catch (error) {
       console.error('Error fetching animals:', error);
@@ -230,18 +206,93 @@ export const expenseServices = {
     }
   },
 
-  // Get all expenses
-  getExpenses: async () => {
+  // Get expenses with pagination and optional date range
+  async getExpenses({ 
+    page = 1, 
+    limit = 10, 
+    dateRange 
+  }: { 
+    page?: number; 
+    limit?: number;
+    dateRange?: { start: Date; end: Date };
+  }): Promise<{ 
+    expenses: Expense[]; 
+    totalPages: number;
+    total: number;
+  }> {
     try {
-      const q = query(collection(db, 'expenses'), orderBy('date', 'desc'));
-      const querySnapshot = await getDocs(q);
+      const expensesRef = collection(db, 'expenses');
       
-      return querySnapshot.docs.map(doc => ({
+      // Build the base query
+      let baseQuery = query(expensesRef, orderBy('date', 'desc'));
+
+      // Add date range filter if provided
+      if (dateRange) {
+        baseQuery = query(
+          expensesRef,
+          where('date', '>=', Timestamp.fromDate(dateRange.start)),
+          where('date', '<=', Timestamp.fromDate(dateRange.end)),
+          orderBy('date', 'desc')
+        );
+      }
+
+      // Get total count for pagination
+      const totalSnapshot = await getCountFromServer(baseQuery);
+      const total = totalSnapshot.data().count;
+      const totalPages = Math.ceil(total / limit);
+
+      // Build the paginated query
+      let paginatedQuery = query(
+        expensesRef,
+        ...(dateRange ? [
+          where('date', '>=', Timestamp.fromDate(dateRange.start)),
+          where('date', '<=', Timestamp.fromDate(dateRange.end))
+        ] : []),
+        orderBy('date', 'desc'),
+        firestoreLimit(limit)
+      );
+
+      // If not on first page, get the last document from previous page
+      if (page > 1) {
+        const previousPageQuery = query(
+          expensesRef,
+          ...(dateRange ? [
+            where('date', '>=', Timestamp.fromDate(dateRange.start)),
+            where('date', '<=', Timestamp.fromDate(dateRange.end))
+          ] : []),
+          orderBy('date', 'desc'),
+          firestoreLimit((page - 1) * limit)
+        );
+        const previousPageSnapshot = await getDocs(previousPageQuery);
+        const lastVisible = previousPageSnapshot.docs[previousPageSnapshot.docs.length - 1];
+        
+        if (lastVisible) {
+          paginatedQuery = query(
+            expensesRef,
+            ...(dateRange ? [
+              where('date', '>=', Timestamp.fromDate(dateRange.start)),
+              where('date', '<=', Timestamp.fromDate(dateRange.end))
+            ] : []),
+            orderBy('date', 'desc'),
+            startAfter(lastVisible),
+            firestoreLimit(limit)
+          );
+        }
+      }
+
+      const snapshot = await getDocs(paginatedQuery);
+      const expenses = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as Expense[];
+
+      return {
+        expenses,
+        totalPages,
+        total
+      };
     } catch (error) {
-      console.error('Error fetching expenses:', error);
+      console.error('Error getting expenses:', error);
       throw error;
     }
   },
