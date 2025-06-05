@@ -7,10 +7,9 @@ import Navbar from '../components/layout/Navbar';
 import AnimalsHeader from '../components/animals/AnimalsHeader';
 import AnimalsList from '../components/animals/AnimalsList';
 import AnimalsPagination from '../components/animals/AnimalsPagination';
-import { useOptimizedAnimalsData } from '../hooks/useOptimizedAnimalsData';
+import { useAnimalsData } from '../hooks/useAnimalsData';
 import { useAnimalsFilters } from '../hooks/useAnimalsFilters';
 
-// Lazy load components
 const AddAnimalForm = lazy(() => import('../components/animals/AddAnimalForm'));
 
 const AnimalsPage = () => {
@@ -19,43 +18,40 @@ const AnimalsPage = () => {
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
   const [isAddAnimalOpen, setIsAddAnimalOpen] = useState(false);
 
-  // Custom hooks for optimized data management and filtering
   const {
     animals,
     loading,
     loadingMore,
     currentPage,
-    totalPages,
+    hasMore,
     isDeleting,
     searchTerm,
+    sortKey,
+    sortDirection,
+    handleSearch,
+    handleSort,
     handleAddAnimal,
     handleDeleteAnimal,
+    handleBulkDelete,
+    handleBulkStatusChange,
     handleScroll,
-    handleSearch,
     SEARCH_DEBOUNCE
-  } = useOptimizedAnimalsData();
+  } = useAnimalsData();
 
   const {
-    sortBy,
-    setSortBy,
-    sortOrder,
-    setSortOrder,
     viewMode,
     setViewMode,
     processedAnimals
   } = useAnimalsFilters(animals);
 
-  // Handle authentication
   useEffect(() => {
     if (authLoading) return;
-    
     if (!currentUser) {
       navigate('/login');
       return;
     }
   }, [navigate, currentUser, authLoading]);
 
-  // Debounced search handler
   useEffect(() => {
     if (!currentUser || authLoading) return;
 
@@ -66,7 +62,6 @@ const AnimalsPage = () => {
     return () => clearTimeout(timeoutId);
   }, [searchTerm, currentUser, authLoading, handleSearch, SEARCH_DEBOUNCE]);
 
-  // Memoized handlers
   const handleAddAnimalWrapper = useCallback(async (newAnimal: Animal) => {
     await handleAddAnimal(newAnimal, selectedAnimal);
     setSelectedAnimal(null);
@@ -78,11 +73,6 @@ const AnimalsPage = () => {
     setIsAddAnimalOpen(true);
   }, []);
 
-  const handleSortOrderChange = useCallback(() => {
-    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-  }, [sortOrder, setSortOrder]);
-
-  // Loading state
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -105,10 +95,10 @@ const AnimalsPage = () => {
         <AnimalsHeader
           searchTerm={searchTerm}
           onSearchChange={handleSearch}
-          sortBy={sortBy}
-          onSortByChange={setSortBy}
-          sortOrder={sortOrder}
-          onSortOrderChange={handleSortOrderChange}
+          sortBy={sortKey}
+          onSortByChange={handleSort}
+          sortOrder={sortDirection}
+          onSortOrderChange={() => handleSort(sortKey)}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onAddAnimal={() => setIsAddAnimalOpen(true)}
@@ -119,22 +109,26 @@ const AnimalsPage = () => {
           viewMode={viewMode}
           loading={loading}
           loadingMore={loadingMore}
-          currentPage={currentPage}
           onEdit={handleEditAnimal}
           onDelete={handleDeleteAnimal}
+          onBulkDelete={handleBulkDelete}
+          onBulkStatusChange={handleBulkStatusChange}
           isDeleting={isDeleting}
           onScroll={handleScroll}
+          onSort={handleSort}
+          sortKey={sortKey}
+          sortDirection={sortDirection}
+          searchTerm={searchTerm}
         />
 
         <AnimalsPagination
           currentPage={currentPage}
-          totalPages={totalPages}
+          totalPages={Math.ceil(animals.length / 20)}
           loading={loading}
-          onPageChange={() => {}} // Disabled for infinite scroll
+          onPageChange={() => {}}
         />
       </div>
 
-      {/* Add/Edit Animal Modal */}
       {isAddAnimalOpen && (
         <Suspense fallback={<div>Loading...</div>}>
           <AddAnimalForm

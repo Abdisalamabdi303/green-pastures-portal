@@ -1,3 +1,4 @@
+
 import { Timestamp } from 'firebase/firestore';
 
 export interface User {
@@ -70,4 +71,23 @@ export interface ChartData {
   value: number;
   amount?: number;
   color?: string;
+}
+
+// New interfaces for table improvements
+export interface TableColumn {
+  key: string;
+  label: string;
+  sortable?: boolean;
+  width?: number;
+  minWidth?: number;
+}
+
+export interface SortConfig {
+  key: string;
+  direction: 'asc' | 'desc';
+}
+
+export interface TableSelection {
+  selectedIds: Set<string>;
+  isAllSelected: boolean;
 }

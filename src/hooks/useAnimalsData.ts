@@ -4,74 +4,81 @@ import { animalServices } from '@/services/firebase';
 import { Animal } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import { useTablePagination } from './useTablePagination';
+import { useAnimalsCache } from './useAnimalsCache';
 
 const ITEMS_PER_PAGE = 20;
-const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
-const SEARCH_DEBOUNCE = 300; // 300ms
-
-// Create cache Map outside component to persist between renders
-const animalsCache = new Map<string, { data: any; timestamp: number }>();
+const SEARCH_DEBOUNCE = 300;
 
 export const useAnimalsData = () => {
   const { currentUser } = useAuth();
   const { toast } = useToast();
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortKey, setSortKey] = useState('createdAt');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  // Memoized cache key generator
-  const getCacheKey = useCallback((page: number, search: string, filter: string, sortBy: string, sortOrder: string) => 
-    `${page}-${search}-${filter}-${sortBy}-${sortOrder}`, 
-    []
-  );
+  const pagination = useTablePagination(ITEMS_PER_PAGE);
+  const cache = useAnimalsCache();
 
-  // Memoized fetch function with infinite scroll support
-  const fetchAnimals = useCallback(async (page: number, search: string, append: boolean = false, filter?: string, sortBy?: string, sortOrder?: string) => {
+  const fetchAnimals = useCallback(async (
+    page: number, 
+    search: string = '', 
+    append: boolean = false,
+    resetPagination: boolean = false
+  ) => {
     if (!currentUser) return;
 
-    const cacheKey = getCacheKey(page, search, filter || 'all', sortBy || 'date', sortOrder || 'desc');
-    const cachedData = animalsCache.get(cacheKey);
-    const now = Date.now();
+    const cacheKey = cache.getCacheKey(page, search, sortKey, sortDirection);
+    const cachedData = cache.getFromCache(cacheKey);
     
-    if (cachedData && now - cachedData.timestamp < CACHE_DURATION) {
+    if (cachedData && !resetPagination) {
       if (append) {
         setAnimals(prev => [...prev, ...cachedData.data.animals]);
       } else {
         setAnimals(cachedData.data.animals);
       }
-      setTotalPages(Math.ceil((cachedData.data.total || 0) / ITEMS_PER_PAGE));
-      setHasMore(cachedData.data.hasMore);
+      pagination.updateCursor(cachedData.lastDoc);
+      pagination.updateHasMore(cachedData.data.hasMore);
       setLoading(false);
+      setLoadingMore(false);
       return;
     }
 
-    setLoading(true);
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
     
     try {
-      const result = await animalServices.getAnimals(page, ITEMS_PER_PAGE, search);
+      const lastDoc = resetPagination ? null : pagination.lastDoc;
+      const result = await animalServices.getAnimals(page, ITEMS_PER_PAGE, search, lastDoc);
       
-      if (!result || !result.animals) {
+      if (!result?.animals) {
         setAnimals([]);
-        setTotalPages(1);
-        setHasMore(false);
+        pagination.updateHasMore(false);
         return;
       }
       
-      animalsCache.set(cacheKey, {
-        data: result,
-        timestamp: now
-      });
+      cache.setInCache(cacheKey, result, result.lastDoc);
       
       if (append) {
-        setAnimals(prev => [...prev, ...result.animals]);
+        setAnimals(prev => {
+          const existingIds = new Set(prev.map(a => a.id));
+          const newAnimals = result.animals.filter(a => !existingIds.has(a.id));
+          return [...prev, ...newAnimals];
+        });
       } else {
         setAnimals(result.animals);
       }
-      setTotalPages(Math.ceil(result.total / ITEMS_PER_PAGE));
-      setHasMore(result.hasMore);
+      
+      pagination.updateHasMore(result.hasMore);
+      pagination.updateCursor(result.lastDoc);
+      
     } catch (error) {
       console.error('Error fetching animals:', error);
       toast({
@@ -80,111 +87,181 @@ export const useAnimalsData = () => {
         variant: 'destructive'
       });
       setAnimals([]);
-      setHasMore(false);
+      pagination.updateHasMore(false);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [toast, currentUser, getCacheKey]);
+  }, [currentUser, cache, sortKey, sortDirection, pagination, toast]);
+
+  const handleSearch = useCallback((newSearchTerm: string) => {
+    setSearchTerm(newSearchTerm);
+    setAnimals([]);
+    pagination.resetPagination();
+    cache.invalidateCache('animals-');
+    fetchAnimals(1, newSearchTerm, false, true);
+  }, [fetchAnimals, pagination, cache]);
+
+  const handleSort = useCallback((key: string) => {
+    const newDirection = sortKey === key && sortDirection === 'asc' ? 'desc' : 'asc';
+    setSortKey(key);
+    setSortDirection(newDirection);
+    setAnimals([]);
+    pagination.resetPagination();
+    cache.invalidateCache('animals-');
+    fetchAnimals(1, searchTerm, false, true);
+  }, [sortKey, sortDirection, searchTerm, fetchAnimals, pagination, cache]);
+
+  const loadMore = useCallback(() => {
+    if (!loading && !loadingMore && pagination.hasMore) {
+      pagination.nextPage();
+      fetchAnimals(pagination.currentPage + 1, searchTerm, true);
+    }
+  }, [loading, loadingMore, pagination, searchTerm, fetchAnimals]);
 
   const handleAddAnimal = useCallback(async (newAnimal: Animal, selectedAnimal?: Animal | null) => {
     try {
-      // Optimistically update UI
       if (selectedAnimal) {
         setAnimals(prev => prev.map(animal => 
           animal.id === selectedAnimal.id ? newAnimal : animal
         ));
+        await animalServices.updateAnimal(selectedAnimal.id, newAnimal);
+        toast({ title: "Success", description: "Animal updated successfully" });
       } else {
         setAnimals(prev => [newAnimal, ...prev]);
-      }
-
-      // Then perform the actual server operation
-      if (selectedAnimal) {
-        await animalServices.updateAnimal(selectedAnimal.id, newAnimal);
-        toast({
-          title: "Success",
-          description: "Animal updated successfully"
-        });
-      } else {
         await animalServices.addAnimal(newAnimal);
-        toast({
-          title: "Success",
-          description: "Animal added successfully"
-        });
+        toast({ title: "Success", description: "Animal added successfully" });
       }
-      animalsCache.clear();
+      
+      cache.invalidateCache();
     } catch (error) {
-      // Revert optimistic update on error
       console.error('Error saving animal:', error);
       toast({
         title: "Error",
         description: "Failed to save animal",
         variant: "destructive"
       });
-      // Refresh the data to ensure UI is in sync with server
-      fetchAnimals(1, '');
+      fetchAnimals(1, searchTerm, false, true);
     }
-  }, [fetchAnimals, toast]);
+  }, [fetchAnimals, toast, searchTerm, cache]);
 
   const handleDeleteAnimal = useCallback(async (id: string) => {
     const animalToDelete = animals.find(a => a.id === id);
     if (!animalToDelete) {
-      toast({
-        title: "Error",
-        description: "Animal not found",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Animal not found", variant: "destructive" });
       return;
     }
 
     if (window.confirm(`Are you sure you want to delete this animal?\n\nID: ${animalToDelete.id}\nType: ${animalToDelete.type}\nBreed: ${animalToDelete.breed}\n\nThis action cannot be undone.`)) {
       try {
-        // Optimistically update UI
         setIsDeleting(id);
         setAnimals(prev => prev.filter(animal => animal.id !== id));
-
-        // Then perform the actual server operation
         await animalServices.deleteAnimal(id);
-        animalsCache.clear();
-        toast({
-          title: "Success",
-          description: "Animal deleted successfully"
-        });
+        cache.invalidateCache();
+        toast({ title: "Success", description: "Animal deleted successfully" });
       } catch (error) {
-        // Revert optimistic update on error
         console.error('Error deleting animal:', error);
         toast({
           title: "Error",
           description: `Failed to delete animal: ${error instanceof Error ? error.message : 'Unknown error'}`,
           variant: "destructive"
         });
-        // Refresh the data to ensure UI is in sync with server
-        fetchAnimals(1, '');
+        fetchAnimals(1, searchTerm, false, true);
       } finally {
         setIsDeleting(null);
       }
     }
-  }, [animals, fetchAnimals, toast]);
+  }, [animals, fetchAnimals, toast, searchTerm, cache]);
+
+  const handleBulkDelete = useCallback(async (selectedIds: string[]) => {
+    if (selectedIds.length === 0) return;
+    
+    const confirmMessage = `Are you sure you want to delete ${selectedIds.length} animal${selectedIds.length > 1 ? 's' : ''}?\n\nThis action cannot be undone.`;
+    
+    if (window.confirm(confirmMessage)) {
+      try {
+        setAnimals(prev => prev.filter(animal => !selectedIds.includes(animal.id)));
+        
+        await Promise.all(selectedIds.map(id => animalServices.deleteAnimal(id)));
+        
+        cache.invalidateCache();
+        toast({ 
+          title: "Success", 
+          description: `${selectedIds.length} animal${selectedIds.length > 1 ? 's' : ''} deleted successfully` 
+        });
+      } catch (error) {
+        console.error('Error bulk deleting animals:', error);
+        toast({
+          title: "Error",
+          description: "Failed to delete some animals",
+          variant: "destructive"
+        });
+        fetchAnimals(1, searchTerm, false, true);
+      }
+    }
+  }, [fetchAnimals, toast, searchTerm, cache]);
+
+  const handleBulkStatusChange = useCallback(async (selectedIds: string[], status: 'active' | 'sold' | 'deceased') => {
+    if (selectedIds.length === 0) return;
+    
+    try {
+      setAnimals(prev => prev.map(animal => 
+        selectedIds.includes(animal.id) ? { ...animal, status } : animal
+      ));
+      
+      await Promise.all(selectedIds.map(id => animalServices.updateAnimal(id, { status })));
+      
+      cache.invalidateCache();
+      toast({ 
+        title: "Success", 
+        description: `${selectedIds.length} animal${selectedIds.length > 1 ? 's' : ''} updated successfully` 
+      });
+    } catch (error) {
+      console.error('Error bulk updating animals:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update some animals",
+        variant: "destructive"
+      });
+      fetchAnimals(1, searchTerm, false, true);
+    }
+  }, [fetchAnimals, toast, searchTerm, cache]);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    if (scrollHeight - scrollTop <= clientHeight * 1.5 && !loading && hasMore) {
-      setCurrentPage(prev => prev + 1);
+    if (scrollHeight - scrollTop <= clientHeight * 1.2 && !loading && !loadingMore && pagination.hasMore) {
+      loadMore();
     }
-  }, [loading, hasMore]);
+  }, [loading, loadingMore, pagination.hasMore, loadMore]);
 
-  return {
+  useEffect(() => {
+    if (!currentUser) return;
+    fetchAnimals(1, '', false, true);
+  }, [currentUser, fetchAnimals]);
+
+  return useMemo(() => ({
     animals,
-    setAnimals,
     loading,
-    currentPage,
-    setCurrentPage,
-    totalPages,
-    hasMore,
+    loadingMore,
+    currentPage: pagination.currentPage,
+    hasMore: pagination.hasMore,
     isDeleting,
-    fetchAnimals,
+    searchTerm,
+    sortKey,
+    sortDirection,
+    handleSearch,
+    handleSort,
     handleAddAnimal,
     handleDeleteAnimal,
+    handleBulkDelete,
+    handleBulkStatusChange,
     handleScroll,
+    loadMore,
     SEARCH_DEBOUNCE
-  };
+  }), [
+    animals, loading, loadingMore, pagination.currentPage, pagination.hasMore,
+    isDeleting, searchTerm, sortKey, sortDirection, handleSearch, handleSort,
+    handleAddAnimal, handleDeleteAnimal, handleBulkDelete, handleBulkStatusChange,
+    handleScroll, loadMore
+  ]);
 };

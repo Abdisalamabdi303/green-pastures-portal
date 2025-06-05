@@ -1,46 +1,26 @@
 
-import React, { Suspense, lazy, memo } from 'react';
-import { Animal } from '@/types';
-import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-
-// Lazy load components
-const OptimizedAnimalTable = lazy(() => import('./OptimizedAnimalTable'));
-const AnimalCardGrid = lazy(() => import('./AnimalCardGrid'));
-
-const ITEMS_PER_PAGE = 20;
-
-// Memoized loading skeleton component
-const LoadingSkeleton = memo(() => (
-  <div className="space-y-4">
-    {[...Array(ITEMS_PER_PAGE)].map((_, i) => (
-      <Card key={i} className="animate-pulse">
-        <CardContent className="p-4">
-          <div className="flex items-center space-x-4">
-            <Skeleton className="h-12 w-12 rounded-full" />
-            <div className="space-y-2 flex-1">
-              <Skeleton className="h-4 w-1/4" />
-              <Skeleton className="h-4 w-1/2" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    ))}
-  </div>
-));
-
-LoadingSkeleton.displayName = 'LoadingSkeleton';
+import React, { memo, useMemo } from 'react';
+import { Animal, TableColumn } from '@/types';
+import VirtualizedAnimalTable from './VirtualizedAnimalTable';
+import AnimalCardGrid from './AnimalCardGrid';
+import BulkActions from './BulkActions';
+import { useTableState } from '@/hooks/useTableState';
 
 interface AnimalsListProps {
   animals: Animal[];
   viewMode: 'card' | 'list';
   loading: boolean;
   loadingMore?: boolean;
-  currentPage: number;
   onEdit: (animal: Animal) => void;
   onDelete: (id: string) => void;
+  onBulkDelete: (selectedIds: string[]) => void;
+  onBulkStatusChange: (selectedIds: string[], status: 'active' | 'sold' | 'deceased') => void;
   isDeleting: string | null;
   onScroll: (e: React.UIEvent<HTMLDivElement>) => void;
+  onSort: (key: string) => void;
+  sortKey: string;
+  sortDirection: 'asc' | 'desc';
+  searchTerm?: string;
 }
 
 const AnimalsList = memo(({
@@ -48,37 +28,81 @@ const AnimalsList = memo(({
   viewMode,
   loading,
   loadingMore = false,
-  currentPage,
   onEdit,
   onDelete,
+  onBulkDelete,
+  onBulkStatusChange,
   isDeleting,
-  onScroll
+  onScroll,
+  onSort,
+  sortKey,
+  sortDirection,
+  searchTerm
 }: AnimalsListProps) => {
   
-  // Show initial loading state
-  if (loading && currentPage === 1 && animals.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <LoadingSkeleton />
-      </div>
-    );
-  }
+  const {
+    selection,
+    selectedCount,
+    toggleSelection,
+    toggleSelectAll,
+    clearSelection
+  } = useTableState();
+
+  const tableColumns: TableColumn[] = useMemo(() => [
+    { key: 'id', label: 'ID', sortable: true },
+    { key: 'type', label: 'Type', sortable: true },
+    { key: 'breed', label: 'Breed', sortable: true },
+    { key: 'age', label: 'Age', sortable: true },
+    { key: 'gender', label: 'Gender', sortable: false },
+    { key: 'weight', label: 'Weight', sortable: true },
+    { key: 'status', label: 'Status', sortable: true },
+    { key: 'actions', label: 'Actions', sortable: false }
+  ], []);
+
+  const sortConfig = useMemo(() => ({
+    key: sortKey,
+    direction: sortDirection
+  }), [sortKey, sortDirection]);
+
+  const handleBulkDelete = () => {
+    const selectedIds = Array.from(selection.selectedIds);
+    onBulkDelete(selectedIds);
+    clearSelection();
+  };
+
+  const handleBulkStatusChange = (status: 'active' | 'sold' | 'deceased') => {
+    const selectedIds = Array.from(selection.selectedIds);
+    onBulkStatusChange(selectedIds, status);
+    clearSelection();
+  };
 
   return (
-    <div 
-      className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
-      onScroll={onScroll}
-      style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto' }}
-    >
-      <Suspense fallback={<LoadingSkeleton />}>
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <BulkActions
+        selectedCount={selectedCount}
+        onBulkDelete={handleBulkDelete}
+        onBulkStatusChange={handleBulkStatusChange}
+        onClearSelection={clearSelection}
+      />
+      
+      <div 
+        onScroll={onScroll}
+        style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto' }}
+      >
         {viewMode === 'list' ? (
-          <OptimizedAnimalTable
+          <VirtualizedAnimalTable
             animals={animals}
+            columns={tableColumns}
+            sortConfig={sortConfig}
+            selection={selection}
+            onSort={onSort}
             onEdit={onEdit}
             onDelete={onDelete}
+            onToggleSelection={toggleSelection}
+            onToggleSelectAll={toggleSelectAll}
             isDeleting={isDeleting}
             loading={loading}
-            loadingMore={loadingMore}
+            searchTerm={searchTerm}
           />
         ) : (
           <AnimalCardGrid
@@ -88,7 +112,7 @@ const AnimalsList = memo(({
             isDeleting={isDeleting}
           />
         )}
-      </Suspense>
+      </div>
       
       {!loading && !loadingMore && animals.length === 0 && (
         <div className="text-center py-12">
