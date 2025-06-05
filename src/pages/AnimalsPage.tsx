@@ -7,7 +7,7 @@ import Navbar from '../components/layout/Navbar';
 import AnimalsHeader from '../components/animals/AnimalsHeader';
 import AnimalsList from '../components/animals/AnimalsList';
 import AnimalsPagination from '../components/animals/AnimalsPagination';
-import { useAnimalsData } from '../hooks/useAnimalsData';
+import { useOptimizedAnimalsData } from '../hooks/useOptimizedAnimalsData';
 import { useAnimalsFilters } from '../hooks/useAnimalsFilters';
 
 // Lazy load components
@@ -19,24 +19,23 @@ const AnimalsPage = () => {
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
   const [isAddAnimalOpen, setIsAddAnimalOpen] = useState(false);
 
-  // Custom hooks for data management and filtering
+  // Custom hooks for optimized data management and filtering
   const {
     animals,
     loading,
+    loadingMore,
     currentPage,
-    setCurrentPage,
     totalPages,
     isDeleting,
-    fetchAnimals,
+    searchTerm,
     handleAddAnimal,
     handleDeleteAnimal,
     handleScroll,
+    handleSearch,
     SEARCH_DEBOUNCE
-  } = useAnimalsData();
+  } = useOptimizedAnimalsData();
 
   const {
-    searchTerm,
-    setSearchTerm,
     sortBy,
     setSortBy,
     sortOrder,
@@ -46,44 +45,33 @@ const AnimalsPage = () => {
     processedAnimals
   } = useAnimalsFilters(animals);
 
-  // Initial data fetch
+  // Handle authentication
   useEffect(() => {
     if (authLoading) return;
-
+    
     if (!currentUser) {
       navigate('/login');
       return;
     }
+  }, [navigate, currentUser, authLoading]);
 
-    fetchAnimals(1, '');
-  }, [navigate, fetchAnimals, currentUser, authLoading]);
-
-  // Handle search and page changes with debounce
+  // Debounced search handler
   useEffect(() => {
     if (!currentUser || authLoading) return;
 
     const timeoutId = setTimeout(() => {
-      setCurrentPage(1);
-      fetchAnimals(1, searchTerm);
+      handleSearch(searchTerm);
     }, SEARCH_DEBOUNCE);
 
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, currentUser, fetchAnimals, authLoading, setCurrentPage, SEARCH_DEBOUNCE]);
-
-  // Load more data when page changes
-  useEffect(() => {
-    if (currentPage > 1) {
-      fetchAnimals(currentPage, searchTerm, true);
-    }
-  }, [currentPage, searchTerm, fetchAnimals]);
+  }, [searchTerm, currentUser, authLoading, handleSearch, SEARCH_DEBOUNCE]);
 
   // Memoized handlers
   const handleAddAnimalWrapper = useCallback(async (newAnimal: Animal) => {
     await handleAddAnimal(newAnimal, selectedAnimal);
     setSelectedAnimal(null);
     setIsAddAnimalOpen(false);
-    fetchAnimals(1, searchTerm);
-  }, [handleAddAnimal, selectedAnimal, searchTerm, fetchAnimals]);
+  }, [handleAddAnimal, selectedAnimal]);
 
   const handleEditAnimal = useCallback((animal: Animal) => {
     setSelectedAnimal(animal);
@@ -94,6 +82,7 @@ const AnimalsPage = () => {
     setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
   }, [sortOrder, setSortOrder]);
 
+  // Loading state
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -115,7 +104,7 @@ const AnimalsPage = () => {
       <div className="container mx-auto px-4 py-8">
         <AnimalsHeader
           searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
+          onSearchChange={handleSearch}
           sortBy={sortBy}
           onSortByChange={setSortBy}
           sortOrder={sortOrder}
@@ -129,6 +118,7 @@ const AnimalsPage = () => {
           animals={processedAnimals}
           viewMode={viewMode}
           loading={loading}
+          loadingMore={loadingMore}
           currentPage={currentPage}
           onEdit={handleEditAnimal}
           onDelete={handleDeleteAnimal}
@@ -140,7 +130,7 @@ const AnimalsPage = () => {
           currentPage={currentPage}
           totalPages={totalPages}
           loading={loading}
-          onPageChange={setCurrentPage}
+          onPageChange={() => {}} // Disabled for infinite scroll
         />
       </div>
 
@@ -149,8 +139,10 @@ const AnimalsPage = () => {
         <Suspense fallback={<div>Loading...</div>}>
           <AddAnimalForm
             onAddAnimal={handleAddAnimalWrapper}
-            isAddAnimalOpen={isAddAnimalOpen}
-            setIsAddAnimalOpen={setIsAddAnimalOpen}
+            onClose={() => {
+              setIsAddAnimalOpen(false);
+              setSelectedAnimal(null);
+            }}
             animalToEdit={selectedAnimal}
           />
         </Suspense>

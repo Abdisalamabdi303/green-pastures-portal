@@ -1,6 +1,6 @@
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, where, setDoc, getDoc, limit as firestoreLimit, startAfter, getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Animal, HealthRecord, Vaccination } from '@/types';
+import { Animal, HealthRecord, Vaccination, Expense } from '@/types';
 
 // Animal Services
 export const animalServices = {
@@ -47,26 +47,49 @@ export const animalServices = {
     }
   },
 
-  // Get all animals with pagination and search
-  getAnimals: async (page = 1, limit = 10, searchTerm = '') => {
+  // Get all animals with optimized pagination and search
+  getAnimals: async (page = 1, limit = 10, searchTerm = '', lastDoc = null) => {
     try {
+      console.log(`Fetching animals - Page: ${page}, Limit: ${limit}, Search: ${searchTerm}`);
+      
       // Build the base query
       let baseQuery = query(
         collection(db, 'animals'),
         orderBy('createdAt', 'desc')
       );
 
-      // Get total count and paginated data in parallel
-      const [countSnapshot, dataSnapshot] = await Promise.all([
-        getCountFromServer(baseQuery),
-        getDocs(query(baseQuery, firestoreLimit(limit)))
-      ]);
+      // Get total count only on first page
+      let total = 0;
+      if (page === 1) {
+        const countSnapshot = await getCountFromServer(baseQuery);
+        total = countSnapshot.data().count;
+      }
 
-      const total = countSnapshot.data().count;
+      // Build paginated query
+      let paginatedQuery = query(
+        collection(db, 'animals'),
+        orderBy('createdAt', 'desc'),
+        firestoreLimit(limit)
+      );
+
+      // Add pagination cursor if provided
+      if (lastDoc && page > 1) {
+        paginatedQuery = query(
+          collection(db, 'animals'),
+          orderBy('createdAt', 'desc'),
+          startAfter(lastDoc),
+          firestoreLimit(limit)
+        );
+      }
+
+      const dataSnapshot = await getDocs(paginatedQuery);
       let animals = dataSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Animal[];
+
+      // Get the last document for next page cursor
+      const lastVisible = dataSnapshot.docs[dataSnapshot.docs.length - 1];
 
       // Filter animals based on search term if provided
       if (searchTerm) {
@@ -78,12 +101,18 @@ export const animalServices = {
         );
       }
 
+      const hasMore = dataSnapshot.docs.length === limit;
+
+      console.log(`Fetched ${animals.length} animals, hasMore: ${hasMore}`);
+
       return {
         animals,
-        total,
+        total: page === 1 ? total : 0, // Only return total on first page
         page,
         limit,
-        totalPages: Math.ceil(total / limit)
+        totalPages: page === 1 ? Math.ceil(total / limit) : 0,
+        hasMore,
+        lastDoc: lastVisible
       };
     } catch (error) {
       console.error('Error fetching animals:', error);
@@ -514,4 +543,4 @@ export const incomeServices = {
       throw error;
     }
   }
-}; 
+};
