@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,19 +20,17 @@ const AnimalsPage = () => {
   const {
     animals,
     loading,
-    loadingMore,
-    currentPage,
-    totalPages,
+    error,
     hasMore,
-    isDeleting,
+    loadMore,
+    refresh,
+    search,
     searchTerm,
-    handleSearch,
+    isDeleting,
     handleAddAnimal,
     handleDeleteAnimal,
     handleBulkDelete,
-    handleBulkStatusChange,
-    handleScroll,
-    SEARCH_DEBOUNCE
+    handleBulkStatusChange
   } = useOptimizedAnimalsData();
 
   const {
@@ -50,15 +47,9 @@ const AnimalsPage = () => {
     }
   }, [navigate, currentUser, authLoading]);
 
-  useEffect(() => {
-    if (!currentUser || authLoading) return;
-
-    const timeoutId = setTimeout(() => {
-      handleSearch(searchTerm);
-    }, SEARCH_DEBOUNCE);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm, currentUser, authLoading, handleSearch, SEARCH_DEBOUNCE]);
+  const handleSearch = useCallback((value: string) => {
+    search(value);
+  }, [search]);
 
   const handleAddAnimalWrapper = useCallback(async (newAnimal: Animal) => {
     await handleAddAnimal(newAnimal, selectedAnimal);
@@ -111,25 +102,24 @@ const AnimalsPage = () => {
           animals={processedAnimals}
           viewMode={viewMode}
           loading={loading}
-          loadingMore={loadingMore}
           onEdit={handleEditAnimal}
           onDelete={handleDeleteAnimal}
           onBulkDelete={handleBulkDelete}
           onBulkStatusChange={handleBulkStatusChange}
           isDeleting={isDeleting}
-          onScroll={handleScroll}
+          onLoadMore={loadMore}
+          hasMore={hasMore}
           onSort={handleSort}
           sortKey=""
           sortDirection="desc"
           searchTerm={searchTerm}
         />
 
-        <AnimalsPagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          loading={loading}
-          onPageChange={() => {}}
-        />
+        {error && (
+          <div className="text-red-500 text-center mt-4">
+            {error}
+          </div>
+        )}
       </div>
 
       {isAddAnimalOpen && (

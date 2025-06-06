@@ -10,6 +10,18 @@ interface AnimalTableProps {
   isDeleting: string | null;
 }
 
+const columns: TableColumn[] = [
+  { key: 'id', label: 'ID', sortable: true },
+  { key: 'type', label: 'Type', sortable: true },
+  { key: 'breed', label: 'Breed', sortable: true },
+  { key: 'age', label: 'Age', sortable: true },
+  { key: 'gender', label: 'Gender', sortable: true },
+  { key: 'weight', label: 'Weight', sortable: true },
+  { key: 'price', label: 'Price', sortable: true },
+  { key: 'status', label: 'Status', sortable: true },
+  { key: 'actions', label: 'Actions', sortable: false }
+];
+
 const AnimalTable = ({ animals, onEdit, onDelete, isDeleting }: AnimalTableProps) => {
   const handleEdit = useCallback((animal: Animal) => {
     onEdit(animal);

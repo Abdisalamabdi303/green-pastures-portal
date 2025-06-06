@@ -1,4 +1,3 @@
-
 export interface Animal {
   id: string;
   name?: string;
@@ -7,6 +6,7 @@ export interface Animal {
   age?: number;
   gender?: 'male' | 'female';
   weight?: number;
+  price: number;
   status: 'active' | 'sold' | 'deceased';
   health?: string;
   isVaccinated?: boolean;
@@ -16,6 +16,7 @@ export interface Animal {
   notes?: string;
   createdAt?: any;
   expenseId?: string;
+  updatedAt: Date;
 }
 
 export interface HealthRecord {
