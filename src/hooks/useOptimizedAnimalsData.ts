@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, orderBy, limit, startAfter, getDocs, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { useDebounce } from '@/hooks/useDebounce';
+import { cacheService } from '@/services/cacheService';
 
 const ITEMS_PER_PAGE = 20;
 const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
@@ -78,7 +79,7 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const debouncedSearchTerm = useDebounce(searchTerm, SEARCH_DEBOUNCE);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   // Refs for pagination and caching
@@ -107,16 +108,26 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
     }
   }, []);
 
-  // Fetch animals with pagination
+  // Fetch animals with pagination and caching
   const fetchAnimals = useCallback(async (isInitial = false) => {
     try {
       setLoading(true);
       setError(null);
 
+      const cacheKey = getCacheKey(isInitial ? 1 : Math.ceil(animals.length / ITEMS_PER_PAGE) + 1, debouncedSearchTerm);
+      const cachedData = cacheService.get(cacheKey);
+
+      if (cachedData && !isInitial) {
+        setAnimals(prev => [...prev, ...cachedData.data]);
+        setHasMore(cachedData.data.length === ITEMS_PER_PAGE);
+        lastDocRef.current = cachedData.lastDoc;
+        return;
+      }
+
       let q = query(
         collection(db, 'animals'),
         orderBy('createdAt', 'desc'),
-        limit(PAGE_SIZE)
+        limit(ITEMS_PER_PAGE)
       );
 
       if (!isInitial && lastDocRef.current) {
@@ -124,14 +135,16 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
       }
 
       const snapshot = await getDocs(q);
-      const newAnimals = snapshot.docs.map(doc => {
-        const data = doc.data() as Animal;
-        cacheRef.current.set(doc.id, data);
-        return { ...data, id: doc.id };
-      });
+      const newAnimals = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id
+      })) as Animal[];
 
       lastDocRef.current = snapshot.docs[snapshot.docs.length - 1] || null;
-      setHasMore(snapshot.docs.length === PAGE_SIZE);
+      setHasMore(snapshot.docs.length === ITEMS_PER_PAGE);
+
+      // Cache the results
+      cacheService.set(cacheKey, newAnimals, lastDocRef.current);
 
       if (isInitial) {
         setAnimals(newAnimals);
@@ -139,20 +152,38 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
         setAnimals(prev => [...prev, ...newAnimals]);
       }
 
-      clearCache();
+      // Warm up next page cache
+      if (hasMore) {
+        const nextPageKey = getCacheKey(Math.ceil(animals.length / ITEMS_PER_PAGE) + 2, debouncedSearchTerm);
+        cacheService.warmup(nextPageKey, async () => {
+          const nextPageQuery = query(
+            collection(db, 'animals'),
+            orderBy('createdAt', 'desc'),
+            startAfter(lastDocRef.current),
+            limit(ITEMS_PER_PAGE)
+          );
+          const nextSnapshot = await getDocs(nextPageQuery);
+          return nextSnapshot.docs.map(doc => ({
+            ...doc.data(),
+            id: doc.id
+          })) as Animal[];
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch animals');
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch animals. Please try again.',
+        variant: 'destructive'
+      });
     } finally {
       setLoading(false);
     }
-  }, [clearCache]);
+  }, [animals.length, debouncedSearchTerm, getCacheKey, hasMore, toast]);
 
-  // Search animals with improved query
+  // Search animals with improved caching
   const searchAnimals = useCallback(async (term: string) => {
-    console.log('Searching for term:', term);
-
     if (!term.trim()) {
-      console.log('Empty search term, fetching all animals');
       setAnimals([]);
       setHasMore(true);
       lastDocRef.current = null;
@@ -164,13 +195,11 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
       setError(null);
 
       const searchTermLower = term.toLowerCase().trim();
-      console.log('Normalized search term:', searchTermLower);
+      const cacheKey = `search-${searchTermLower}`;
+      const cachedResults = cacheService.get(cacheKey);
 
-      // Check cache first
-      const cachedResults = searchCacheRef.current.get(searchTermLower);
       if (cachedResults) {
-        console.log('Using cached results:', cachedResults.length);
-        setAnimals(cachedResults);
+        setAnimals(cachedResults.data);
         setHasMore(false);
         return;
       }
@@ -178,7 +207,7 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
       const animalsRef = collection(db, 'animals');
       let results: Animal[] = [];
 
-      // If the search term looks like an ID (alphanumeric), search by ID first
+      // If the search term looks like an ID, search by ID first
       if (/^[a-zA-Z0-9]+$/.test(searchTermLower)) {
         const idQuery = query(
           animalsRef,
@@ -192,13 +221,13 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
         })) as Animal[];
       }
 
-      // If no results found by ID or search term is not an ID, search by type
+      // If no results found by ID, search by type
       if (results.length === 0) {
         const typeQuery = query(
           animalsRef,
           where('type', '>=', searchTermLower),
           where('type', '<=', searchTermLower + '\uf8ff'),
-          limit(PAGE_SIZE)
+          limit(ITEMS_PER_PAGE)
         );
 
         const typeSnapshot = await getDocs(typeQuery);
@@ -207,11 +236,11 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
           id: doc.id
         })) as Animal[];
 
-        // If still no results, try partial match on type
+        // If still no results, try partial match
         if (results.length === 0) {
           const allAnimalsQuery = query(
             animalsRef,
-            limit(PAGE_SIZE)
+            limit(ITEMS_PER_PAGE)
           );
           const allSnapshot = await getDocs(allAnimalsQuery);
           const allAnimals = allSnapshot.docs.map(doc => ({
@@ -226,14 +255,8 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
         }
       }
 
-      console.log('Search results:', results.length);
-
-      // Cache results
-      searchCacheRef.current.set(searchTermLower, results);
-      if (searchCacheRef.current.size > 10) {
-        const firstKey = searchCacheRef.current.keys().next().value;
-        searchCacheRef.current.delete(firstKey);
-      }
+      // Cache search results
+      cacheService.set(cacheKey, results);
 
       setAnimals(results);
       setHasMore(false);
@@ -250,193 +273,129 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
     }
   }, [fetchAnimals, toast]);
 
-  // Load more animals
-  const loadMore = useCallback(async () => {
-    if (loading || !hasMore || debouncedSearchTerm) return;
-    await fetchAnimals();
-  }, [loading, hasMore, debouncedSearchTerm, fetchAnimals]);
-
-  // Refresh data
-  const refresh = useCallback(async () => {
-    lastDocRef.current = null;
-    await fetchAnimals(true);
-  }, [fetchAnimals]);
-
-  // Handle search term changes with immediate feedback
-  const handleSearch = useCallback((term: string) => {
-    console.log('handleSearch called with term:', term);
-    setSearchTerm(term);
-    searchAnimals(term);
-  }, [searchAnimals]);
-
-  // Effect to handle debounced search for performance
-  useEffect(() => {
-    if (debouncedSearchTerm !== searchTerm) {
-      console.log('Debounced search triggered:', debouncedSearchTerm);
-      searchAnimals(debouncedSearchTerm);
-    }
-  }, [debouncedSearchTerm, searchTerm, searchAnimals]);
-
-  // Initial load
-  useMemo(() => {
-    fetchAnimals(true);
-  }, [fetchAnimals]);
-
-  // Optimized CRUD operations with cache invalidation
-  const handleAddAnimal = useCallback(async (newAnimal: Animal, selectedAnimal?: Animal | null) => {
+  // Handle animal deletion with cache invalidation
+  const handleDeleteAnimal = useCallback(async (id: string) => {
     try {
-      console.log('Adding/updating animal:', { newAnimal, selectedAnimal });
+      setIsDeleting(id);
+      await animalServices.deleteAnimal(id);
       
-      if (selectedAnimal) {
-        // Update existing animal
-        const updatedAnimal = await animalServices.updateAnimal(selectedAnimal.id, newAnimal);
-        setAnimals(prev => prev.map(animal => 
-          animal.id === selectedAnimal.id ? { ...animal, ...updatedAnimal } : animal
-        ));
-        toast({ title: "Success", description: "Animal updated successfully" });
-      } else {
-        // Add new animal
-        const addedAnimal = await animalServices.addAnimal(newAnimal);
-        setAnimals(prev => [addedAnimal, ...prev]);
-        toast({ title: "Success", description: "Animal added successfully" });
-      }
+      // Invalidate all animal-related caches
+      cacheService.invalidatePattern('animals-');
+      cacheService.invalidatePattern('search-');
       
-      // Clear cache to ensure fresh data
-      animalsCache.clear();
+      setAnimals(prev => prev.filter(animal => animal.id !== id));
+      toast({
+        title: "Success",
+        description: "Animal deleted successfully.",
+      });
     } catch (error) {
-      console.error('Error saving animal:', error);
+      console.error('Error deleting animal:', error);
       toast({
         title: "Error",
-        description: `Failed to ${selectedAnimal ? 'update' : 'add'} animal: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        description: "Failed to delete animal. Please try again.",
         variant: "destructive"
       });
-      // Refresh data on error
-      fetchAnimals(true);
+    } finally {
+      setIsDeleting(null);
     }
-  }, [fetchAnimals, toast]);
+  }, [toast]);
 
-  const handleDeleteAnimal = useCallback(async (id: string) => {
-    console.log('handleDeleteAnimal called with id:', id);
-    
-    const animalToDelete = animals.find(a => a.id === id);
-    if (!animalToDelete) {
-      console.error('Animal not found:', id);
-      toast({ title: "Error", description: "Animal not found", variant: "destructive" });
-      return;
-    }
-
-    console.log('Animal found for deletion:', animalToDelete);
-
-    const confirmMessage = `Are you sure you want to delete this animal?\n\nID: ${animalToDelete.id}\nType: ${animalToDelete.type}\nBreed: ${animalToDelete.breed}\n\nThis action cannot be undone and will also delete all related health records, vaccinations, and expenses.`;
-    
-    if (window.confirm(confirmMessage)) {
-      try {
-        console.log('User confirmed deletion, setting isDeleting to:', id);
-        setIsDeleting(id);
-        
-        console.log('Attempting to delete animal from backend:', id);
-        
-        // Call backend deletion first
-        await animalServices.deleteAnimal(id);
-        console.log('Animal successfully deleted from backend');
-        
-        // Only update UI state after successful backend deletion
-        setAnimals(prev => {
-          const newAnimals = prev.filter(animal => animal.id !== id);
-          console.log('Updated animals list, removed animal:', id);
-          return newAnimals;
-        });
-        
-        // Clear cache to ensure consistency
-        animalsCache.clear();
-        
-        toast({ 
-          title: "Success", 
-          description: "Animal and all related records deleted successfully" 
-        });
-        
-      } catch (error) {
-        console.error('Critical error deleting animal:', error);
-        toast({
-          title: "Error",
-          description: `Failed to delete animal: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          variant: "destructive"
-        });
-        
-        // Refresh data on error to ensure UI consistency with backend
-        fetchAnimals(true);
-      } finally {
-        console.log('Setting isDeleting to null');
-        setIsDeleting(null);
-      }
-    } else {
-      console.log('User cancelled deletion');
-    }
-  }, [animals, fetchAnimals, toast]);
-
+  // Handle bulk delete with cache invalidation
   const handleBulkDelete = useCallback(async (selectedIds: string[]) => {
-    if (selectedIds.length === 0) return;
-    
-    const confirmMessage = `Are you sure you want to delete ${selectedIds.length} animal${selectedIds.length > 1 ? 's' : ''}?\n\nThis action cannot be undone and will also delete all related health records, vaccinations, and expenses.`;
-    
-    if (window.confirm(confirmMessage)) {
-      try {
-        console.log('Bulk deleting animals from backend:', selectedIds);
-        
-        // Delete from backend first
-        await Promise.all(selectedIds.map(id => animalServices.deleteAnimal(id)));
-        console.log('All animals successfully deleted from backend');
-        
-        // Only update UI after successful backend deletion
-        setAnimals(prev => prev.filter(animal => !selectedIds.includes(animal.id)));
-        
-        animalsCache.clear();
-        toast({ 
-          title: "Success", 
-          description: `${selectedIds.length} animal${selectedIds.length > 1 ? 's' : ''} and all related records deleted successfully` 
-        });
-      } catch (error) {
-        console.error('Error bulk deleting animals:', error);
-        toast({
-          title: "Error",
-          description: `Failed to delete some animals: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          variant: "destructive"
-        });
-        fetchAnimals(true);
-      }
-    }
-  }, [fetchAnimals, toast]);
-
-  const handleBulkStatusChange = useCallback(async (selectedIds: string[], status: 'active' | 'sold' | 'deceased') => {
-    if (selectedIds.length === 0) return;
-    
     try {
-      console.log('Bulk updating animal status in backend:', selectedIds, status);
+      for (const id of selectedIds) {
+        await animalServices.deleteAnimal(id);
+      }
       
-      // Update backend first
-      await Promise.all(selectedIds.map(id => animalServices.updateAnimal(id, { status })));
-      console.log('All animals successfully updated in backend');
+      // Invalidate all animal-related caches
+      cacheService.invalidatePattern('animals-');
+      cacheService.invalidatePattern('search-');
       
-      // Update UI state after successful backend update
+      setAnimals(prev => prev.filter(animal => !selectedIds.includes(animal.id)));
+      toast({
+        title: "Success",
+        description: "Selected animals deleted successfully.",
+      });
+    } catch (error) {
+      console.error('Error in bulk delete:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete some animals. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [toast]);
+
+  // Handle bulk status change with cache invalidation
+  const handleBulkStatusChange = useCallback(async (selectedIds: string[], status: 'active' | 'sold' | 'deceased') => {
+    try {
+      for (const id of selectedIds) {
+        await animalServices.updateAnimal(id, { status });
+      }
+      
+      // Invalidate all animal-related caches
+      cacheService.invalidatePattern('animals-');
+      cacheService.invalidatePattern('search-');
+      
       setAnimals(prev => prev.map(animal => 
         selectedIds.includes(animal.id) ? { ...animal, status } : animal
       ));
       
-      animalsCache.clear();
-      toast({ 
-        title: "Success", 
-        description: `${selectedIds.length} animal${selectedIds.length > 1 ? 's' : ''} updated successfully` 
+      toast({
+        title: "Success",
+        description: "Selected animals updated successfully.",
       });
     } catch (error) {
-      console.error('Error bulk updating animals:', error);
+      console.error('Error in bulk status change:', error);
       toast({
         title: "Error",
-        description: `Failed to update some animals: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        description: "Failed to update some animals. Please try again.",
         variant: "destructive"
       });
+    }
+  }, [toast]);
+
+  // Handle adding new animal with cache invalidation
+  const handleAddAnimal = useCallback(async (newAnimal: Animal, animalToEdit?: Animal | null) => {
+    try {
+      if (animalToEdit) {
+        await animalServices.updateAnimal(animalToEdit.id, newAnimal);
+        toast({
+          title: "Success",
+          description: "Animal updated successfully.",
+        });
+      } else {
+        await animalServices.addAnimal(newAnimal);
+        toast({
+          title: "Success",
+          description: "Animal added successfully.",
+        });
+      }
+      
+      // Invalidate all animal-related caches
+      cacheService.invalidatePattern('animals-');
+      cacheService.invalidatePattern('search-');
+      
+      // Refresh the list
       fetchAnimals(true);
+    } catch (error) {
+      console.error('Error adding/updating animal:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add/update animal. Please try again.",
+        variant: "destructive"
+      });
     }
   }, [fetchAnimals, toast]);
+
+  // Effect for initial load and search term changes
+  useEffect(() => {
+    if (debouncedSearchTerm) {
+      searchAnimals(debouncedSearchTerm);
+    } else {
+      fetchAnimals(true);
+    }
+  }, [debouncedSearchTerm, fetchAnimals, searchAnimals]);
 
   // Memoized return value to prevent unnecessary re-renders
   return useMemo(() => ({
@@ -444,9 +403,9 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
     loading,
     error,
     hasMore,
-    loadMore,
-    refresh,
-    search: handleSearch,
+    loadMore: () => fetchAnimals(false),
+    refresh: () => fetchAnimals(true),
+    search: setSearchTerm,
     searchTerm,
     isDeleting,
     handleAddAnimal,
@@ -458,9 +417,8 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
     loading,
     error,
     hasMore,
-    loadMore,
-    refresh,
-    handleSearch,
+    fetchAnimals,
+    setSearchTerm,
     searchTerm,
     isDeleting,
     handleAddAnimal,
