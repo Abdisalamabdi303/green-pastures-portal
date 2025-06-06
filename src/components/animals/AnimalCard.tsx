@@ -1,3 +1,4 @@
+
 import { Animal } from '@/types';
 import { Edit, Trash, Loader2 } from 'lucide-react';
 
@@ -18,8 +19,8 @@ const AnimalCard = ({ animal, onEdit, onDelete, isDeleting }: AnimalCardProps) =
             alt={`${animal.type} ${animal.breed}`} 
             className="w-full h-full object-cover"
           />
-          </div>
-        )}
+        </div>
+      )}
       
       <div className="p-4">
         <div className="flex justify-between items-start">
@@ -52,7 +53,7 @@ const AnimalCard = ({ animal, onEdit, onDelete, isDeleting }: AnimalCardProps) =
           </div>
           <div>
             <span className="text-gray-500">Price:</span>
-            <span className="ml-2 text-gray-900">${animal.purchasePrice.toFixed(2)}</span>
+            <span className="ml-2 text-gray-900">${animal.purchasePrice?.toFixed(2) || 'N/A'}</span>
           </div>
           {animal.isVaccinated !== undefined && (
             <div>

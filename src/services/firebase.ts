@@ -1,4 +1,3 @@
-
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, where, setDoc, getDoc, limit as firestoreLimit, startAfter, getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Animal, HealthRecord, Vaccination, Expense } from '@/types';
@@ -9,6 +8,15 @@ export const animalServices = {
   addAnimal: async (animalData: Animal) => {
     try {
       console.log('Adding animal to backend:', animalData);
+      
+      // Check if animal with this ID already exists
+      const existingAnimalRef = doc(db, 'animals', animalData.id);
+      const existingAnimalDoc = await getDoc(existingAnimalRef);
+      
+      if (existingAnimalDoc.exists()) {
+        throw new Error(`Animal with ID ${animalData.id} already exists`);
+      }
+      
       const animalRef = doc(db, 'animals', animalData.id);
       const animalToAdd = {
         ...animalData,
@@ -124,23 +132,41 @@ export const animalServices = {
     }
   },
 
-  // Update an animal
+  // Update an animal - Enhanced to handle ID changes properly
   updateAnimal: async (id: string, animalData: Partial<Animal>) => {
     try {
       console.log('Updating animal in backend:', id, animalData);
       
+      // Check if animal exists
+      const currentAnimalRef = doc(db, 'animals', id);
+      const currentAnimalDoc = await getDoc(currentAnimalRef);
+      
+      if (!currentAnimalDoc.exists()) {
+        throw new Error(`Animal with ID ${id} not found`);
+      }
+      
       // If the ID is being changed
       if (animalData.id && animalData.id !== id) {
-        // Create new document with new ID
+        // Check if new ID already exists
         const newAnimalRef = doc(db, 'animals', animalData.id);
+        const newAnimalDoc = await getDoc(newAnimalRef);
+        
+        if (newAnimalDoc.exists()) {
+          throw new Error(`Animal with ID ${animalData.id} already exists`);
+        }
+        
+        // Get current animal data
+        const currentData = currentAnimalDoc.data();
+        
+        // Create new document with new ID
         await setDoc(newAnimalRef, {
+          ...currentData,
           ...animalData,
-          createdAt: Timestamp.now()
+          id: animalData.id
         });
 
         // Delete old document
-        const oldAnimalRef = doc(db, 'animals', id);
-        await deleteDoc(oldAnimalRef);
+        await deleteDoc(currentAnimalRef);
 
         // Update related records with new animalId
         const healthRecordsQuery = query(
@@ -163,12 +189,21 @@ export const animalServices = {
         );
         await Promise.all(vaccinationsUpdates);
 
+        const expensesQuery = query(
+          collection(db, 'expenses'),
+          where('animalId', '==', id)
+        );
+        const expensesSnapshot = await getDocs(expensesQuery);
+        const expensesUpdates = expensesSnapshot.docs.map(doc => 
+          updateDoc(doc.ref, { animalId: animalData.id })
+        );
+        await Promise.all(expensesUpdates);
+
         console.log('Animal successfully updated in backend with new ID');
-        return { ...animalData, id: animalData.id };
+        return { ...currentData, ...animalData, id: animalData.id };
       } else {
         // Regular update without ID change
-        const animalRef = doc(db, 'animals', id);
-        await updateDoc(animalRef, animalData);
+        await updateDoc(currentAnimalRef, animalData);
         console.log('Animal successfully updated in backend');
         return { id, ...animalData };
       }
@@ -178,7 +213,7 @@ export const animalServices = {
     }
   },
 
-  // Delete an animal - FIXED FOR PROPER BACKEND DELETION
+  // Delete an animal - Enhanced with better error handling
   deleteAnimal: async (id: string) => {
     try {
       console.log('Starting deletion process for animal:', id);

@@ -5,7 +5,7 @@ import { Timestamp } from 'firebase/firestore';
 interface AddAnimalFormProps {
   onAddAnimal: (animal: Animal) => void;
   onClose: () => void;
-  animalToEdit?: Animal;
+  animalToEdit?: Animal | null;
 }
 
 const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProps) => {
@@ -17,7 +17,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
     age: 0,
     health: 'Good',
     weight: 0,
-    gender: '',
+    gender: undefined,
     status: 'active',
     purchaseDate: new Date().toISOString().split('T')[0],
     purchasePrice: 0,
@@ -47,7 +47,6 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
         isVaccinated: value === 'Yes'
       });
     } else if (type === 'number') {
-      // For number inputs, use the value directly if it's a valid number
       const numValue = value === '' ? 0 : Number(value);
       setFormData({
         ...formData,
@@ -97,7 +96,6 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
       return;
     }
 
-    // Remove any whitespace from ID
     const cleanId = formData.id.trim();
     
     if (!cleanId) {
@@ -112,7 +110,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
       age: formData.age || 0,
       health: formData.health || 'Good',
       weight: formData.weight || 0,
-      gender: formData.gender,
+      gender: formData.gender as 'male' | 'female',
       status: formData.status || 'active',
       purchaseDate: formData.purchaseDate,
       purchasePrice: formData.purchasePrice,
@@ -132,7 +130,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
       age: 0,
       health: 'Good',
       weight: 0,
-      gender: '',
+      gender: undefined,
       status: 'active',
       purchaseDate: new Date().toISOString().split('T')[0],
       purchasePrice: 0,
@@ -221,7 +219,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
                       value={formData.gender || ''} 
                       onChange={handleFormChange} 
                       required 
-                      options={["Male", "Female"]} 
+                      options={["male", "female"]} 
                     />
                     <InputField 
                       label="Purchase Price" 

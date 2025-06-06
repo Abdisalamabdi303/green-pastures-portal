@@ -12,6 +12,8 @@ export interface Animal {
   isVaccinated?: boolean;
   purchasePrice?: number;
   purchaseDate?: string;
+  photoUrl?: string;
+  notes?: string;
   createdAt?: any;
   expenseId?: string;
 }
@@ -70,4 +72,15 @@ export interface SortConfig {
 export interface TableSelection {
   selectedIds: Set<string>;
   isAllSelected: boolean;
+}
+
+export interface ChartData {
+  name: string;
+  value: number;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name?: string;
 }
