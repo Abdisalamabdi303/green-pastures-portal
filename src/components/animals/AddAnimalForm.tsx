@@ -1,6 +1,8 @@
 import { Animal } from '@/types';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Timestamp } from 'firebase/firestore';
+import { Button } from '@/components/ui/button';
+import { Camera, CameraOff, RotateCcw } from 'lucide-react';
 
 interface AddAnimalFormProps {
   onAddAnimal: (animal: Animal) => void;
@@ -10,6 +12,11 @@ interface AddAnimalFormProps {
 
 const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProps) => {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [isCameraOn, setIsCameraOn] = useState(false);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const videoRef = useRef<HTMLVideoElement>(null);
+  
   const [formData, setFormData] = useState<Partial<Animal>>({
     id: '',
     type: '',
@@ -35,6 +42,62 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
       }
     }
   }, [animalToEdit]);
+
+  const startCamera = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode }
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setIsCameraOn(true);
+      }
+    } catch (err) {
+      console.error('Error accessing camera:', err);
+    }
+  }, [facingMode]);
+
+  const stopCamera = useCallback(() => {
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+      setIsCameraOn(false);
+    }
+  }, []);
+
+  const capturePhoto = useCallback(() => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        ctx.drawImage(videoRef.current, 0, 0);
+        const imageData = canvas.toDataURL('image/jpeg');
+        setPhotoPreview(imageData);
+        setFormData(prev => ({ ...prev, photoUrl: imageData }));
+        stopCamera();
+        setShowCamera(false);
+      }
+    }
+  }, [stopCamera]);
+
+  const switchCamera = useCallback(() => {
+    stopCamera();
+    setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
+    startCamera();
+  }, [startCamera, stopCamera]);
+
+  useEffect(() => {
+    if (showCamera) {
+      startCamera();
+    }
+    return () => {
+      stopCamera();
+    };
+  }, [showCamera, startCamera, stopCamera]);
 
   const handleFormChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -155,14 +218,126 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
                   {animalToEdit ? 'Edit Animal' : 'Add New Animal'}
                 </h3>
                 <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-                  <PhotoUpload 
-                    preview={photoPreview || formData.photoUrl} 
-                    onFileChange={handlePhotoChange} 
-                    onRemove={() => { 
-                      setPhotoPreview(null); 
-                      setFormData((prev) => ({ ...prev, photoUrl: '' })); 
-                    }} 
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Animal Photo</label>
+                    <div className="mt-1 flex justify-center border-2 border-gray-300 border-dashed rounded-md">
+                      <div className="space-y-1 text-center p-4 w-full">
+                        {photoPreview ? (
+                          <div className="mx-auto w-32 h-32 relative">
+                            <img src={photoPreview} alt="Preview" className="mx-auto h-32 w-32 object-cover rounded-md" />
+                            <button 
+                              type="button" 
+                              className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 text-xs" 
+                              onClick={() => {
+                                setPhotoPreview(null);
+                                setFormData(prev => ({ ...prev, photoUrl: '' }));
+                              }}
+                            >
+                              &times;
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <div className="flex text-sm text-gray-600 justify-center gap-4">
+                              <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-farm-600 hover:text-farm-500 focus-within:outline-none">
+                                <span>Upload a photo</span>
+                                <input 
+                                  id="file-upload" 
+                                  name="file-upload" 
+                                  type="file" 
+                                  accept="image/*" 
+                                  className="sr-only" 
+                                  onChange={handlePhotoChange} 
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => setShowCamera(true)}
+                                className="relative cursor-pointer bg-white rounded-md font-medium text-farm-600 hover:text-farm-500 focus-within:outline-none"
+                              >
+                                Take a photo
+                              </button>
+                            </div>
+                            <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {showCamera && (
+                    <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center">
+                      <div className="bg-white rounded-lg p-4 max-w-lg w-full mx-4">
+                        <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-black">
+                          <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        
+                        <div className="flex justify-center gap-4 mt-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              if (isCameraOn) {
+                                stopCamera();
+                              } else {
+                                startCamera();
+                              }
+                            }}
+                            className="flex items-center gap-2"
+                          >
+                            {isCameraOn ? (
+                              <>
+                                <CameraOff className="h-4 w-4" />
+                                Turn Off
+                              </>
+                            ) : (
+                              <>
+                                <Camera className="h-4 w-4" />
+                                Turn On
+                              </>
+                            )}
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            onClick={switchCamera}
+                            className="flex items-center gap-2"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                            Switch Camera
+                          </Button>
+                          
+                          <Button
+                            onClick={capturePhoto}
+                            disabled={!isCameraOn}
+                            className="flex items-center gap-2"
+                          >
+                            <Camera className="h-4 w-4" />
+                            Take Photo
+                          </Button>
+                        </div>
+                        
+                        <div className="mt-4 flex justify-end">
+                          <Button 
+                            variant="ghost" 
+                            onClick={() => {
+                              stopCamera();
+                              setShowCamera(false);
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   <InputField 
                     label="Animal ID" 
@@ -288,35 +463,6 @@ const SelectField = ({ label, options, ...props }: { label: string; options: str
       <option value="" disabled>Select {label.toLowerCase()}</option>
       {options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
     </select>
-  </div>
-);
-
-const PhotoUpload = ({ preview, onFileChange, onRemove }: { preview: string | null; onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void; onRemove: () => void }) => (
-  <div>
-    <label className="block text-sm font-medium text-gray-700">Animal Photo</label>
-    <div className="mt-1 flex justify-center border-2 border-gray-300 border-dashed rounded-md">
-      <div className="space-y-1 text-center p-4 w-full">
-        {preview ? (
-          <div className="mx-auto w-32 h-32 relative">
-            <img src={preview} alt="Preview" className="mx-auto h-32 w-32 object-cover rounded-md" />
-            <button type="button" className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 text-xs" onClick={onRemove}>&times;</button>
-          </div>
-        ) : (
-          <>
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <div className="flex text-sm text-gray-600 justify-center">
-              <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-farm-600 hover:text-farm-500 focus-within:outline-none">
-                <span>Upload a photo</span>
-                <input id="file-upload" name="file-upload" type="file" accept="image/*" className="sr-only" onChange={onFileChange} />
-              </label>
-            </div>
-            <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
-          </>
-        )}
-      </div>
-    </div>
   </div>
 );
 

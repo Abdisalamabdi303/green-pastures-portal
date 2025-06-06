@@ -4,23 +4,13 @@ import { Animal, TableColumn, SortConfig, TableSelection } from '@/types';
 import { ChevronUp, ChevronDown, Trash2, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { formatPrice } from '@/utils/format';
 
 // Constants
 const ROW_HEIGHT = 60;
 const HEADER_HEIGHT = 48;
 const WINDOW_SIZE = 20; // Number of items to render at once
 const SCROLL_THRESHOLD = 0.8; // Load more when 80% scrolled
-
-// Memoized formatters
-const formatPrice = (price: number | undefined) => {
-  if (!price) return '-';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(price);
-};
 
 interface VirtualizedAnimalTableProps {
   animals: Animal[];

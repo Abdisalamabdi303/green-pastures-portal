@@ -8,6 +8,17 @@ export const formatCurrency = (amount: number): string => {
   }).format(amount);
 };
 
+// Format price to USD
+const formatPrice = (price: number | undefined): string => {
+  if (price === undefined) return '$0.00';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(price);
+};
+
 // Format date to locale string
 export const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-IN', {
@@ -15,4 +26,6 @@ export const formatDate = (dateString: string) => {
     month: 'short',
     day: 'numeric'
   });
-}; 
+};
+
+export { formatPrice }; 
