@@ -1,43 +1,19 @@
 
-import { Timestamp } from 'firebase/firestore';
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-}
-
 export interface Animal {
   id: string;
   name?: string;
-  type: string;
+  type?: string;
   breed?: string;
   age?: number;
-  gender?: string;
+  gender?: 'male' | 'female';
   weight?: number;
-  purchaseDate?: string;
-  purchasePrice?: number;
   status: 'active' | 'sold' | 'deceased';
-  notes?: string;
-  createdAt: any; // Firestore Timestamp
   health?: string;
-  photoUrl?: string;
   isVaccinated?: boolean;
+  purchasePrice?: number;
+  purchaseDate?: string;
+  createdAt?: any;
   expenseId?: string;
-}
-
-export interface Expense {
-  id: string;
-  category: string;
-  amount: number;
-  date: any; // Firestore Timestamp
-  description: string;
-  createdAt: any; // Firestore Timestamp
-  paymentMethod: string;
-  animalRelated: boolean;
-  animalId?: string;
-  animalName?: string;
 }
 
 export interface HealthRecord {
@@ -47,10 +23,10 @@ export interface HealthRecord {
   animalType: string;
   condition: 'healthy' | 'sick' | 'injured' | 'pregnant';
   treatment: string;
-  date: string | any; // Firestore Timestamp
+  date: any;
   cost: number;
-  notes?: string;
-  createdAt: any; // Firestore Timestamp
+  notes: string;
+  createdAt: any;
 }
 
 export interface Vaccination {
@@ -59,27 +35,31 @@ export interface Vaccination {
   animalName: string;
   animalType: string;
   vaccineName: string;
-  date: string | any; // Firestore Timestamp
-  nextDueDate: string | any; // Firestore Timestamp
+  date: any;
+  nextDueDate: any;
   administered: boolean;
-  notes?: string;
-  createdAt: any; // Firestore Timestamp
+  notes: string;
+  cost?: number;
+  createdAt: any;
 }
 
-export interface ChartData {
-  name: string;
-  value: number;
-  amount?: number;
-  color?: string;
+export interface Expense {
+  id: string;
+  category: string;
+  amount: number;
+  date: any;
+  description: string;
+  paymentMethod: string;
+  animalRelated?: boolean;
+  animalId?: string;
+  animalName?: string;
+  createdAt: any;
 }
 
-// New interfaces for table improvements
 export interface TableColumn {
   key: string;
   label: string;
-  sortable?: boolean;
-  width?: number;
-  minWidth?: number;
+  sortable: boolean;
 }
 
 export interface SortConfig {

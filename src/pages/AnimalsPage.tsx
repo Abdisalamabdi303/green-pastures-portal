@@ -7,7 +7,7 @@ import Navbar from '../components/layout/Navbar';
 import AnimalsHeader from '../components/animals/AnimalsHeader';
 import AnimalsList from '../components/animals/AnimalsList';
 import AnimalsPagination from '../components/animals/AnimalsPagination';
-import { useAnimalsData } from '../hooks/useAnimalsData';
+import { useOptimizedAnimalsData } from '../hooks/useOptimizedAnimalsData';
 import { useAnimalsFilters } from '../hooks/useAnimalsFilters';
 
 const AddAnimalForm = lazy(() => import('../components/animals/AddAnimalForm'));
@@ -23,20 +23,18 @@ const AnimalsPage = () => {
     loading,
     loadingMore,
     currentPage,
+    totalPages,
     hasMore,
     isDeleting,
     searchTerm,
-    sortKey,
-    sortDirection,
     handleSearch,
-    handleSort,
     handleAddAnimal,
     handleDeleteAnimal,
     handleBulkDelete,
     handleBulkStatusChange,
     handleScroll,
     SEARCH_DEBOUNCE
-  } = useAnimalsData();
+  } = useOptimizedAnimalsData();
 
   const {
     viewMode,
@@ -73,6 +71,11 @@ const AnimalsPage = () => {
     setIsAddAnimalOpen(true);
   }, []);
 
+  const handleSort = useCallback((key: string) => {
+    // Implement sorting logic
+    console.log('Sorting by:', key);
+  }, []);
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -95,10 +98,10 @@ const AnimalsPage = () => {
         <AnimalsHeader
           searchTerm={searchTerm}
           onSearchChange={handleSearch}
-          sortBy={sortKey}
+          sortBy=""
           onSortByChange={handleSort}
-          sortOrder={sortDirection}
-          onSortOrderChange={() => handleSort(sortKey)}
+          sortOrder="desc"
+          onSortOrderChange={() => {}}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onAddAnimal={() => setIsAddAnimalOpen(true)}
@@ -116,14 +119,14 @@ const AnimalsPage = () => {
           isDeleting={isDeleting}
           onScroll={handleScroll}
           onSort={handleSort}
-          sortKey={sortKey}
-          sortDirection={sortDirection}
+          sortKey=""
+          sortDirection="desc"
           searchTerm={searchTerm}
         />
 
         <AnimalsPagination
           currentPage={currentPage}
-          totalPages={Math.ceil(animals.length / 20)}
+          totalPages={totalPages}
           loading={loading}
           onPageChange={() => {}}
         />
