@@ -77,6 +77,7 @@ export interface TableSelection {
 export interface ChartData {
   name: string;
   value: number;
+  amount?: number;
 }
 
 export interface User {

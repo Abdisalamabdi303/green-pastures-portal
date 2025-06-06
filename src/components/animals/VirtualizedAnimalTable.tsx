@@ -1,4 +1,3 @@
-
 import React, { memo, useMemo, useCallback } from 'react';
 import { FixedSizeList as List } from 'react-window';
 import { Animal, TableColumn, SortConfig, TableSelection } from '@/types';
@@ -40,10 +39,20 @@ interface VirtualRowProps {
 }
 
 const VirtualRow = memo(({ index, style, data }: VirtualRowProps) => {
-  const { animals, columns, selection, onEdit, onDelete, onToggleSelection, isDeleting, searchTerm } = data;
+  const { animals, selection, onEdit, onDelete, onToggleSelection, isDeleting, searchTerm } = data;
   const animal = animals[index];
 
   if (!animal) return null;
+
+  const handleDelete = useCallback(() => {
+    console.log('Delete clicked for animal:', animal.id);
+    onDelete(animal.id);
+  }, [animal.id, onDelete]);
+
+  const handleEdit = useCallback(() => {
+    console.log('Edit clicked for animal:', animal.id);
+    onEdit(animal);
+  }, [animal, onEdit]);
 
   const highlightText = (text: string) => {
     if (!searchTerm || !text) return text;
@@ -102,15 +111,16 @@ const VirtualRow = memo(({ index, style, data }: VirtualRowProps) => {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => onEdit(animal)}
+            onClick={handleEdit}
             className="h-8 w-8 p-0"
+            disabled={isDeleting === animal.id}
           >
             <Edit className="h-4 w-4" />
           </Button>
           <Button
             size="sm"
             variant="outline"
-            onClick={() => onDelete(animal.id)}
+            onClick={handleDelete}
             disabled={isDeleting === animal.id}
             className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
           >

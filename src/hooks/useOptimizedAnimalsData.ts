@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { animalServices } from '@/services/firebase';
 import { Animal } from '@/types';
@@ -222,17 +221,24 @@ export const useOptimizedAnimalsData = () => {
   }, [fetchAnimals, toast, searchTerm]);
 
   const handleDeleteAnimal = useCallback(async (id: string) => {
+    console.log('handleDeleteAnimal called with id:', id);
+    
     const animalToDelete = animals.find(a => a.id === id);
     if (!animalToDelete) {
+      console.error('Animal not found:', id);
       toast({ title: "Error", description: "Animal not found", variant: "destructive" });
       return;
     }
+
+    console.log('Animal found for deletion:', animalToDelete);
 
     const confirmMessage = `Are you sure you want to delete this animal?\n\nID: ${animalToDelete.id}\nType: ${animalToDelete.type}\nBreed: ${animalToDelete.breed}\n\nThis action cannot be undone and will also delete all related health records, vaccinations, and expenses.`;
     
     if (window.confirm(confirmMessage)) {
       try {
+        console.log('User confirmed deletion, setting isDeleting to:', id);
         setIsDeleting(id);
+        
         console.log('Attempting to delete animal from backend:', id);
         
         // Call backend deletion first
@@ -240,7 +246,11 @@ export const useOptimizedAnimalsData = () => {
         console.log('Animal successfully deleted from backend');
         
         // Only update UI state after successful backend deletion
-        setAnimals(prev => prev.filter(animal => animal.id !== id));
+        setAnimals(prev => {
+          const newAnimals = prev.filter(animal => animal.id !== id);
+          console.log('Updated animals list, removed animal:', id);
+          return newAnimals;
+        });
         
         // Clear cache to ensure consistency
         animalsCache.clear();
@@ -261,8 +271,11 @@ export const useOptimizedAnimalsData = () => {
         // Refresh data on error to ensure UI consistency with backend
         fetchAnimals(1, searchTerm, false, true);
       } finally {
+        console.log('Setting isDeleting to null');
         setIsDeleting(null);
       }
+    } else {
+      console.log('User cancelled deletion');
     }
   }, [animals, fetchAnimals, toast, searchTerm]);
 

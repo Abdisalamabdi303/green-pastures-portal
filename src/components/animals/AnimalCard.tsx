@@ -10,6 +10,16 @@ interface AnimalCardProps {
 }
 
 const AnimalCard = ({ animal, onEdit, onDelete, isDeleting }: AnimalCardProps) => {
+  const handleDelete = () => {
+    console.log('Delete button clicked for animal:', animal.id);
+    onDelete(animal.id);
+  };
+
+  const handleEdit = () => {
+    console.log('Edit button clicked for animal:', animal.id);
+    onEdit(animal);
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       {animal.photoUrl && (
@@ -69,14 +79,14 @@ const AnimalCard = ({ animal, onEdit, onDelete, isDeleting }: AnimalCardProps) =
 
         <div className="mt-4 flex justify-end space-x-2">
           <button
-            onClick={() => onEdit(animal)}
+            onClick={handleEdit}
             className="p-2 text-gray-600 hover:text-farm-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isDeleting === animal.id}
           >
             <Edit className="h-5 w-5" />
           </button>
           <button
-            onClick={() => onDelete(animal.id)}
+            onClick={handleDelete}
             className="p-2 text-gray-600 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isDeleting === animal.id}
           >
