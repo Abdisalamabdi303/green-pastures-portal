@@ -103,6 +103,9 @@ const VirtualRow = memo(({ index, style, data }: VirtualRowProps) => {
         <div className="truncate">
           {highlightText(animal.breed || '')}
         </div>
+        <div className="truncate font-medium text-green-600">
+          {formatPrice(animal.purchasePrice)}
+        </div>
         <div className="truncate">
           {animal.age || '-'}
         </div>
@@ -111,9 +114,6 @@ const VirtualRow = memo(({ index, style, data }: VirtualRowProps) => {
         </div>
         <div className="truncate">
           {animal.weight ? `${animal.weight} kg` : '-'}
-        </div>
-        <div className="truncate font-medium text-green-600">
-          {formatPrice(animal.price)}
         </div>
         <div className="truncate">
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${

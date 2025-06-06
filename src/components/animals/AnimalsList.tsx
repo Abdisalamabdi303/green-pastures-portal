@@ -1,4 +1,3 @@
-
 import React, { memo, useMemo } from 'react';
 import { Animal, TableColumn } from '@/types';
 import VirtualizedAnimalTable from './VirtualizedAnimalTable';
@@ -52,6 +51,7 @@ const AnimalsList = memo(({
     { key: 'id', label: 'ID', sortable: true },
     { key: 'type', label: 'Type', sortable: true },
     { key: 'breed', label: 'Breed', sortable: true },
+    { key: 'purchasePrice', label: 'Purchase Price', sortable: true },
     { key: 'age', label: 'Age', sortable: true },
     { key: 'gender', label: 'Gender', sortable: false },
     { key: 'weight', label: 'Weight', sortable: true },
