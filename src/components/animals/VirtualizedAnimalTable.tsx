@@ -147,7 +147,6 @@ const TableHeader = memo(({
     <div className="w-12 flex items-center justify-center">
       <Checkbox
         checked={selection.isAllSelected}
-        indeterminate={selection.selectedIds.size > 0 && !selection.isAllSelected}
         onCheckedChange={() => onToggleSelectAll(animalIds)}
       />
     </div>
@@ -245,6 +244,7 @@ const VirtualizedAnimalTable = ({
       {animals.length > 0 ? (
         <List
           height={Math.min(animals.length * ROW_HEIGHT, 600)}
+          width="100%"
           itemCount={animals.length}
           itemSize={ROW_HEIGHT}
           itemData={itemData}

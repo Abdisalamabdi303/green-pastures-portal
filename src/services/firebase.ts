@@ -1,3 +1,4 @@
+
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, where, setDoc, getDoc, limit as firestoreLimit, startAfter, getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Animal, HealthRecord, Vaccination, Expense } from '@/types';
@@ -7,6 +8,7 @@ export const animalServices = {
   // Add a new animal
   addAnimal: async (animalData: Animal) => {
     try {
+      console.log('Adding animal to backend:', animalData);
       const animalRef = doc(db, 'animals', animalData.id);
       const animalToAdd = {
         ...animalData,
@@ -17,6 +19,7 @@ export const animalServices = {
       };
       
       await setDoc(animalRef, animalToAdd);
+      console.log('Animal successfully added to backend');
 
       // Create an expense record for the animal purchase
       if (animalData.purchasePrice && animalData.purchasePrice > 0) {
@@ -33,6 +36,7 @@ export const animalServices = {
         };
 
         const expenseRef = await addDoc(collection(db, 'expenses'), expenseData);
+        console.log('Expense record created:', expenseRef.id);
         
         // Update the animal document with the expense reference
         await updateDoc(animalRef, {
@@ -107,7 +111,7 @@ export const animalServices = {
 
       return {
         animals,
-        total: page === 1 ? total : 0, // Only return total on first page
+        total: page === 1 ? total : 0,
         page,
         limit,
         totalPages: page === 1 ? Math.ceil(total / limit) : 0,
@@ -123,6 +127,8 @@ export const animalServices = {
   // Update an animal
   updateAnimal: async (id: string, animalData: Partial<Animal>) => {
     try {
+      console.log('Updating animal in backend:', id, animalData);
+      
       // If the ID is being changed
       if (animalData.id && animalData.id !== id) {
         // Create new document with new ID
@@ -157,11 +163,13 @@ export const animalServices = {
         );
         await Promise.all(vaccinationsUpdates);
 
+        console.log('Animal successfully updated in backend with new ID');
         return { ...animalData, id: animalData.id };
       } else {
         // Regular update without ID change
         const animalRef = doc(db, 'animals', id);
         await updateDoc(animalRef, animalData);
+        console.log('Animal successfully updated in backend');
         return { id, ...animalData };
       }
     } catch (error) {
@@ -170,7 +178,7 @@ export const animalServices = {
     }
   },
 
-  // Delete an animal
+  // Delete an animal - FIXED FOR PROPER BACKEND DELETION
   deleteAnimal: async (id: string) => {
     try {
       console.log('Starting deletion process for animal:', id);
@@ -180,16 +188,13 @@ export const animalServices = {
       const animalDoc = await getDoc(animalRef);
       
       if (!animalDoc.exists()) {
+        console.error(`Animal with ID ${id} not found`);
         throw new Error(`Animal with ID ${id} not found`);
       }
 
       console.log('Animal found, proceeding with deletion');
 
-      // Delete the animal
-      await deleteDoc(animalRef);
-      console.log('Animal document deleted');
-
-      // Delete related health records
+      // Delete related health records first
       const healthRecordsQuery = query(
         collection(db, 'health_records'),
         where('animalId', '==', id)
@@ -197,11 +202,14 @@ export const animalServices = {
       const healthRecordsSnapshot = await getDocs(healthRecordsQuery);
       console.log(`Found ${healthRecordsSnapshot.size} health records to delete`);
       
-      const healthRecordsDeletions = healthRecordsSnapshot.docs.map(doc => 
-        deleteDoc(doc.ref)
-      );
-      await Promise.all(healthRecordsDeletions);
-      console.log('Health records deleted');
+      if (healthRecordsSnapshot.size > 0) {
+        const healthRecordsDeletions = healthRecordsSnapshot.docs.map(doc => {
+          console.log('Deleting health record:', doc.id);
+          return deleteDoc(doc.ref);
+        });
+        await Promise.all(healthRecordsDeletions);
+        console.log('Health records deleted successfully');
+      }
 
       // Delete related vaccinations
       const vaccinationsQuery = query(
@@ -211,30 +219,56 @@ export const animalServices = {
       const vaccinationsSnapshot = await getDocs(vaccinationsQuery);
       console.log(`Found ${vaccinationsSnapshot.size} vaccinations to delete`);
       
-      const vaccinationsDeletions = vaccinationsSnapshot.docs.map(doc => 
-        deleteDoc(doc.ref)
+      if (vaccinationsSnapshot.size > 0) {
+        const vaccinationsDeletions = vaccinationsSnapshot.docs.map(doc => {
+          console.log('Deleting vaccination:', doc.id);
+          return deleteDoc(doc.ref);
+        });
+        await Promise.all(vaccinationsDeletions);
+        console.log('Vaccinations deleted successfully');
+      }
+
+      // Delete related expenses
+      const expensesQuery = query(
+        collection(db, 'expenses'),
+        where('animalId', '==', id)
       );
-      await Promise.all(vaccinationsDeletions);
-      console.log('Vaccinations deleted');
+      const expensesSnapshot = await getDocs(expensesQuery);
+      console.log(`Found ${expensesSnapshot.size} expenses to delete`);
+      
+      if (expensesSnapshot.size > 0) {
+        const expensesDeletions = expensesSnapshot.docs.map(doc => {
+          console.log('Deleting expense:', doc.id);
+          return deleteDoc(doc.ref);
+        });
+        await Promise.all(expensesDeletions);
+        console.log('Related expenses deleted successfully');
+      }
+
+      // Finally delete the animal document
+      await deleteDoc(animalRef);
+      console.log('Animal document deleted successfully from backend');
 
       return id;
     } catch (error) {
-      console.error('Error in deleteAnimal:', error);
-      throw error;
+      console.error('Critical error in deleteAnimal:', error);
+      throw new Error(`Failed to delete animal: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 };
 
-// Expense Services
+// Expense Services - FIXED FOR PROPER CRUD
 export const expenseServices = {
   // Add a new expense
   addExpense: async (expenseData: any) => {
     try {
+      console.log('Adding expense to backend:', expenseData);
       const docRef = await addDoc(collection(db, 'expenses'), {
         ...expenseData,
         createdAt: Timestamp.now(),
         date: Timestamp.fromDate(new Date(expenseData.date))
       });
+      console.log('Expense successfully added to backend:', docRef.id);
       return { id: docRef.id, ...expenseData };
     } catch (error) {
       console.error('Error adding expense:', error);
@@ -257,6 +291,7 @@ export const expenseServices = {
     total: number;
   }> {
     try {
+      console.log(`Fetching expenses - Page: ${page}, Limit: ${limit}`);
       const expensesRef = collection(db, 'expenses');
       
       // Build the base query
@@ -322,6 +357,8 @@ export const expenseServices = {
         ...doc.data()
       })) as Expense[];
 
+      console.log(`Fetched ${expenses.length} expenses from backend`);
+
       return {
         expenses,
         totalPages,
@@ -333,13 +370,45 @@ export const expenseServices = {
     }
   },
 
-  // Delete an expense
+  // Delete an expense - FIXED FOR PROPER BACKEND DELETION
   deleteExpense: async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'expenses', id));
+      console.log('Deleting expense from backend:', id);
+      
+      // Check if expense exists first
+      const expenseRef = doc(db, 'expenses', id);
+      const expenseDoc = await getDoc(expenseRef);
+      
+      if (!expenseDoc.exists()) {
+        console.error(`Expense with ID ${id} not found`);
+        throw new Error(`Expense with ID ${id} not found`);
+      }
+
+      await deleteDoc(expenseRef);
+      console.log('Expense successfully deleted from backend:', id);
       return id;
     } catch (error) {
-      console.error('Error deleting expense:', error);
+      console.error('Critical error deleting expense:', error);
+      throw new Error(`Failed to delete expense: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  },
+
+  // Update expense
+  updateExpense: async (id: string, expenseData: Partial<Expense>) => {
+    try {
+      console.log('Updating expense in backend:', id, expenseData);
+      const expenseRef = doc(db, 'expenses', id);
+      
+      const updateData = { ...expenseData };
+      if (updateData.date && typeof updateData.date === 'string') {
+        updateData.date = Timestamp.fromDate(new Date(updateData.date));
+      }
+      
+      await updateDoc(expenseRef, updateData);
+      console.log('Expense successfully updated in backend');
+      return { id, ...expenseData };
+    } catch (error) {
+      console.error('Error updating expense:', error);
       throw error;
     }
   }
@@ -356,11 +425,10 @@ export const healthServices = {
         animalName: recordData.animalName || '',
         animalType: recordData.animalType || '',
         condition: recordData.condition,
-        status: recordData.status,
+        treatment: recordData.treatment,
         date: typeof recordData.date === 'string' 
           ? Timestamp.fromDate(new Date(recordData.date))
           : recordData.date,
-        treatment: recordData.treatment,
         cost: recordData.cost || 0,
         notes: recordData.notes || '',
         createdAt: Timestamp.now()
