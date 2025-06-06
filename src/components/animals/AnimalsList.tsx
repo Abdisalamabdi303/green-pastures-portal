@@ -1,9 +1,11 @@
 import React, { memo, useMemo } from 'react';
 import { Animal, TableColumn } from '@/types';
 import VirtualizedAnimalTable from './VirtualizedAnimalTable';
+import MobileAnimalTable from './MobileAnimalTable';
 import AnimalCardGrid from './AnimalCardGrid';
 import BulkActions from './BulkActions';
 import { useTableState } from '@/hooks/useTableState';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 interface AnimalsListProps {
   animals: Animal[];
@@ -38,6 +40,7 @@ const AnimalsList = memo(({
   sortDirection,
   searchTerm
 }: AnimalsListProps) => {
+  const isMobile = useMediaQuery('(max-width: 640px)');
   
   const {
     selection,
@@ -90,20 +93,33 @@ const AnimalsList = memo(({
         style={{ maxHeight: 'calc(100vh - 300px)', overflowY: 'auto' }}
       >
         {viewMode === 'list' ? (
-          <VirtualizedAnimalTable
-            animals={animals}
-            columns={tableColumns}
-            sortConfig={sortConfig}
-            selection={selection}
-            onSort={onSort}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onToggleSelection={toggleSelection}
-            onToggleSelectAll={toggleSelectAll}
-            isDeleting={isDeleting}
-            loading={loading}
-            searchTerm={searchTerm}
-          />
+          isMobile ? (
+            <MobileAnimalTable
+              animals={animals}
+              selection={selection}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onToggleSelection={toggleSelection}
+              onToggleSelectAll={toggleSelectAll}
+              isDeleting={isDeleting}
+              searchTerm={searchTerm}
+            />
+          ) : (
+            <VirtualizedAnimalTable
+              animals={animals}
+              columns={tableColumns}
+              sortConfig={sortConfig}
+              selection={selection}
+              onSort={onSort}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onToggleSelection={toggleSelection}
+              onToggleSelectAll={toggleSelectAll}
+              isDeleting={isDeleting}
+              loading={loading}
+              searchTerm={searchTerm}
+            />
+          )
         ) : (
           <AnimalCardGrid
             animals={animals}

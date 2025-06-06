@@ -84,35 +84,35 @@ const VirtualRow = memo(({ index, style, data }: VirtualRowProps) => {
   return (
     <div
       style={style}
-      className="flex items-center border-b border-gray-200 hover:bg-gray-50 px-4"
+      className="flex items-center border-b border-gray-200 hover:bg-gray-50 px-2 sm:px-4"
     >
-      <div className="w-12 flex items-center justify-center">
+      <div className="w-8 sm:w-12 flex items-center justify-center">
         <Checkbox
           checked={selection.selectedIds.has(animal.id)}
           onCheckedChange={() => onToggleSelection(animal.id)}
         />
       </div>
       
-      <div className="flex-1 grid grid-cols-9 gap-4 items-center">
+      <div className="flex-1 grid grid-cols-4 sm:grid-cols-9 gap-2 sm:gap-4 items-center text-sm">
         <div className="truncate font-medium">
           {highlightText(animal.id)}
         </div>
         <div className="truncate">
           {highlightText(animal.type || '')}
         </div>
-        <div className="truncate">
+        <div className="truncate hidden sm:block">
           {highlightText(animal.breed || '')}
         </div>
-        <div className="truncate font-medium text-green-600">
+        <div className="truncate font-medium text-green-600 hidden sm:block">
           {formatPrice(animal.purchasePrice)}
         </div>
-        <div className="truncate">
+        <div className="truncate hidden sm:block">
           {animal.age || '-'}
         </div>
-        <div className="truncate">
+        <div className="truncate hidden sm:block">
           {animal.gender || '-'}
         </div>
-        <div className="truncate">
+        <div className="truncate hidden sm:block">
           {animal.weight ? `${animal.weight} kg` : '-'}
         </div>
         <div className="truncate">
@@ -124,27 +124,27 @@ const VirtualRow = memo(({ index, style, data }: VirtualRowProps) => {
             {animal.status}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           <Button
             size="sm"
             variant="outline"
             onClick={handleEdit}
-            className="h-8 w-8 p-0"
+            className="h-7 w-7 sm:h-8 sm:w-8 p-0"
             disabled={isDeleting === animal.id}
           >
-            <Edit className="h-4 w-4" />
+            <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
           <Button
             size="sm"
             variant="outline"
             onClick={handleDelete}
             disabled={isDeleting === animal.id}
-            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+            className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-red-600 hover:text-red-700"
           >
             {isDeleting === animal.id ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600" />
+              <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-red-600" />
             ) : (
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
             )}
           </Button>
         </div>
@@ -171,17 +171,24 @@ const TableHeader = memo(({
   onSort: (key: string) => void;
   onToggleSelectAll: (allIds: string[]) => void;
 }) => (
-  <div className="flex items-center border-b border-gray-300 bg-gray-50 px-4 font-medium text-gray-700" style={{ height: HEADER_HEIGHT }}>
-    <div className="w-12 flex items-center justify-center">
+  <div className="flex items-center border-b border-gray-300 bg-gray-50 px-2 sm:px-4 font-medium text-gray-700 text-sm" style={{ height: HEADER_HEIGHT }}>
+    <div className="w-8 sm:w-12 flex items-center justify-center">
       <Checkbox
         checked={selection.isAllSelected}
         onCheckedChange={() => onToggleSelectAll(animalIds)}
       />
     </div>
     
-    <div className="flex-1 grid grid-cols-9 gap-4 items-center">
+    <div className="flex-1 grid grid-cols-4 sm:grid-cols-9 gap-2 sm:gap-4 items-center">
       {columns.map((column) => (
-        <div key={column.key} className="flex items-center">
+        <div 
+          key={column.key} 
+          className={`flex items-center ${
+            ['breed', 'purchasePrice', 'age', 'gender', 'weight'].includes(column.key) 
+              ? 'hidden sm:block' 
+              : ''
+          }`}
+        >
           {column.sortable ? (
             <button
               onClick={() => onSort(column.key)}
@@ -190,8 +197,8 @@ const TableHeader = memo(({
               <span>{column.label}</span>
               {sortConfig.key === column.key && (
                 sortConfig.direction === 'asc' ? 
-                <ChevronUp className="h-4 w-4" /> : 
-                <ChevronDown className="h-4 w-4" />
+                <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4" /> : 
+                <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
               )}
             </button>
           ) : (
@@ -349,6 +356,7 @@ const VirtualizedAnimalTable = ({
           width="100%"
           onScroll={handleScroll}
           itemData={itemData}
+          className="scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
         >
           {VirtualRow}
         </List>
