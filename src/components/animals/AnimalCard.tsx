@@ -1,6 +1,8 @@
-
+import React from 'react';
 import { Animal } from '@/types';
-import { Edit, Trash, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Edit, Trash2 } from 'lucide-react';
+import { formatPrice } from '@/utils/format';
 
 interface AnimalCardProps {
   animal: Animal;
@@ -11,19 +13,15 @@ interface AnimalCardProps {
 
 const AnimalCard = ({ animal, onEdit, onDelete, isDeleting }: AnimalCardProps) => {
   const handleDelete = () => {
-    console.log('Delete button clicked for animal:', animal.id);
-    onDelete(animal.id);
-  };
-
-  const handleEdit = () => {
-    console.log('Edit button clicked for animal:', animal.id);
-    onEdit(animal);
+    if (window.confirm(`Are you sure you want to delete animal ${animal.id}?`)) {
+      onDelete(animal.id);
+    }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+    <div className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
       {animal.photoUrl && (
-        <div className="h-48 overflow-hidden">
+        <div className="relative h-32 w-full overflow-hidden rounded-t-lg">
           <img 
             src={animal.photoUrl} 
             alt={`${animal.type} ${animal.breed}`} 
@@ -31,71 +29,73 @@ const AnimalCard = ({ animal, onEdit, onDelete, isDeleting }: AnimalCardProps) =
           />
         </div>
       )}
-      
-      <div className="p-4">
-        <div className="flex justify-between items-start">
+      <div className="p-3">
+        <div className="flex items-start justify-between mb-2">
           <div>
-            <h3 className="text-lg font-semibold text-gray-800">ID: {animal.id}</h3>
-            <p className="text-sm text-gray-600">Type: {animal.type}</p>
-            <p className="text-sm text-gray-600">Breed: {animal.breed}</p>
+            <h3 className="font-semibold text-gray-900 truncate text-sm">{animal.id}</h3>
+            <p className="text-xs text-gray-600">{animal.type}</p>
           </div>
-          <span className={`px-2 py-1 text-xs leading-5 font-semibold rounded-full ${
-            animal.health === 'Excellent' ? 'bg-green-100 text-green-800' : 
-            animal.health === 'Good' ? 'bg-blue-100 text-blue-800' : 
-            'bg-yellow-100 text-yellow-800'
-          }`}>
-            {animal.health}
-          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onEdit(animal)}
+              className="h-7 w-7 p-0 hover:bg-gray-100"
+              disabled={isDeleting === animal.id}
+            >
+              <Edit className="h-3 w-3 text-gray-600" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleDelete}
+              className="h-7 w-7 p-0 hover:bg-red-50"
+              disabled={isDeleting === animal.id}
+            >
+              {isDeleting === animal.id ? (
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-600" />
+              ) : (
+                <Trash2 className="h-3 w-3 text-red-600" />
+              )}
+            </Button>
+          </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-          <div>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-500">Breed:</span>
+            <span className="font-medium text-gray-900">{animal.breed || '-'}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
             <span className="text-gray-500">Age:</span>
-            <span className="ml-2 text-gray-900">{animal.age} {animal.age === 1 ? 'year' : 'years'}</span>
+            <span className="font-medium text-gray-900">{animal.age || '-'}</span>
           </div>
-          <div>
-            <span className="text-gray-500">Weight:</span>
-            <span className="ml-2 text-gray-900">{animal.weight ? `${animal.weight} kg` : 'N/A'}</span>
-          </div>
-          <div>
+          <div className="flex items-center justify-between text-xs">
             <span className="text-gray-500">Gender:</span>
-            <span className="ml-2 text-gray-900">{animal.gender}</span>
+            <span className="font-medium text-gray-900">{animal.gender || '-'}</span>
           </div>
-          <div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-500">Weight:</span>
+            <span className="font-medium text-gray-900">
+              {animal.weight ? `${animal.weight} kg` : '-'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
             <span className="text-gray-500">Price:</span>
-            <span className="ml-2 text-gray-900">${animal.purchasePrice?.toFixed(2) || 'N/A'}</span>
+            <span className="font-medium text-green-600">
+              {formatPrice(animal.purchasePrice)}
+            </span>
           </div>
-          {animal.isVaccinated !== undefined && (
-            <div>
-              <span className="text-gray-500">Vaccinated:</span>
-              <span className="ml-2 text-gray-900">
-                {typeof animal.isVaccinated === 'boolean' 
-                  ? (animal.isVaccinated ? 'Yes' : 'No') 
-                  : animal.isVaccinated}
-              </span>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-4 flex justify-end space-x-2">
-          <button
-            onClick={handleEdit}
-            className="p-2 text-gray-600 hover:text-farm-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isDeleting === animal.id}
-          >
-            <Edit className="h-5 w-5" />
-          </button>
-          <button
-            onClick={handleDelete}
-            className="p-2 text-gray-600 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isDeleting === animal.id}
-          >
-            {isDeleting === animal.id ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Trash className="h-5 w-5" />
-            )}
-          </button>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-500">Status:</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${
+              animal.status === 'active' ? 'bg-green-100 text-green-800' :
+              animal.status === 'sold' ? 'bg-blue-100 text-blue-800' :
+              'bg-red-100 text-red-800'
+            }`}>
+              {animal.status}
+            </span>
+          </div>
         </div>
       </div>
     </div>
