@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Plus, Search, LayoutGrid, List } from 'lucide-react';
+import { Plus, Search, LayoutGrid, List, ChevronUp, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -87,17 +86,30 @@ const AnimalsHeader = ({
             </SelectTrigger>
             <SelectContent className="bg-white border border-gray-200">
               <SelectItem value="date">Date Added</SelectItem>
-              <SelectItem value="name">Name</SelectItem>
               <SelectItem value="type">Type</SelectItem>
+              <SelectItem value="gender">Gender</SelectItem>
               <SelectItem value="value">Value</SelectItem>
+              <SelectItem value="age">Age</SelectItem>
+              <SelectItem value="weight">Weight</SelectItem>
+              <SelectItem value="status">Status</SelectItem>
             </SelectContent>
           </Select>
           <Button
             variant="outline"
             onClick={onSortOrderChange}
-            className="bg-white border-gray-200"
+            className="bg-white border-gray-200 flex items-center gap-2"
           >
-            {sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+            {sortOrder === 'asc' ? (
+              <>
+                <span>Ascending</span>
+                <ChevronUp className="h-4 w-4" />
+              </>
+            ) : (
+              <>
+                <span>Descending</span>
+                <ChevronDown className="h-4 w-4" />
+              </>
+            )}
           </Button>
         </div>
       </div>

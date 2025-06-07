@@ -36,7 +36,11 @@ const AnimalsPage = () => {
   const {
     viewMode,
     setViewMode,
-    processedAnimals
+    processedAnimals,
+    sortBy,
+    setSortBy,
+    sortOrder,
+    toggleSortOrder
   } = useAnimalsFilters(animals);
 
   useEffect(() => {
@@ -89,10 +93,10 @@ const AnimalsPage = () => {
         <AnimalsHeader
           searchTerm={searchTerm}
           onSearchChange={handleSearch}
-          sortBy=""
-          onSortByChange={handleSort}
-          sortOrder="desc"
-          onSortOrderChange={() => {}}
+          sortBy={sortBy}
+          onSortByChange={setSortBy}
+          sortOrder={sortOrder}
+          onSortOrderChange={toggleSortOrder}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onAddAnimal={() => setIsAddAnimalOpen(true)}
