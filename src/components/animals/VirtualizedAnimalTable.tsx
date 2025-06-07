@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { memo, useMemo, useCallback, useRef, useEffect, useState } from 'react';
 import { FixedSizeList as List, ListOnScrollProps } from 'react-window';
 import { Animal, TableColumn, SortConfig, TableSelection } from '@/types';
 import { ChevronUp, ChevronDown, Trash2, Edit } from 'lucide-react';
@@ -36,7 +36,7 @@ interface VirtualRowProps {
     animals: Animal[];
     selection: TableSelection;
     onEdit: (animal: Animal) => void;
-    onDelete: (id: string) => void;
+    onDelete: (animal: Animal) => void;
     onToggleSelection: (id: string) => void;
     isDeleting: string | null;
     searchTerm?: string;
@@ -51,8 +51,8 @@ const VirtualRow = memo(({ index, style, data }: VirtualRowProps) => {
   if (!animal) return null;
 
   const handleDelete = useCallback(() => {
-    onDelete(animal.id);
-  }, [animal.id, onDelete]);
+    onDelete(animal);
+  }, [animal, onDelete]);
 
   const handleEdit = useCallback(() => {
     onEdit(animal);
@@ -265,15 +265,23 @@ const VirtualizedAnimalTable = ({
     return result;
   }, [animals, searchTerm, sortConfig]);
 
+  const handleDeleteClick = useCallback((animal: Animal) => {
+    const confirmMessage = `Are you sure you want to delete this animal?\n\nID: ${animal.id}\nType: ${animal.type}\nBreed: ${animal.breed}\n\nThis action cannot be undone and will also delete all related health records, vaccinations, and expenses.`;
+    
+    if (window.confirm(confirmMessage)) {
+      onDelete(animal.id);
+    }
+  }, [onDelete]);
+
   const itemData = useMemo(() => ({
     animals: filteredAndSortedAnimals,
     selection,
     onEdit,
-    onDelete,
+    onDelete: handleDeleteClick,
     onToggleSelection,
     isDeleting,
     searchTerm
-  }), [filteredAndSortedAnimals, selection, onEdit, onDelete, onToggleSelection, isDeleting, searchTerm]);
+  }), [filteredAndSortedAnimals, selection, onEdit, handleDeleteClick, onToggleSelection, isDeleting, searchTerm]);
 
   const handleScroll = useCallback(({ scrollOffset, scrollUpdateWasRequested }: ListOnScrollProps) => {
     if (!onLoadMore || !hasMore || scrollUpdateWasRequested) return;
@@ -345,7 +353,10 @@ const VirtualizedAnimalTable = ({
           itemSize={ROW_HEIGHT}
           width="100%"
           onScroll={handleScroll}
-          itemData={itemData}
+          itemData={{
+            ...itemData,
+            onDelete: handleDeleteClick
+          }}
           className="scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
         >
           {VirtualRow}

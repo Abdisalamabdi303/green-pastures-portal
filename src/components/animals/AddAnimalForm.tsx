@@ -154,8 +154,8 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
       return;
     }
 
-    if (!formData.purchasePrice || formData.purchasePrice <= 0) {
-      alert('Purchase price is required and must be greater than 0');
+    if (formData.purchasePrice === undefined || formData.purchasePrice < 0) {
+      alert('Purchase price must be a non-negative number');
       return;
     }
 

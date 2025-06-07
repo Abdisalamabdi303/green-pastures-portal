@@ -69,8 +69,14 @@ const AnimalsList = memo(({
 
   const handleBulkDelete = () => {
     const selectedIds = Array.from(selection.selectedIds);
-    onBulkDelete(selectedIds);
-    clearSelection();
+    const selectedAnimals = animals.filter(animal => selectedIds.includes(animal.id));
+    
+    const confirmMessage = `Are you sure you want to delete ${selectedIds.length} selected animal${selectedIds.length > 1 ? 's' : ''}?\n\nSelected animals:\n${selectedAnimals.map(animal => `- ID: ${animal.id}, Type: ${animal.type}, Breed: ${animal.breed}`).join('\n')}\n\nThis action cannot be undone and will also delete all related health records, vaccinations, and expenses.`;
+    
+    if (window.confirm(confirmMessage)) {
+      onBulkDelete(selectedIds);
+      clearSelection();
+    }
   };
 
   const handleBulkStatusChange = (status: 'active' | 'sold' | 'deceased') => {
