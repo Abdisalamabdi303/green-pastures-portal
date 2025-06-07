@@ -3,7 +3,7 @@ import { animalServices } from '@/services/firebase';
 import { Animal } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, orderBy, limit, startAfter, getDocs, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, startAfter, getDocs, QueryDocumentSnapshot, Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { useDebounce } from '@/hooks/useDebounce';
 import { cacheService } from '@/services/cacheService';
@@ -69,6 +69,7 @@ interface UseAnimalsDataReturn {
   refresh: () => Promise<void>;
   search: (term: string) => void;
   searchTerm: string;
+  calculateMonthlyIncome: () => Promise<number>;
 }
 
 export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
@@ -327,19 +328,45 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
   }, [toast]);
 
   // Handle bulk status change with cache invalidation
-  const handleBulkStatusChange = useCallback(async (selectedIds: string[], status: 'active' | 'sold' | 'deceased') => {
+  const handleBulkStatusChange = useCallback(async (selectedIds: string[], status: 'active' | 'sold' | 'deceased', sellingPrice?: number) => {
     try {
       for (const id of selectedIds) {
-        await animalServices.updateAnimal(id, { status });
+        const updateData: Partial<Animal> = { 
+          status,
+          updatedAt: Timestamp.now()
+        };
+        
+        if (status === 'sold' && sellingPrice !== undefined) {
+          updateData.sellingPrice = sellingPrice;
+          updateData.soldDate = Timestamp.now();
+        }
+        
+        // Remove any undefined values before sending to Firebase
+        Object.keys(updateData).forEach(key => {
+          if (updateData[key as keyof typeof updateData] === undefined) {
+            delete updateData[key as keyof typeof updateData];
+          }
+        });
+        
+        await animalServices.updateAnimal(id, updateData);
       }
       
       // Invalidate all animal-related caches
       cacheService.invalidatePattern('animals-');
       cacheService.invalidatePattern('search-');
       
-      setAnimals(prev => prev.map(animal => 
-        selectedIds.includes(animal.id) ? { ...animal, status } : animal
-      ));
+      // Update UI state after successful backend update
+      setAnimals(prev => prev.map(animal => {
+        if (selectedIds.includes(animal.id)) {
+          const update: Partial<Animal> = { status };
+          if (status === 'sold' && sellingPrice !== undefined) {
+            update.sellingPrice = sellingPrice;
+            update.soldDate = new Date().toISOString();
+          }
+          return { ...animal, ...update };
+        }
+        return animal;
+      }));
       
       toast({
         title: "Success",
@@ -388,6 +415,47 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
     }
   }, [fetchAnimals, toast]);
 
+  // Calculate monthly income from sold animals
+  const calculateMonthlyIncome = useCallback(async () => {
+    try {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+      console.log('Calculating monthly income for period:', {
+        start: startOfMonth.toISOString(),
+        end: endOfMonth.toISOString()
+      });
+
+      const soldAnimalsQuery = query(
+        collection(db, 'animals'),
+        where('status', '==', 'sold'),
+        where('soldDate', '>=', Timestamp.fromDate(startOfMonth)),
+        where('soldDate', '<=', Timestamp.fromDate(endOfMonth))
+      );
+
+      const snapshot = await getDocs(soldAnimalsQuery);
+      const soldAnimals = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id
+      })) as Animal[];
+
+      console.log('Found sold animals:', soldAnimals);
+
+      const totalIncome = soldAnimals.reduce((sum, animal) => {
+        const price = animal.sellingPrice || 0;
+        console.log(`Animal ${animal.id} sold for: ${price}`);
+        return sum + price;
+      }, 0);
+
+      console.log('Total monthly income:', totalIncome);
+      return totalIncome;
+    } catch (error) {
+      console.error('Error calculating monthly income:', error);
+      return 0;
+    }
+  }, []);
+
   // Effect for initial load and search term changes
   useEffect(() => {
     if (debouncedSearchTerm) {
@@ -411,7 +479,8 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
     handleAddAnimal,
     handleDeleteAnimal,
     handleBulkDelete,
-    handleBulkStatusChange
+    handleBulkStatusChange,
+    calculateMonthlyIncome
   }), [
     animals,
     loading,
@@ -424,6 +493,7 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
     handleAddAnimal,
     handleDeleteAnimal,
     handleBulkDelete,
-    handleBulkStatusChange
+    handleBulkStatusChange,
+    calculateMonthlyIncome
   ]);
 };

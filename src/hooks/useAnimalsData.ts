@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { animalServices } from '@/services/firebase';
 import { Animal } from '@/types';
@@ -230,20 +229,48 @@ export const useAnimalsData = () => {
     }
   }, [fetchAnimals, toast, searchTerm, cache]);
 
-  const handleBulkStatusChange = useCallback(async (selectedIds: string[], status: 'active' | 'sold' | 'deceased') => {
+  const handleBulkStatusChange = useCallback(async (selectedIds: string[], status: 'active' | 'sold' | 'deceased', sellingPrice?: number) => {
     if (selectedIds.length === 0) return;
     
     try {
       console.log('Bulk updating animal status in backend:', selectedIds, status);
       
       // Update backend first
-      await Promise.all(selectedIds.map(id => animalServices.updateAnimal(id, { status })));
+      await Promise.all(selectedIds.map(id => {
+        const updateData: Partial<Animal> = { 
+          status,
+          updatedAt: new Date()
+        };
+        
+        if (status === 'sold' && sellingPrice !== undefined) {
+          updateData.sellingPrice = sellingPrice;
+          updateData.soldDate = new Date().toISOString();
+        }
+        
+        // Remove any undefined values before sending to Firebase
+        Object.keys(updateData).forEach(key => {
+          if (updateData[key as keyof typeof updateData] === undefined) {
+            delete updateData[key as keyof typeof updateData];
+          }
+        });
+        
+        return animalServices.updateAnimal(id, updateData);
+      }));
+      
       console.log('All animals successfully updated in backend');
       
       // Update UI state after successful backend update
-      setAnimals(prev => prev.map(animal => 
-        selectedIds.includes(animal.id) ? { ...animal, status } : animal
-      ));
+      setAnimals(prev => prev.map(animal => {
+        if (selectedIds.includes(animal.id)) {
+          const update: Partial<Animal> = { status };
+          if (status === 'sold' && sellingPrice !== undefined) {
+            update.sellingPrice = sellingPrice;
+            update.soldDate = new Date().toISOString();
+          }
+          return { ...animal, ...update };
+        }
+        return animal;
+      }));
       
       cache.invalidateCache();
       toast({ 

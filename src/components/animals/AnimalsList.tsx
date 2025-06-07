@@ -92,6 +92,8 @@ const AnimalsList = memo(({
         onBulkDelete={handleBulkDelete}
         onBulkStatusChange={handleBulkStatusChange}
         onClearSelection={clearSelection}
+        selectedIds={Array.from(selection.selectedIds)}
+        animals={animals}
       />
       
       <div 

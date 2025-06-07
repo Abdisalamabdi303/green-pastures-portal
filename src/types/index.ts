@@ -12,6 +12,8 @@ export interface Animal {
   isVaccinated?: boolean;
   purchasePrice?: number;
   purchaseDate?: string;
+  sellingPrice?: number;
+  soldDate?: string;
   photoUrl?: string;
   notes?: string;
   createdAt?: any;

@@ -6,10 +6,18 @@ import { RefreshCw, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import useOptimizedDashboard from '../hooks/useOptimizedDashboard';
 
-// Lazy load components
-const StatCards = lazy(() => import('../components/dashboard/StatCards'));
-const ExpenseChart = lazy(() => import('../components/dashboard/ExpenseChart'));
-const AnimalTypesChart = lazy(() => import('../components/dashboard/AnimalTypesChart'));
+// Lazy load components with error boundaries
+const StatCards = lazy(() => import('../components/dashboard/StatCards').then(module => ({
+  default: module.StatCards
+})));
+
+const ExpenseChart = lazy(() => import('../components/dashboard/ExpenseChart').then(module => ({
+  default: module.default
+})));
+
+const AnimalTypesChart = lazy(() => import('../components/dashboard/AnimalTypesChart').then(module => ({
+  default: module.default
+})));
 
 const DashboardPage = () => {
   const { stats, loading, error, refreshData } = useOptimizedDashboard();
@@ -59,6 +67,7 @@ const DashboardPage = () => {
                   totalAnimals={stats.totalAnimals}
                   dailyExpenses={stats.dailyExpenses}
                   monthlyProfit={stats.monthlyProfit}
+                  monthlyIncome={stats.monthlyIncome}
                 />
               </Suspense>
               

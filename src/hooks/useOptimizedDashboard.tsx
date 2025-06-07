@@ -23,7 +23,7 @@ interface DashboardState {
 }
 
 const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes for dashboard
-const dashboardCache = new Map<string, { data: any; timestamp: number }>();
+const dashboardCache = new Map<string, { data: DashboardStats; timestamp: number }>();
 
 const DEFAULT_STATS: DashboardStats = {
     totalAnimals: 0,
@@ -146,7 +146,7 @@ export default function useOptimizedDashboard() {
       const estimatedMonthlyRevenue = totalAnimals * 500; // Example: $500 per animal per month
       const monthlyProfit = Math.max(0, estimatedMonthlyRevenue - monthlyExpenses);
         
-        const newStats = {
+        const newStats: DashboardStats = {
           totalAnimals,
           dailyExpenses,
           monthlyProfit,
