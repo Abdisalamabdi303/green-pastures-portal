@@ -197,16 +197,19 @@ const ExpensesPage = () => {
   };
 
   const handleDeleteExpense = async (id: string, description: string): Promise<boolean> => {
-    try {
-      await expenseServices.deleteExpense(id);
-      setAllExpenses(prev => prev.filter(expense => expense.id !== id));
-      toast.success(`Expense "${description}" deleted successfully`);
-      return true;
-    } catch (error) {
-      console.error('Error deleting expense:', error);
-      toast.error('Failed to delete expense');
-      return false;
+    if (window.confirm(`Are you sure you want to delete the expense "${description}"?`)) {
+      try {
+        await expenseServices.deleteExpense(id);
+        setAllExpenses(prev => prev.filter(expense => expense.id !== id));
+        toast.success(`Expense "${description}" deleted successfully`);
+        return true;
+      } catch (error) {
+        console.error('Error deleting expense:', error);
+        toast.error('Failed to delete expense');
+        return false;
+      }
     }
+    return false;
   };
 
   // Create a wrapper function for category icons
