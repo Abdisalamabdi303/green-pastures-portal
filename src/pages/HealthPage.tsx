@@ -29,10 +29,8 @@ const HealthPage = () => {
   const [vaccinationToDelete, setVaccinationToDelete] = useState<string | null>(null);
   const [filters, setFilters] = useState({
     search: '',
-    dateRange: { start: '', end: '' },
     animalType: '',
-    condition: '',
-    vaccinationStatus: ''
+    condition: ''
   });
   const [isBatchAddingVaccinations, setIsBatchAddingVaccinations] = useState(false);
 
@@ -162,12 +160,6 @@ const HealthPage = () => {
     if (filters.condition && record.condition !== filters.condition) {
       return false;
     }
-    if (filters.dateRange.start && new Date(record.date) < new Date(filters.dateRange.start)) {
-      return false;
-    }
-    if (filters.dateRange.end && new Date(record.date) > new Date(filters.dateRange.end)) {
-      return false;
-    }
     return true;
   }) || [];
 
@@ -176,15 +168,6 @@ const HealthPage = () => {
       return false;
     }
     if (filters.animalType && vaccination.animalType !== filters.animalType) {
-      return false;
-    }
-    if (filters.vaccinationStatus && vaccination.status !== filters.vaccinationStatus) {
-      return false;
-    }
-    if (filters.dateRange.start && new Date(vaccination.date) < new Date(filters.dateRange.start)) {
-      return false;
-    }
-    if (filters.dateRange.end && new Date(vaccination.date) > new Date(filters.dateRange.end)) {
       return false;
     }
     return true;
@@ -201,7 +184,7 @@ const HealthPage = () => {
 
   if (animalsError || healthError || vaccinationError) {
     return (
-      <div className="min-h-screen bg-[#f5f5f0]">
+      <div className="min-h-screen bg-white">
         <Navbar />
         <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
           <div className="text-center text-red-600">
@@ -228,35 +211,7 @@ const HealthPage = () => {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 mb-6">
-          <Card className="bg-white border-[#e8e8e0]">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-[#2c3e2d]">Total Health Records</CardTitle>
-              <Activity className="h-4 w-4 text-[#4a6741]" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-[#2c3e2d]">{healthData?.records.length || 0}</div>
-              <p className="text-xs text-[#4a6741] mt-1">
-                {isLoadingHealth ? 'Loading...' : 'Health records this month'}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border-[#e8e8e0]">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-[#2c3e2d]">Total Vaccinations</CardTitle>
-              <Syringe className="h-4 w-4 text-[#4a6741]" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-[#2c3e2d]">{vaccinationData?.vaccinations.length || 0}</div>
-              <p className="text-xs text-[#4a6741] mt-1">
-                {isLoadingVaccinations ? 'Loading...' : 'Vaccinations this month'}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
+        <Card className="bg-white border-[#e8e8e0]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xl font-bold text-[#2c3e2d]">Health Records</CardTitle>
             <div className="flex items-center space-x-2">
@@ -282,17 +237,17 @@ const HealthPage = () => {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-4 bg-gray-100 p-1 rounded-lg">
+              <TabsList className="grid w-full grid-cols-2 mb-4 bg-white p-1 rounded-lg border border-[#e8e8e0]">
                 <TabsTrigger 
                   value="health" 
-                  className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#4a6741]"
+                  className="flex items-center space-x-2 data-[state=active]:bg-[#f5f5f0] data-[state=active]:shadow-sm data-[state=active]:text-[#4a6741]"
                 >
                   <Activity className="h-4 w-4" />
                   <span>Health Records</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="vaccinations" 
-                  className="flex items-center space-x-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#4a6741]"
+                  className="flex items-center space-x-2 data-[state=active]:bg-[#f5f5f0] data-[state=active]:shadow-sm data-[state=active]:text-[#4a6741]"
                 >
                   <Syringe className="h-4 w-4" />
                   <span>Vaccinations</span>
@@ -302,7 +257,7 @@ const HealthPage = () => {
               <TabsContent value="health">
                 <div className="space-y-4">
                   <HealthFilters onFilterChange={handleFilterChange} />
-                  <div className="rounded-md border border-[#e8e8e0]">
+                  <div className="rounded-md border border-[#e8e8e0] bg-white">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -371,7 +326,7 @@ const HealthPage = () => {
               <TabsContent value="vaccinations">
                 <div className="space-y-4">
                   <HealthFilters onFilterChange={handleFilterChange} />
-                  <div className="rounded-md border border-[#e8e8e0]">
+                  <div className="rounded-md border border-[#e8e8e0] bg-white">
                     <Table>
                       <TableHeader>
                         <TableRow>
