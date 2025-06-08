@@ -144,6 +144,9 @@ export const animalServices = {
       if (!currentAnimalDoc.exists()) {
         throw new Error(`Animal with ID ${id} not found`);
       }
+
+      // Get current animal data
+      const currentData = currentAnimalDoc.data();
       
       // If the ID is being changed
       if (animalData.id && animalData.id !== id) {
@@ -155,14 +158,12 @@ export const animalServices = {
           throw new Error(`Animal with ID ${animalData.id} already exists`);
         }
         
-        // Get current animal data
-        const currentData = currentAnimalDoc.data();
-        
         // Create new document with new ID
         await setDoc(newAnimalRef, {
           ...currentData,
           ...animalData,
-          id: animalData.id
+          id: animalData.id,
+          updatedAt: Timestamp.now()
         });
 
         // Delete old document
@@ -198,15 +199,43 @@ export const animalServices = {
           updateDoc(doc.ref, { animalId: animalData.id })
         );
         await Promise.all(expensesUpdates);
-
-        console.log('Animal successfully updated in backend with new ID');
-        return { ...currentData, ...animalData, id: animalData.id };
       } else {
-        // Regular update without ID change
-        await updateDoc(currentAnimalRef, animalData);
-        console.log('Animal successfully updated in backend');
-        return { id, ...animalData };
+        // Regular update
+        const updateData = {
+          ...animalData,
+          updatedAt: Timestamp.now()
+        };
+
+        // If this is a sale update, create an income record
+        if (animalData.status === 'sold' && animalData.sellingPrice) {
+          const incomeData = {
+            type: 'Animal Sale',
+            amount: animalData.sellingPrice,
+            date: animalData.soldDate || Timestamp.now(),
+            description: `Sale of animal ${id}`,
+            paymentMethod: 'Cash',
+            animalRelated: true,
+            animalId: id,
+            createdAt: Timestamp.now(),
+            status: 'completed'
+          };
+
+          // Create income record first
+          const incomeRef = await addDoc(collection(db, 'income'), incomeData);
+          console.log('Income record created:', incomeRef.id);
+
+          // Then update the animal record
+          await updateDoc(currentAnimalRef, {
+            ...updateData,
+            incomeId: incomeRef.id // Link the income record to the animal
+          });
+        } else {
+          // Regular update without income record
+          await updateDoc(currentAnimalRef, updateData);
+        }
       }
+
+      return { id, ...animalData };
     } catch (error) {
       console.error('Error updating animal:', error);
       throw error;

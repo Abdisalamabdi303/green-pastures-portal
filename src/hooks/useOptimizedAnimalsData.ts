@@ -3,7 +3,7 @@ import { animalServices } from '@/services/firebase';
 import { Animal } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, orderBy, limit, startAfter, getDocs, QueryDocumentSnapshot, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, startAfter, getDocs, QueryDocumentSnapshot, Timestamp, addDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase/config';
 import { useDebounce } from '@/hooks/useDebounce';
 import { cacheService } from '@/services/cacheService';
@@ -330,6 +330,14 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
   // Handle bulk status change with cache invalidation
   const handleBulkStatusChange = useCallback(async (selectedIds: string[], status: 'active' | 'sold' | 'deceased', sellingPrice?: number) => {
     try {
+      console.log('Bulk updating animals:', { selectedIds, status, sellingPrice });
+      
+      // Validate inputs
+      if (status === 'sold' && (sellingPrice === undefined || sellingPrice <= 0)) {
+        throw new Error('Valid selling price is required for sold status');
+      }
+
+      // Process each animal
       for (const id of selectedIds) {
         const updateData: Partial<Animal> = { 
           status,
@@ -337,30 +345,30 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
         };
         
         if (status === 'sold' && sellingPrice !== undefined) {
-          updateData.sellingPrice = sellingPrice;
+          // Calculate individual selling price for each animal
+          const individualPrice = sellingPrice / selectedIds.length;
+          
+          // Update animal record with selling price and date
+          updateData.sellingPrice = individualPrice;
           updateData.soldDate = Timestamp.now();
         }
-        
-        // Remove any undefined values before sending to Firebase
-        Object.keys(updateData).forEach(key => {
-          if (updateData[key as keyof typeof updateData] === undefined) {
-            delete updateData[key as keyof typeof updateData];
-          }
-        });
-        
+
+        // Update the animal - this will also create income records for sold animals
         await animalServices.updateAnimal(id, updateData);
       }
       
-      // Invalidate all animal-related caches
+      // Invalidate all caches
       cacheService.invalidatePattern('animals-');
       cacheService.invalidatePattern('search-');
+      cacheService.invalidatePattern('income-');
       
       // Update UI state after successful backend update
       setAnimals(prev => prev.map(animal => {
         if (selectedIds.includes(animal.id)) {
           const update: Partial<Animal> = { status };
           if (status === 'sold' && sellingPrice !== undefined) {
-            update.sellingPrice = sellingPrice;
+            const individualPrice = sellingPrice / selectedIds.length;
+            update.sellingPrice = individualPrice;
             update.soldDate = new Date().toISOString();
           }
           return { ...animal, ...update };
@@ -376,7 +384,7 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
       console.error('Error in bulk status change:', error);
       toast({
         title: "Error",
-        description: "Failed to update some animals. Please try again.",
+        description: error.message || "Failed to update some animals. Please try again.",
         variant: "destructive"
       });
     }

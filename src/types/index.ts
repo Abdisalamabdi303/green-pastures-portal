@@ -19,6 +19,7 @@ export interface Animal {
   createdAt?: any;
   expenseId?: string;
   updatedAt: Date;
+  incomeId?: string;
 }
 
 export interface HealthRecord {
@@ -86,5 +87,22 @@ export interface ChartData {
 export interface User {
   id: string;
   email: string;
-  name?: string;
+  name: string;
+  role: string;
+}
+
+export interface Income {
+  id: string;
+  type: string;
+  amount: number;
+  date: Date | { toDate: () => Date };
+  description: string;
+  paymentMethod: string;
+  animalRelated: boolean;
+  animalId?: string;
+  createdAt: Date | { toDate: () => Date };
+  status: string;
+  batchId?: string;
+  totalBatchAmount?: number;
+  animalsInBatch?: number;
 }
