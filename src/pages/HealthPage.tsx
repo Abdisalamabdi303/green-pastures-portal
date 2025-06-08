@@ -218,19 +218,19 @@ const HealthPage = () => {
               {activeTab === 'health' ? (
                 <Button
                   onClick={() => setOpenBatchHealthForm(true)}
-                  className="bg-[#4a6741] hover:bg-[#3d5636] text-white"
+                  className="bg-[#61a14d] hover:bg-[#5a8a4d] text-white"
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Batch Health Record
+                  Add Health Record
                 </Button>
               ) : (
                 <Button
                   onClick={() => setOpenBatchVaccinationForm(true)}
                   disabled={isBatchAddingVaccinations}
-                  className="bg-[#4a6741] hover:bg-[#3d5636] text-white"
+                  className="bg-[#61a14d] hover:bg-[#5a8a4d] text-white"
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Batch Vaccination
+                  Add Vaccination
                 </Button>
               )}
             </div>

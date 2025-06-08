@@ -122,11 +122,11 @@ function ExpenseAnalytics({
 
   return (
     <div className="mb-6 space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-800 flex items-center">
-        <BarChart3 className="h-5 w-5 mr-2 text-farm-600" />
-        Expense Overview
-      </h2>
+          <BarChart3 className="h-5 w-5 mr-2 text-farm-600" />
+          Expense Overview
+        </h2>
         {selectedDate && (
           <div className="flex items-center text-sm text-gray-600">
             <Calendar className="h-4 w-4 mr-2" />
@@ -136,36 +136,35 @@ function ExpenseAnalytics({
       </div>
       
       {/* Filter Controls */}
-      <ExpenseFilters 
-        selectedYear={selectedYear}
-        setSelectedYear={setSelectedYear}
-        selectedMonth={selectedMonth}
-        setSelectedMonth={setSelectedMonth}
-        expenses={expenses}
-      />
+      
       
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-4">
-        {/* Monthly Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Monthly Total Card */}
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <h3 className="text-sm font-medium text-gray-500 mb-2 flex items-center">
             <DollarSign className="h-4 w-4 mr-1" />
-            Monthly Summary
+            Monthly Total
           </h3>
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs text-gray-500">Total</p>
-              <p className="text-lg font-semibold text-gray-900">{formatCurrency(monthlyStats.total)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Daily Total</p>
-              <p className="text-lg font-semibold text-gray-900">{formatCurrency(monthlyStats.dailyTotal)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">Highest Expense</p>
-              <p className="text-lg font-semibold text-gray-900">{formatCurrency(monthlyStats.highest.amount)}</p>
-            </div>
-          </div>
+          <p className="text-lg font-semibold text-gray-900">{formatCurrency(monthlyStats.total)}</p>
+        </div>
+
+        {/* Daily Total Card */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <h3 className="text-sm font-medium text-gray-500 mb-2 flex items-center">
+            <DollarSign className="h-4 w-4 mr-1" />
+            Daily Total
+          </h3>
+          <p className="text-lg font-semibold text-gray-900">{formatCurrency(monthlyStats.dailyTotal)}</p>
+        </div>
+
+        {/* Highest Expense Card */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <h3 className="text-sm font-medium text-gray-500 mb-2 flex items-center">
+            <DollarSign className="h-4 w-4 mr-1" />
+            Highest Expense
+          </h3>
+          <p className="text-lg font-semibold text-gray-900">{formatCurrency(monthlyStats.highest.amount)}</p>
         </div>
       </div>
       
