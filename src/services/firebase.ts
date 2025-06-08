@@ -206,33 +206,8 @@ export const animalServices = {
           updatedAt: Timestamp.now()
         };
 
-        // If this is a sale update, create an income record
-        if (animalData.status === 'sold' && animalData.sellingPrice) {
-          const incomeData = {
-            type: 'Animal Sale',
-            amount: animalData.sellingPrice,
-            date: animalData.soldDate || Timestamp.now(),
-            description: `Sale of animal ${id}`,
-            paymentMethod: 'Cash',
-            animalRelated: true,
-            animalId: id,
-            createdAt: Timestamp.now(),
-            status: 'completed'
-          };
-
-          // Create income record first
-          const incomeRef = await addDoc(collection(db, 'income'), incomeData);
-          console.log('Income record created:', incomeRef.id);
-
-          // Then update the animal record
-          await updateDoc(currentAnimalRef, {
-            ...updateData,
-            incomeId: incomeRef.id // Link the income record to the animal
-          });
-        } else {
-          // Regular update without income record
-          await updateDoc(currentAnimalRef, updateData);
-        }
+        // Update the animal record
+        await updateDoc(currentAnimalRef, updateData);
       }
 
       return { id, ...animalData };

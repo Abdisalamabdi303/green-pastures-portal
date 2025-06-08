@@ -328,50 +328,29 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
   }, [toast]);
 
   // Handle bulk status change with cache invalidation
-  const handleBulkStatusChange = useCallback(async (selectedIds: string[], status: 'active' | 'sold' | 'deceased', sellingPrice?: number) => {
+  const handleBulkStatusChange = useCallback(async (selectedIds: string[], status: 'active' | 'deceased') => {
     try {
-      console.log('Bulk updating animals:', { selectedIds, status, sellingPrice });
+      console.log('Bulk updating animals:', { selectedIds, status });
       
-      // Validate inputs
-      if (status === 'sold' && (sellingPrice === undefined || sellingPrice <= 0)) {
-        throw new Error('Valid selling price is required for sold status');
-      }
-
       // Process each animal
       for (const id of selectedIds) {
         const updateData: Partial<Animal> = { 
           status,
           updatedAt: Timestamp.now()
         };
-        
-        if (status === 'sold' && sellingPrice !== undefined) {
-          // Calculate individual selling price for each animal
-          const individualPrice = sellingPrice / selectedIds.length;
-          
-          // Update animal record with selling price and date
-          updateData.sellingPrice = individualPrice;
-          updateData.soldDate = Timestamp.now();
-        }
 
-        // Update the animal - this will also create income records for sold animals
+        // Update the animal
         await animalServices.updateAnimal(id, updateData);
       }
       
       // Invalidate all caches
       cacheService.invalidatePattern('animals-');
       cacheService.invalidatePattern('search-');
-      cacheService.invalidatePattern('income-');
       
       // Update UI state after successful backend update
       setAnimals(prev => prev.map(animal => {
         if (selectedIds.includes(animal.id)) {
-          const update: Partial<Animal> = { status };
-          if (status === 'sold' && sellingPrice !== undefined) {
-            const individualPrice = sellingPrice / selectedIds.length;
-            update.sellingPrice = individualPrice;
-            update.soldDate = new Date().toISOString();
-          }
-          return { ...animal, ...update };
+          return { ...animal, status };
         }
         return animal;
       }));

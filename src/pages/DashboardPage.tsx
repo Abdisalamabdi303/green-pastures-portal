@@ -7,7 +7,7 @@ import { DollarSign, TrendingUp, Calendar as CalendarIcon, Users, AlertTriangle 
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { startOfMonth, endOfMonth, format, subMonths } from 'date-fns';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 interface DashboardStats {
   totalAnimals: number;
@@ -139,7 +139,7 @@ const DashboardPage = () => {
           acc[type] = (acc[type] || 0) + 1;
           return acc;
         }, {} as Record<string, number>)
-      ).map(([type, count]) => ({ type, count }));
+      ).map(([type, count]) => ({ type, count: Number(count) }));
 
       // Filter sales for current month
       const monthlySales = allSales.filter(sale => {
@@ -192,73 +192,76 @@ const DashboardPage = () => {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div className="md:flex md:items-center md:justify-between mb-6">
+        <div className="md:flex md:items-center md:justify-between mb-8">
           <div className="flex-1 min-w-0">
-            <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
-              Dashboard
+            <h2 className="text-3xl font-bold leading-7 text-gray-900 sm:truncate">
+              Dashboard Overview
             </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Welcome back! Here's what's happening with your farm today.
+            </p>
           </div>
         </div>
 
         {/* Overview Cards */}
-        <div className="grid gap-4 md:grid-cols-4 mb-6">
+        <div className="grid gap-6 md:grid-cols-4 mb-8">
           {/* Total Animals Card */}
-          <Card>
+          <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Animals</CardTitle>
-              <Users className="h-4 w-4 text-blue-600" />
+              <CardTitle className="text-sm font-medium text-gray-600">Total Animals</CardTitle>
+              <Users className="h-5 w-5 text-blue-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalAnimals}</div>
-              <p className="text-xs text-gray-500 mt-1">
+              <div className="text-3xl font-bold text-gray-900">{stats.totalAnimals}</div>
+              <p className="text-sm text-gray-500 mt-1">
                 Current inventory
               </p>
             </CardContent>
           </Card>
 
           {/* Monthly Sales Card */}
-          <Card>
+          <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monthly Sales</CardTitle>
-              <DollarSign className="h-4 w-4 text-green-600" />
+              <CardTitle className="text-sm font-medium text-gray-600">Monthly Sales</CardTitle>
+              <DollarSign className="h-5 w-5 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${stats.monthlySales.toFixed(2)}</div>
-              <p className="text-xs text-gray-500 mt-1">
+              <div className="text-3xl font-bold text-gray-900">${stats.monthlySales.toFixed(2)}</div>
+              <p className="text-sm text-gray-500 mt-1">
                 {stats.monthlySalesCount} sales this month
               </p>
             </CardContent>
           </Card>
 
           {/* Monthly Expenses Card */}
-          <Card>
+          <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monthly Expenses</CardTitle>
-              <DollarSign className="h-4 w-4 text-red-600" />
+              <CardTitle className="text-sm font-medium text-gray-600">Monthly Expenses</CardTitle>
+              <DollarSign className="h-5 w-5 text-red-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${stats.monthlyExpenses.toFixed(2)}</div>
-              <p className="text-xs text-gray-500 mt-1">
+              <div className="text-3xl font-bold text-gray-900">${stats.monthlyExpenses.toFixed(2)}</div>
+              <p className="text-sm text-gray-500 mt-1">
                 Total expenses this month
               </p>
             </CardContent>
           </Card>
 
           {/* Monthly Profit/Loss Card */}
-          <Card>
+          <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monthly Profit/Loss</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600">Monthly Profit/Loss</CardTitle>
               {stats.monthlyProfit >= 0 ? (
-                <TrendingUp className="h-4 w-4 text-green-600" />
+                <TrendingUp className="h-5 w-5 text-green-600" />
               ) : (
-                <AlertTriangle className="h-4 w-4 text-red-600" />
+                <AlertTriangle className="h-5 w-5 text-red-600" />
               )}
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${stats.monthlyProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <div className={`text-3xl font-bold ${stats.monthlyProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 ${Math.abs(stats.monthlyProfit).toFixed(2)}
               </div>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-sm text-gray-500 mt-1">
                 {stats.monthlyProfit >= 0 ? 'Profit' : 'Loss'} this month
               </p>
             </CardContent>
@@ -266,21 +269,44 @@ const DashboardPage = () => {
         </div>
 
         {/* Charts */}
-        <div className="grid gap-4 md:grid-cols-2 mb-6">
+        <div className="grid gap-6 md:grid-cols-2 mb-8">
           {/* Monthly Sales Trend */}
-          <Card>
+          <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
             <CardHeader>
-              <CardTitle className="text-sm font-medium">Monthly Sales Trend</CardTitle>
+              <CardTitle className="text-lg font-semibold text-gray-900">Monthly Sales Trend</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
+              <div className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={stats.monthlyTrends.sales}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [`$${value}`, 'Sales']} />
-                    <Line type="monotone" dataKey="amount" stroke="#10B981" strokeWidth={2} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis 
+                      dataKey="month" 
+                      stroke="#666"
+                      tick={{ fill: '#666' }}
+                    />
+                    <YAxis 
+                      stroke="#666"
+                      tick={{ fill: '#666' }}
+                      tickFormatter={(value) => `$${value}`}
+                    />
+                    <Tooltip 
+                      formatter={(value) => [`$${value}`, 'Sales']}
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: '1px solid #f0f0f0',
+                        borderRadius: '8px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="amount" 
+                      stroke="#10B981" 
+                      strokeWidth={3}
+                      dot={{ fill: '#10B981', strokeWidth: 2 }}
+                      activeDot={{ r: 6, fill: '#10B981' }}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -288,19 +314,42 @@ const DashboardPage = () => {
           </Card>
 
           {/* Monthly Expenses Trend */}
-          <Card>
+          <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
             <CardHeader>
-              <CardTitle className="text-sm font-medium">Monthly Expenses Trend</CardTitle>
+              <CardTitle className="text-lg font-semibold text-gray-900">Monthly Expenses Trend</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
+              <div className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={stats.monthlyTrends.expenses}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [`$${value}`, 'Expenses']} />
-                    <Line type="monotone" dataKey="amount" stroke="#EF4444" strokeWidth={2} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis 
+                      dataKey="month" 
+                      stroke="#666"
+                      tick={{ fill: '#666' }}
+                    />
+                    <YAxis 
+                      stroke="#666"
+                      tick={{ fill: '#666' }}
+                      tickFormatter={(value) => `$${value}`}
+                    />
+                    <Tooltip 
+                      formatter={(value) => [`$${value}`, 'Expenses']}
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: '1px solid #f0f0f0',
+                        borderRadius: '8px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="amount" 
+                      stroke="#EF4444" 
+                      strokeWidth={3}
+                      dot={{ fill: '#EF4444', strokeWidth: 2 }}
+                      activeDot={{ r: 6, fill: '#EF4444' }}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -309,12 +358,12 @@ const DashboardPage = () => {
         </div>
 
         {/* Animal Types Distribution */}
-        <Card className="mb-6">
+        <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Animals by Type</CardTitle>
+            <CardTitle className="text-lg font-semibold text-gray-900">Animals by Type</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
+            <div className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -323,14 +372,37 @@ const DashboardPage = () => {
                     nameKey="type"
                     cx="50%"
                     cy="50%"
-                    outerRadius={100}
+                    outerRadius={150}
+                    innerRadius={60}
                     label={({ type, percent }) => `${type} (${(percent * 100).toFixed(0)}%)`}
+                    labelLine={false}
                   >
                     {stats.animalTypes.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={COLORS[index % COLORS.length]}
+                        stroke="white"
+                        strokeWidth={2}
+                      />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value, name) => [`${value} animals`, name]} />
+                  <Tooltip 
+                    formatter={(value, name) => [`${value} animals`, name]}
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid #f0f0f0',
+                      borderRadius: '8px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    }}
+                  />
+                  <Legend 
+                    layout="horizontal" 
+                    verticalAlign="bottom" 
+                    align="center"
+                    wrapperStyle={{
+                      paddingTop: '20px'
+                    }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>

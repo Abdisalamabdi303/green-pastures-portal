@@ -1,3 +1,5 @@
+export type AnimalStatus = 'active' | 'deceased';
+
 export interface Animal {
   id: string;
   name?: string;
@@ -7,13 +9,11 @@ export interface Animal {
   gender?: 'male' | 'female';
   weight?: number;
   price: number;
-  status: 'active' | 'sold' | 'deceased';
+  status: AnimalStatus;
   health?: string;
   isVaccinated?: boolean;
   purchasePrice?: number;
   purchaseDate?: string;
-  sellingPrice?: number;
-  soldDate?: string;
   photoUrl?: string;
   notes?: string;
   createdAt?: any;
