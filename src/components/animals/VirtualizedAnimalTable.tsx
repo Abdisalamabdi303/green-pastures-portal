@@ -1,16 +1,14 @@
-import React, { memo, useMemo, useCallback, useRef, useEffect, useState } from 'react';
-import { FixedSizeList as List, ListOnScrollProps } from 'react-window';
+import React, { memo, useMemo, useCallback, useRef } from 'react';
 import { Animal, TableColumn, SortConfig, TableSelection } from '@/types';
 import { ChevronUp, ChevronDown, Trash2, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { formatPrice } from '@/utils/format';
+import { useVirtualizer } from '@tanstack/react-virtual';
 
 // Constants
 const ROW_HEIGHT = 60;
 const HEADER_HEIGHT = 48;
-const WINDOW_SIZE = 20; // Number of items to render at once
-const SCROLL_THRESHOLD = 0.8; // Load more when 80% scrolled
 
 interface VirtualizedAnimalTableProps {
   animals: Animal[];
@@ -29,7 +27,7 @@ interface VirtualizedAnimalTableProps {
   hasMore?: boolean;
 }
 
-interface VirtualRowProps {
+const VirtualRow = memo(({ index, style, data }: {
   index: number;
   style: React.CSSProperties;
   data: {
@@ -41,10 +39,7 @@ interface VirtualRowProps {
     isDeleting: string | null;
     searchTerm?: string;
   };
-}
-
-// Memoized row component
-const VirtualRow = memo(({ index, style, data }: VirtualRowProps) => {
+}) => {
   const { animals, selection, onEdit, onDelete, onToggleSelection, isDeleting, searchTerm } = data;
   const animal = animals[index];
 
@@ -58,18 +53,20 @@ const VirtualRow = memo(({ index, style, data }: VirtualRowProps) => {
     onEdit(animal);
   }, [animal, onEdit]);
 
-  const highlightText = useCallback((text: string) => {
+  const handleToggleSelection = useCallback(() => {
+    onToggleSelection(animal.id);
+  }, [animal.id, onToggleSelection]);
+
+  const highlightText = (text: string) => {
     if (!searchTerm || !text) return text;
-    
     const regex = new RegExp(`(${searchTerm})`, 'gi');
     const parts = text.split(regex);
-    
     return parts.map((part, i) => 
       regex.test(part) ? (
         <mark key={i} className="bg-yellow-200 px-1 rounded">{part}</mark>
       ) : part
     );
-  }, [searchTerm]);
+  };
 
   return (
     <div
@@ -79,7 +76,7 @@ const VirtualRow = memo(({ index, style, data }: VirtualRowProps) => {
       <div className="w-8 sm:w-12 flex items-center justify-center">
         <Checkbox
           checked={selection.selectedIds.has(animal.id)}
-          onCheckedChange={() => onToggleSelection(animal.id)}
+          onCheckedChange={handleToggleSelection}
         />
       </div>
       
@@ -145,7 +142,6 @@ const VirtualRow = memo(({ index, style, data }: VirtualRowProps) => {
 
 VirtualRow.displayName = 'VirtualRow';
 
-// Memoized header component
 const TableHeader = memo(({ 
   columns, 
   sortConfig, 
@@ -218,52 +214,15 @@ const VirtualizedAnimalTable = ({
   onLoadMore,
   hasMore = false
 }: VirtualizedAnimalTableProps) => {
-  const listRef = useRef<List>(null);
+  const parentRef = useRef<HTMLDivElement>(null);
   const animalIds = useMemo(() => animals.map(a => a.id), [animals]);
 
-  // Filter and sort animals
-  const filteredAndSortedAnimals = useMemo(() => {
-    let result = [...animals];
-
-    // Apply search filter
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      result = result.filter(animal => 
-        animal.id?.toLowerCase().includes(searchLower) ||
-        animal.type?.toLowerCase().includes(searchLower) ||
-        animal.breed?.toLowerCase().includes(searchLower) ||
-        animal.status?.toLowerCase().includes(searchLower)
-      );
-    }
-
-    // Apply sorting
-    if (sortConfig.key) {
-      result.sort((a, b) => {
-        const aValue = a[sortConfig.key as keyof Animal];
-        const bValue = b[sortConfig.key as keyof Animal];
-
-        if (aValue === undefined && bValue === undefined) return 0;
-        if (aValue === undefined) return 1;
-        if (bValue === undefined) return -1;
-
-        if (typeof aValue === 'string' && typeof bValue === 'string') {
-          return sortConfig.direction === 'asc' 
-            ? aValue.localeCompare(bValue)
-            : bValue.localeCompare(aValue);
-        }
-
-        if (typeof aValue === 'number' && typeof bValue === 'number') {
-          return sortConfig.direction === 'asc'
-            ? aValue - bValue
-            : bValue - aValue;
-        }
-
-        return 0;
-      });
-    }
-
-    return result;
-  }, [animals, searchTerm, sortConfig]);
+  const rowVirtualizer = useVirtualizer({
+    count: animals.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 5
+  });
 
   const handleDeleteClick = useCallback((animal: Animal) => {
     const confirmMessage = `Are you sure you want to delete this animal?\n\nID: ${animal.id}\nType: ${animal.type}\nBreed: ${animal.breed}\n\nThis action cannot be undone and will also delete all related health records, vaccinations, and expenses.`;
@@ -274,35 +233,25 @@ const VirtualizedAnimalTable = ({
   }, [onDelete]);
 
   const itemData = useMemo(() => ({
-    animals: filteredAndSortedAnimals,
+    animals,
     selection,
     onEdit,
     onDelete: handleDeleteClick,
     onToggleSelection,
     isDeleting,
     searchTerm
-  }), [filteredAndSortedAnimals, selection, onEdit, handleDeleteClick, onToggleSelection, isDeleting, searchTerm]);
+  }), [animals, selection, onEdit, handleDeleteClick, onToggleSelection, isDeleting, searchTerm]);
 
-  const handleScroll = useCallback(({ scrollOffset, scrollUpdateWasRequested }: ListOnScrollProps) => {
-    if (!onLoadMore || !hasMore || scrollUpdateWasRequested) return;
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (!onLoadMore || !hasMore) return;
 
-    const { current: list } = listRef;
-    if (!list) return;
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
 
-    const { scrollHeight, clientHeight } = list._outerRef as HTMLDivElement;
-    const scrollPercentage = (scrollOffset + clientHeight) / scrollHeight;
-
-    if (scrollPercentage > SCROLL_THRESHOLD) {
+    if (scrollPercentage > 0.8) {
       onLoadMore();
     }
   }, [onLoadMore, hasMore]);
-
-  // Reset scroll position when search term changes
-  useEffect(() => {
-    if (listRef.current) {
-      listRef.current.scrollTo(0);
-    }
-  }, [searchTerm]);
 
   if (loading && animals.length === 0) {
     return (
@@ -341,29 +290,37 @@ const VirtualizedAnimalTable = ({
         onToggleSelectAll={onToggleSelectAll}
       />
       
-      {loading ? (
-        <div className="flex items-center justify-center h-32">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
-        </div>
-      ) : (
-        <List
-          ref={listRef}
-          height={600}
-          itemCount={filteredAndSortedAnimals.length}
-          itemSize={ROW_HEIGHT}
-          width="100%"
-          onScroll={handleScroll}
-          itemData={{
-            ...itemData,
-            onDelete: handleDeleteClick
+      <div 
+        ref={parentRef}
+        className="h-[600px] overflow-auto"
+        onScroll={handleScroll}
+      >
+        <div
+          style={{
+            height: `${rowVirtualizer.getTotalSize()}px`,
+            width: '100%',
+            position: 'relative',
           }}
-          className="scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
         >
-          {VirtualRow}
-        </List>
-      )}
+          {rowVirtualizer.getVirtualItems().map((virtualRow) => (
+            <VirtualRow
+              key={virtualRow.index}
+              index={virtualRow.index}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: `${ROW_HEIGHT}px`,
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+              data={itemData}
+            />
+          ))}
+        </div>
+      </div>
       
-      {!loading && filteredAndSortedAnimals.length === 0 && (
+      {!loading && animals.length === 0 && (
         <div className="text-center py-12">
           <p className="text-gray-500">
             {searchTerm ? 'No animals found matching your search' : 'No animals found'}

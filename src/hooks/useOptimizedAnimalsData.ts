@@ -111,6 +111,8 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
 
   // Fetch animals with pagination and caching
   const fetchAnimals = useCallback(async (isInitial = false) => {
+    if (!currentUser) return;
+
     try {
       setLoading(true);
       setError(null);
@@ -130,6 +132,16 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
         orderBy('createdAt', 'desc'),
         limit(ITEMS_PER_PAGE)
       );
+
+      if (debouncedSearchTerm) {
+        q = query(
+          collection(db, 'animals'),
+          where('name', '>=', debouncedSearchTerm),
+          where('name', '<=', debouncedSearchTerm + '\uf8ff'),
+          orderBy('name'),
+          limit(ITEMS_PER_PAGE)
+        );
+      }
 
       if (!isInitial && lastDocRef.current) {
         q = query(q, startAfter(lastDocRef.current));
@@ -180,7 +192,7 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
     } finally {
       setLoading(false);
     }
-  }, [animals.length, debouncedSearchTerm, getCacheKey, hasMore, toast]);
+  }, [animals.length, debouncedSearchTerm, getCacheKey, hasMore, toast, currentUser]);
 
   // Search animals with improved caching
   const searchAnimals = useCallback(async (term: string) => {
@@ -409,11 +421,6 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-      console.log('Calculating monthly income for period:', {
-        start: startOfMonth.toISOString(),
-        end: endOfMonth.toISOString()
-      });
-
       const soldAnimalsQuery = query(
         collection(db, 'animals'),
         where('status', '==', 'sold'),
@@ -427,16 +434,7 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
         id: doc.id
       })) as Animal[];
 
-      console.log('Found sold animals:', soldAnimals);
-
-      const totalIncome = soldAnimals.reduce((sum, animal) => {
-        const price = animal.sellingPrice || 0;
-        console.log(`Animal ${animal.id} sold for: ${price}`);
-        return sum + price;
-      }, 0);
-
-      console.log('Total monthly income:', totalIncome);
-      return totalIncome;
+      return soldAnimals.reduce((sum, animal) => sum + (animal.sellingPrice || 0), 0);
     } catch (error) {
       console.error('Error calculating monthly income:', error);
       return 0;
@@ -446,11 +444,11 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
   // Effect for initial load and search term changes
   useEffect(() => {
     if (debouncedSearchTerm) {
-      searchAnimals(debouncedSearchTerm);
+      fetchAnimals(true);
     } else {
       fetchAnimals(true);
     }
-  }, [debouncedSearchTerm, fetchAnimals, searchAnimals]);
+  }, [debouncedSearchTerm, fetchAnimals]);
 
   // Memoized return value to prevent unnecessary re-renders
   return useMemo(() => ({

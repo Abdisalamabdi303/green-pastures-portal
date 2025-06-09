@@ -33,7 +33,6 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 const DashboardStats = lazy(() => import('@/components/dashboard/DashboardStats'));
 const MonthlyTrendsChart = lazy(() => import('@/components/dashboard/MonthlyTrendsChart'));
 const AnimalTypeDistribution = lazy(() => import('@/components/dashboard/AnimalTypeDistribution'));
-const RecentExpenses = lazy(() => import('@/components/dashboard/RecentExpenses'));
 
 // Loading component
 const LoadingFallback = () => (
@@ -107,6 +106,9 @@ const DashboardPage = () => {
         ...doc.data()
       })) as Animal[];
 
+      // Filter active animals
+      const activeAnimals = allAnimals.filter(animal => animal.status === 'active');
+
       // Calculate monthly trends (last 6 months)
       const monthlyTrends = {
         sales: Array.from({ length: 6 }, (_, i) => {
@@ -146,9 +148,9 @@ const DashboardPage = () => {
         }).reverse()
       };
 
-      // Calculate animal types distribution
+      // Calculate animal types distribution (only active animals)
       const animalTypes = Object.entries(
-        allAnimals.reduce((acc, animal) => {
+        activeAnimals.reduce((acc, animal) => {
           const type = animal.type || 'Unknown';
           acc[type] = (acc[type] || 0) + 1;
           return acc;
@@ -181,7 +183,7 @@ const DashboardPage = () => {
       );
 
       setStats({
-        totalAnimals: allAnimals.length,
+        totalAnimals: activeAnimals.length,
         monthlySales: monthlyTotalSales,
         monthlyExpenses: monthlyTotalExpenses,
         monthlyProfit,
@@ -202,30 +204,63 @@ const DashboardPage = () => {
     return <div className="p-8 text-center">Loading...</div>;
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="container mx-auto px-4 py-8">
+          <div className="animate-pulse space-y-8">
+            <div className="h-8 bg-gray-200 rounded w-48"></div>
+            <div className="space-y-8">
+              <div className="h-80 bg-gray-200 rounded-lg"></div>
+              <div className="h-96 bg-gray-200 rounded-lg"></div>
+              <div className="h-80 bg-gray-200 rounded-lg"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-6">Dashboard</h1>
+        <h1 className="text-2xl font-semibold text-gray-900 mb-8">Dashboard</h1>
         
-        <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-          <Suspense fallback={<LoadingFallback />}>
-            <DashboardStats stats={stats} />
-          </Suspense>
+        <div className="space-y-8">
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle>Monthly Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Suspense fallback={<LoadingFallback />}>
+                <DashboardStats stats={stats} />
+              </Suspense>
+            </CardContent>
+          </Card>
           
-          <Suspense fallback={<LoadingFallback />}>
-            <MonthlyTrendsChart trends={stats.monthlyTrends} />
-          </Suspense>
-        </div>
-        
-        <div className="mt-6 grid gap-6 grid-cols-1 lg:grid-cols-2">
-          <Suspense fallback={<LoadingFallback />}>
-            <AnimalTypeDistribution types={stats.animalTypes} />
-          </Suspense>
-          
-          <Suspense fallback={<LoadingFallback />}>
-            <RecentExpenses expenses={stats.recentExpenses} />
-          </Suspense>
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle>Animal Distribution</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Suspense fallback={<LoadingFallback />}>
+                <AnimalTypeDistribution types={stats.animalTypes} />
+              </Suspense>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle>Monthly Trends</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Suspense fallback={<LoadingFallback />}>
+                <MonthlyTrendsChart trends={stats.monthlyTrends} />
+              </Suspense>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

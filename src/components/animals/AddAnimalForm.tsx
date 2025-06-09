@@ -2,7 +2,8 @@ import { Animal } from '@/types';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Timestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Camera, CameraOff, RotateCcw } from 'lucide-react';
+import { Camera, CameraOff, RotateCcw, X, Upload } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 
 interface AddAnimalFormProps {
   onAddAnimal: (animal: Animal) => void;
@@ -15,7 +16,14 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
   const [showCamera, setShowCamera] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const imagePreview = useRef<string | null>(null);
+  const imageFile = useRef<File | null>(null);
+  const [selectedCamera, setSelectedCamera] = useState<string>('environment');
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
   
   const [formData, setFormData] = useState<Partial<Animal>>({
     id: '',
@@ -45,37 +53,85 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
 
   const startCamera = useCallback(async () => {
     try {
+      // Check if we're in a secure context
+      if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+        alert('Camera access requires a secure connection (HTTPS) or localhost');
+        setShowCamera(false);
+        return;
+      }
+
+      // Check if mediaDevices is supported
+      if (!navigator.mediaDevices) {
+        alert('Camera access is not supported in this browser. Please try using Chrome, Firefox, or Safari.');
+        setShowCamera(false);
+        return;
+      }
+
+      // First get camera permissions
+      const initialStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      initialStream.getTracks().forEach(track => track.stop());
+
+      // Then get available cameras
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cameras = devices.filter(device => device.kind === 'videoinput');
+      setAvailableCameras(cameras);
+
+      if (cameras.length === 0) {
+        alert('No cameras found');
+        setShowCamera(false);
+        return;
+      }
+
+      // Find the back camera (environment) if available
+      const backCamera = cameras.find(camera => 
+        camera.label.toLowerCase().includes('back') || 
+        camera.label.toLowerCase().includes('rear')
+      );
+
+      // Set initial camera
+      const initialCamera = backCamera?.deviceId || cameras[0].deviceId;
+      setSelectedCamera(initialCamera);
+
+      // Start the camera with the selected device
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode }
+        video: {
+          deviceId: { exact: initialCamera }
+        }
       });
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        setIsCameraOn(true);
+        streamRef.current = stream;
       }
-    } catch (err) {
-      console.error('Error accessing camera:', err);
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      alert('Please allow camera access to take a photo');
+      setShowCamera(false);
     }
-  }, [facingMode]);
+  }, []);
 
   const stopCamera = useCallback(() => {
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
       videoRef.current.srcObject = null;
-      setIsCameraOn(false);
     }
   }, []);
 
   const capturePhoto = useCallback(() => {
-    if (videoRef.current) {
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      const ctx = canvas.getContext('2d');
-      
-      if (ctx) {
-        ctx.drawImage(videoRef.current, 0, 0);
-        const imageData = canvas.toDataURL('image/jpeg');
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+
+      if (context) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = canvas.toDataURL('image/jpeg', 0.95);
         setPhotoPreview(imageData);
         setFormData(prev => ({ ...prev, photoUrl: imageData }));
         stopCamera();
@@ -84,20 +140,35 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
     }
   }, [stopCamera]);
 
-  const switchCamera = useCallback(() => {
-    stopCamera();
-    setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
-    startCamera();
-  }, [startCamera, stopCamera]);
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setPhotoPreview(result);
+        setFormData(prev => ({ ...prev, photoUrl: result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopCamera();
+      if (imagePreview.current) {
+        URL.revokeObjectURL(imagePreview.current);
+      }
+    };
+  }, [stopCamera]);
+
+  // Start camera when showing camera
   useEffect(() => {
     if (showCamera) {
       startCamera();
     }
-    return () => {
-      stopCamera();
-    };
-  }, [showCamera, startCamera, stopCamera]);
+  }, [showCamera, startCamera]);
 
   const handleFormChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -120,19 +191,6 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
         ...formData,
         [name]: value
       });
-    }
-  };
-
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        setPhotoPreview(result);
-        setFormData((prev) => ({ ...prev, photoUrl: result }));
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -205,245 +263,257 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
     onClose();
   };
 
+  const switchCamera = async () => {
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+
+      // Get current camera index
+      const currentIndex = availableCameras.findIndex(cam => cam.deviceId === selectedCamera);
+      // Get next camera index (loop back to start if at end)
+      const nextIndex = (currentIndex + 1) % availableCameras.length;
+      const nextCamera = availableCameras[nextIndex];
+
+      setSelectedCamera(nextCamera.deviceId);
+
+      // Start new stream with next camera
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          deviceId: { exact: nextCamera.deviceId }
+        }
+      });
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        streamRef.current = stream;
+      }
+    } catch (error) {
+      console.error('Error switching camera:', error);
+      alert('Failed to switch camera');
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-10 overflow-y-auto" aria-modal="true">
-      <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75" onClick={onClose} />
-        <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-            <div className="sm:flex sm:items-start">
-              <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">
-                  {animalToEdit ? 'Edit Animal' : 'Add New Animal'}
-                </h3>
-                <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Animal Photo</label>
-                    <div className="mt-1 flex justify-center border-2 border-gray-300 border-dashed rounded-md">
-                      <div className="space-y-1 text-center p-4 w-full">
-                        {photoPreview ? (
-                          <div className="mx-auto w-32 h-32 relative">
-                            <img src={photoPreview} alt="Preview" className="mx-auto h-32 w-32 object-cover rounded-md" />
-                            <button 
-                              type="button" 
-                              className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 text-xs" 
-                              onClick={() => {
-                                setPhotoPreview(null);
-                                setFormData(prev => ({ ...prev, photoUrl: '' }));
-                              }}
-                            >
-                              &times;
-                            </button>
-                          </div>
-                        ) : (
-                          <>
-                            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <div className="flex text-sm text-gray-600 justify-center gap-4">
-                              <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-farm-600 hover:text-farm-500 focus-within:outline-none">
-                                <span>Upload a photo</span>
-                                <input 
-                                  id="file-upload" 
-                                  name="file-upload" 
-                                  type="file" 
-                                  accept="image/*" 
-                                  className="sr-only" 
-                                  onChange={handlePhotoChange} 
-                                />
-                              </label>
-                              <button
-                                type="button"
-                                onClick={() => setShowCamera(true)}
-                                className="relative cursor-pointer bg-white rounded-md font-medium text-farm-600 hover:text-farm-500 focus-within:outline-none"
-                              >
-                                Take a photo
-                              </button>
-                            </div>
-                            <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
-                          </>
-                        )}
-                      </div>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">{animalToEdit ? 'Edit Animal' : 'Add New Animal'}</h2>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="h-6 w-6" />
+          </Button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <Label>Animal Photo</Label>
+            <div className="relative">
+              {photoPreview ? (
+                <div className="relative">
+                  <img
+                    src={photoPreview}
+                    alt="Animal preview"
+                    className="w-full aspect-video object-cover rounded-lg"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2"
+                    onClick={() => {
+                      setPhotoPreview(null);
+                      setFormData(prev => ({ ...prev, photoUrl: '' }));
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : showCamera ? (
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  <div className="aspect-video relative bg-gray-100 rounded-lg overflow-hidden">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                    <canvas ref={canvasRef} className="hidden" />
+                    <div className="absolute bottom-4 right-4 flex gap-2">
+                      {availableCameras.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          onClick={switchCamera}
+                          className="bg-white/90 hover:bg-white shadow-md"
+                          title="Switch Camera"
+                        >
+                          <Camera className="h-5 w-5" />
+                          <span className="sr-only">Switch Camera</span>
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="icon"
+                        onClick={capturePhoto}
+                        className="bg-white/90 hover:bg-white shadow-md"
+                        title="Take Photo"
+                      >
+                        <Camera className="h-5 w-5" />
+                        <span className="sr-only">Take Photo</span>
+                      </Button>
                     </div>
                   </div>
-
-                  {showCamera && (
-                    <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center">
-                      <div className="bg-white rounded-lg p-4 max-w-lg w-full mx-4">
-                        <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-black">
-                          <video
-                            ref={videoRef}
-                            autoPlay
-                            playsInline
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        
-                        <div className="flex justify-center gap-4 mt-4">
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              if (isCameraOn) {
-                                stopCamera();
-                              } else {
-                                startCamera();
-                              }
-                            }}
-                            className="flex items-center gap-2"
-                          >
-                            {isCameraOn ? (
-                              <>
-                                <CameraOff className="h-4 w-4" />
-                                Turn Off
-                              </>
-                            ) : (
-                              <>
-                                <Camera className="h-4 w-4" />
-                                Turn On
-                              </>
-                            )}
-                          </Button>
-                          
-                          <Button
-                            variant="outline"
-                            onClick={switchCamera}
-                            className="flex items-center gap-2"
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                            Switch Camera
-                          </Button>
-                          
-                          <Button
-                            onClick={capturePhoto}
-                            disabled={!isCameraOn}
-                            className="flex items-center gap-2"
-                          >
-                            <Camera className="h-4 w-4" />
-                            Take Photo
-                          </Button>
-                        </div>
-                        
-                        <div className="mt-4 flex justify-end">
-                          <Button 
-                            variant="ghost" 
-                            onClick={() => {
-                              stopCamera();
-                              setShowCamera(false);
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
+                  <div className="mt-4 flex justify-between items-center">
+                    <div className="text-sm text-gray-500">
+                      {availableCameras.length > 1 ? 'Tap the camera icon to switch between front and back cameras' : ''}
                     </div>
-                  )}
-                  
-                  <InputField 
-                    label="Animal ID" 
-                    name="id" 
-                    type="text" 
-                    value={formData.id || ''} 
-                    onChange={handleFormChange} 
-                    placeholder="Enter animal ID" 
-                    required 
-                  />
-                 
-                  <div className="grid grid-cols-2 gap-4">
-                    <SelectField 
-                      label="Type" 
-                      name="type" 
-                      value={formData.type || ''} 
-                      onChange={handleFormChange} 
-                      options={["Cow", "Goat", "Sheep", "Camel"]} 
-                    />
-                    <InputField 
-                      label="Breed" 
-                      name="breed" 
-                      type="text" 
-                      value={formData.breed || ''} 
-                      onChange={handleFormChange} 
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <InputField 
-                      label="Age (years)" 
-                      name="age" 
-                      type="number" 
-                      min={0} 
-                      step={0.1} 
-                      value={formData.age || 0} 
-                      onChange={handleFormChange} 
-                    />
-                    <InputField 
-                      label="Weight (kg)" 
-                      name="weight" 
-                      type="number" 
-                      min={0} 
-                      step={0.1} 
-                      value={formData.weight || 0} 
-                      onChange={handleFormChange} 
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <SelectField 
-                      label="Gender" 
-                      name="gender" 
-                      value={formData.gender || ''} 
-                      onChange={handleFormChange} 
-                      required 
-                      options={["male", "female"]} 
-                    />
-                    <InputField 
-                      label="Purchase Price" 
-                      name="purchasePrice" 
-                      type="number" 
-                      min={0} 
-                      step={0.01} 
-                      value={formData.purchasePrice || 0} 
-                      onChange={handleFormChange} 
-                      required 
-                    />
-                  </div>
-                  
-                  <SelectField 
-                    label="Health Status" 
-                    name="health" 
-                    value={formData.health || 'Good'} 
-                    onChange={handleFormChange} 
-                    options={["Excellent", "Good", "Fair", "Poor"]} 
-                  />
-                  
-                  <SelectField
-                    label="Is Vaccinated?"
-                    name="isVaccinated"
-                    value={formData.isVaccinated === true ? 'Yes' : 'No'}
-                    onChange={handleFormChange}
-                    options={["Yes", "No"]}
-                  />
-                  
-                  <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
-                    <button 
-                      type="submit" 
-                      className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-farm-600 text-base font-medium text-white hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500 sm:ml-3 sm:w-auto sm:text-sm"
-                    >
-                      {animalToEdit ? 'Update Animal' : 'Add Animal'}
-                    </button>
-                    <button 
-                      type="button" 
-                      onClick={onClose} 
-                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500 sm:mt-0 sm:w-auto sm:text-sm"
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        stopCamera();
+                        setShowCamera(false);
+                      }}
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
-                </form>
-              </div>
+                </div>
+              ) : (
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  <div className="text-center">
+                    <div className="flex justify-center gap-4">
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handlePhotoChange}
+                        />
+                        <div className="flex flex-col items-center gap-2 p-4 rounded-lg hover:bg-gray-50">
+                          <Upload className="h-8 w-8 text-gray-400" />
+                          <span className="text-sm text-gray-600">Upload Photo</span>
+                        </div>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowCamera(true)}
+                        className="flex flex-col items-center gap-2 p-4 rounded-lg hover:bg-gray-50"
+                      >
+                        <Camera className="h-8 w-8 text-gray-400" />
+                        <span className="text-sm text-gray-600">Take Photo</span>
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">PNG, JPG, GIF up to 10MB</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        </div>
+
+          <InputField 
+            label="Animal ID" 
+            name="id" 
+            type="text" 
+            value={formData.id || ''} 
+            onChange={handleFormChange} 
+            placeholder="Enter animal ID" 
+            required 
+          />
+         
+          <div className="grid grid-cols-2 gap-4">
+            <SelectField 
+              label="Type" 
+              name="type" 
+              value={formData.type || ''} 
+              onChange={handleFormChange} 
+              options={["Cow", "Goat", "Sheep", "Camel"]} 
+            />
+            <InputField 
+              label="Breed" 
+              name="breed" 
+              type="text" 
+              value={formData.breed || ''} 
+              onChange={handleFormChange} 
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <InputField 
+              label="Age (years)" 
+              name="age" 
+              type="number" 
+              min={0} 
+              step={0.1} 
+              value={formData.age || 0} 
+              onChange={handleFormChange} 
+            />
+            <InputField 
+              label="Weight (kg)" 
+              name="weight" 
+              type="number" 
+              min={0} 
+              step={0.1} 
+              value={formData.weight || 0} 
+              onChange={handleFormChange} 
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <SelectField 
+              label="Gender" 
+              name="gender" 
+              value={formData.gender || ''} 
+              onChange={handleFormChange} 
+              required 
+              options={["male", "female"]} 
+            />
+            <InputField 
+              label="Purchase Price" 
+              name="purchasePrice" 
+              type="number" 
+              min={0} 
+              step={0.01} 
+              value={formData.purchasePrice || 0} 
+              onChange={handleFormChange} 
+              required 
+            />
+          </div>
+          
+          <SelectField 
+            label="Health Status" 
+            name="health" 
+            value={formData.health || 'Good'} 
+            onChange={handleFormChange} 
+            options={["Excellent", "Good", "Fair", "Poor"]} 
+          />
+          
+          <SelectField
+            label="Is Vaccinated?"
+            name="isVaccinated"
+            value={formData.isVaccinated === true ? 'Yes' : 'No'}
+            onChange={handleFormChange}
+            options={["Yes", "No"]}
+          />
+          
+          <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+            <button 
+              type="submit" 
+              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-farm-600 text-base font-medium text-white hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500 sm:ml-3 sm:w-auto sm:text-sm"
+            >
+              {animalToEdit ? 'Update Animal' : 'Add Animal'}
+            </button>
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500 sm:mt-0 sm:w-auto sm:text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
