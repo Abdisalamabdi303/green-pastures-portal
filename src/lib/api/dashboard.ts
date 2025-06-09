@@ -9,8 +9,12 @@ export async function getDashboardStats() {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    // Get all animals
-    const animalsSnapshot = await getDocs(collection(db, 'animals'));
+    // Get all active animals
+    const animalsQuery = query(
+      collection(db, 'animals'),
+      where('status', '==', 'active')
+    );
+    const animalsSnapshot = await getDocs(animalsQuery);
     const animals = animalsSnapshot.docs.map(doc => ({
       ...doc.data(),
       id: doc.id
@@ -72,7 +76,7 @@ export async function getDashboardStats() {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 5);
 
-    // Get animals by type
+    // Get animals by type (only active)
     const animalsByType = animals.reduce((acc, animal) => {
       const type = animal.type || 'Unknown';
       acc[type] = (acc[type] || 0) + 1;

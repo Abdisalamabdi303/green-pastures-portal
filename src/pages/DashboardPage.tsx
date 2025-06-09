@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/layout/Navbar';
 import { User, Income, Expense, Animal } from '../types';
@@ -8,6 +8,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { startOfMonth, endOfMonth, format, subMonths } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface DashboardStats {
   totalAnimals: number;
@@ -27,6 +28,19 @@ interface DashboardStats {
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+
+// Lazy load heavy components
+const DashboardStats = lazy(() => import('@/components/dashboard/DashboardStats'));
+const MonthlyTrendsChart = lazy(() => import('@/components/dashboard/MonthlyTrendsChart'));
+const AnimalTypeDistribution = lazy(() => import('@/components/dashboard/AnimalTypeDistribution'));
+const RecentExpenses = lazy(() => import('@/components/dashboard/RecentExpenses'));
+
+// Loading component
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center h-64">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farm-600"></div>
+  </div>
+);
 
 const DashboardPage = () => {
   const navigate = useNavigate();
@@ -191,224 +205,29 @@ const DashboardPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div className="md:flex md:items-center md:justify-between mb-8">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-3xl font-bold leading-7 text-gray-900 sm:truncate">
-              Dashboard Overview
-            </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Welcome back! Here's what's happening with your farm today.
-            </p>
-          </div>
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-2xl font-semibold text-gray-900 mb-6">Dashboard</h1>
+        
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+          <Suspense fallback={<LoadingFallback />}>
+            <DashboardStats stats={stats} />
+          </Suspense>
+          
+          <Suspense fallback={<LoadingFallback />}>
+            <MonthlyTrendsChart trends={stats.monthlyTrends} />
+          </Suspense>
         </div>
-
-        {/* Overview Cards */}
-        <div className="grid gap-6 md:grid-cols-4 mb-8">
-          {/* Total Animals Card */}
-          <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Animals</CardTitle>
-              <Users className="h-5 w-5 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">{stats.totalAnimals}</div>
-              <p className="text-sm text-gray-500 mt-1">
-                Current inventory
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Monthly Sales Card */}
-          <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Monthly Sales</CardTitle>
-              <DollarSign className="h-5 w-5 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">${stats.monthlySales.toFixed(2)}</div>
-              <p className="text-sm text-gray-500 mt-1">
-                {stats.monthlySalesCount} sales this month
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Monthly Expenses Card */}
-          <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Monthly Expenses</CardTitle>
-              <DollarSign className="h-5 w-5 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">${stats.monthlyExpenses.toFixed(2)}</div>
-              <p className="text-sm text-gray-500 mt-1">
-                Total expenses this month
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Monthly Profit/Loss Card */}
-          <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Monthly Profit/Loss</CardTitle>
-              {stats.monthlyProfit >= 0 ? (
-                <TrendingUp className="h-5 w-5 text-green-600" />
-              ) : (
-                <AlertTriangle className="h-5 w-5 text-red-600" />
-              )}
-            </CardHeader>
-            <CardContent>
-              <div className={`text-3xl font-bold ${stats.monthlyProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                ${Math.abs(stats.monthlyProfit).toFixed(2)}
-              </div>
-              <p className="text-sm text-gray-500 mt-1">
-                {stats.monthlyProfit >= 0 ? 'Profit' : 'Loss'} this month
-              </p>
-            </CardContent>
-          </Card>
+        
+        <div className="mt-6 grid gap-6 grid-cols-1 lg:grid-cols-2">
+          <Suspense fallback={<LoadingFallback />}>
+            <AnimalTypeDistribution types={stats.animalTypes} />
+          </Suspense>
+          
+          <Suspense fallback={<LoadingFallback />}>
+            <RecentExpenses expenses={stats.recentExpenses} />
+          </Suspense>
         </div>
-
-        {/* Charts */}
-        <div className="grid gap-6 md:grid-cols-2 mb-8">
-          {/* Monthly Sales Trend */}
-          <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-gray-900">Monthly Sales Trend</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[350px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={stats.monthlyTrends.sales}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis 
-                      dataKey="month" 
-                      stroke="#666"
-                      tick={{ fill: '#666' }}
-                    />
-                    <YAxis 
-                      stroke="#666"
-                      tick={{ fill: '#666' }}
-                      tickFormatter={(value) => `$${value}`}
-                    />
-                    <Tooltip 
-                      formatter={(value) => [`$${value}`, 'Sales']}
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: '1px solid #f0f0f0',
-                        borderRadius: '8px',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                      }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="amount" 
-                      stroke="#10B981" 
-                      strokeWidth={3}
-                      dot={{ fill: '#10B981', strokeWidth: 2 }}
-                      activeDot={{ r: 6, fill: '#10B981' }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Monthly Expenses Trend */}
-          <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-gray-900">Monthly Expenses Trend</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[350px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={stats.monthlyTrends.expenses}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis 
-                      dataKey="month" 
-                      stroke="#666"
-                      tick={{ fill: '#666' }}
-                    />
-                    <YAxis 
-                      stroke="#666"
-                      tick={{ fill: '#666' }}
-                      tickFormatter={(value) => `$${value}`}
-                    />
-                    <Tooltip 
-                      formatter={(value) => [`$${value}`, 'Expenses']}
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: '1px solid #f0f0f0',
-                        borderRadius: '8px',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                      }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="amount" 
-                      stroke="#EF4444" 
-                      strokeWidth={3}
-                      dot={{ fill: '#EF4444', strokeWidth: 2 }}
-                      activeDot={{ r: 6, fill: '#EF4444' }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Animal Types Distribution */}
-        <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-gray-900">Animals by Type</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={stats.animalTypes}
-                    dataKey="count"
-                    nameKey="type"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={150}
-                    innerRadius={60}
-                    label={({ type, percent }) => `${type} (${(percent * 100).toFixed(0)}%)`}
-                    labelLine={false}
-                  >
-                    {stats.animalTypes.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={COLORS[index % COLORS.length]}
-                        stroke="white"
-                        strokeWidth={2}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value, name) => [`${value} animals`, name]}
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #f0f0f0',
-                      borderRadius: '8px',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                    }}
-                  />
-                  <Legend 
-                    layout="horizontal" 
-                    verticalAlign="bottom" 
-                    align="center"
-                    wrapperStyle={{
-                      paddingTop: '20px'
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </main>
+      </div>
     </div>
   );
 };

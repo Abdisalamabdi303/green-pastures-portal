@@ -1,6 +1,5 @@
-
 import { useEffect, useState } from "react";
-import { collection, query, getDocs, orderBy, limit } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, limit, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import PreviewStatCards from "./PreviewStatCards";
 import PreviewExpenseChart from "./PreviewExpenseChart";
@@ -31,8 +30,11 @@ export default function DashboardPreview() {
       try {
         setLoading(true);
         
-        // Get animals count
-        const animalsQuery = query(collection(db, "animals"));
+        // Get active animals count
+        const animalsQuery = query(
+          collection(db, "animals"),
+          where("status", "==", "active")
+        );
         const animalSnapshot = await getDocs(animalsQuery);
         const animalCount = animalSnapshot.size;
         
