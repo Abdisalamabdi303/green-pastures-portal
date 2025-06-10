@@ -9,6 +9,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 // Constants
 const ROW_HEIGHT = 60;
 const HEADER_HEIGHT = 48;
+const OVERSCAN_COUNT = 5;
 
 interface VirtualizedAnimalTableProps {
   animals: Animal[];
@@ -20,6 +21,7 @@ interface VirtualizedAnimalTableProps {
   onDelete: (id: string) => void;
   onToggleSelection: (id: string) => void;
   onToggleSelectAll: (allIds: string[]) => void;
+  onBulkStatusChange: (selectedIds: string[], status: 'active' | 'deceased') => void;
   isDeleting: string | null;
   loading?: boolean;
   searchTerm?: string;
@@ -57,7 +59,7 @@ const VirtualRow = memo(({ index, style, data }: {
     onToggleSelection(animal.id);
   }, [animal.id, onToggleSelection]);
 
-  const highlightText = (text: string) => {
+  const highlightText = useCallback((text: string) => {
     if (!searchTerm || !text) return text;
     const regex = new RegExp(`(${searchTerm})`, 'gi');
     const parts = text.split(regex);
@@ -66,7 +68,7 @@ const VirtualRow = memo(({ index, style, data }: {
         <mark key={i} className="bg-yellow-200 px-1 rounded">{part}</mark>
       ) : part
     );
-  };
+  }, [searchTerm]);
 
   return (
     <div
@@ -208,6 +210,7 @@ const VirtualizedAnimalTable = ({
   onDelete,
   onToggleSelection,
   onToggleSelectAll,
+  onBulkStatusChange,
   isDeleting,
   loading = false,
   searchTerm,
@@ -221,7 +224,7 @@ const VirtualizedAnimalTable = ({
     count: animals.length,
     getScrollElement: () => parentRef.current,
     estimateSize: useCallback(() => ROW_HEIGHT, []),
-    overscan: 3,
+    overscan: OVERSCAN_COUNT,
     initialOffset: 0,
     measureElement: useCallback((element) => {
       return element.getBoundingClientRect().height;
@@ -250,47 +253,25 @@ const VirtualizedAnimalTable = ({
     if (!onLoadMore || !hasMore) return;
 
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
-
-    if (scrollPercentage > 0.8) {
+    if (scrollHeight - scrollTop - clientHeight < 100) {
       onLoadMore();
     }
   }, [onLoadMore, hasMore]);
 
   useEffect(() => {
-    return () => {
-      rowVirtualizer.cleanup();
-    };
-  }, [rowVirtualizer]);
+    const scrollElement = parentRef.current;
+    if (!scrollElement) return;
 
-  if (loading && animals.length === 0) {
-    return (
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
-        <TableHeader
-          columns={columns}
-          sortConfig={sortConfig}
-          selection={selection}
-          animalIds={[]}
-          onSort={onSort}
-          onToggleSelectAll={onToggleSelectAll}
-        />
-        <div className="space-y-2 p-4">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="animate-pulse flex space-x-4">
-              <div className="rounded bg-gray-200 h-12 w-12"></div>
-              <div className="flex-1 space-y-2 py-1">
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+    const handleScrollEvent = (e: Event) => {
+      handleScroll(e as unknown as React.UIEvent<HTMLDivElement>);
+    };
+
+    scrollElement.addEventListener('scroll', handleScrollEvent);
+    return () => scrollElement.removeEventListener('scroll', handleScrollEvent);
+  }, [handleScroll]);
 
   return (
-    <div className="relative">
+    <div ref={parentRef} className="relative" style={{ height: 'calc(100vh - 300px)' }}>
       <TableHeader
         columns={columns}
         sortConfig={sortConfig}
@@ -300,41 +281,33 @@ const VirtualizedAnimalTable = ({
         onToggleSelectAll={onToggleSelectAll}
       />
       
-      <div 
-        ref={parentRef}
-        className="h-[600px] overflow-auto"
-        onScroll={handleScroll}
+      <div
+        style={{
+          height: `${rowVirtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative'
+        }}
       >
-        <div
-          style={{
-            height: `${rowVirtualizer.getTotalSize()}px`,
-            width: '100%',
-            position: 'relative',
-          }}
-        >
-          {rowVirtualizer.getVirtualItems().map((virtualRow) => (
-            <VirtualRow
-              key={virtualRow.index}
-              index={virtualRow.index}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: `${ROW_HEIGHT}px`,
-                transform: `translateY(${virtualRow.start}px)`,
-              }}
-              data={itemData}
-            />
-          ))}
-        </div>
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => (
+          <VirtualRow
+            key={virtualRow.index}
+            index={virtualRow.index}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: `${virtualRow.size}px`,
+              transform: `translateY(${virtualRow.start}px)`
+            }}
+            data={itemData}
+          />
+        ))}
       </div>
-      
-      {!loading && animals.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-gray-500">
-            {searchTerm ? 'No animals found matching your search' : 'No animals found'}
-          </p>
+
+      {loading && (
+        <div className="absolute bottom-0 left-0 right-0 flex justify-center p-4 bg-white bg-opacity-75">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-farm-600"></div>
         </div>
       )}
     </div>

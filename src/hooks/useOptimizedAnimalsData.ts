@@ -87,6 +87,7 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
   const lastDocRef = useRef<QueryDocumentSnapshot | null>(null);
   const cacheRef = useRef<Map<string, Animal>>(new Map());
   const searchCacheRef = useRef<Map<string, Animal[]>>(new Map());
+  const isInitialLoadRef = useRef(true);
 
   // Memoized cache key generator
   const getCacheKey = useCallback((page: number, search: string) => 
@@ -248,43 +249,61 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
           ...doc.data(),
           id: doc.id
         })) as Animal[];
-
-        // If still no results, try partial match
-        if (results.length === 0) {
-          const allAnimalsQuery = query(
-            animalsRef,
-            limit(ITEMS_PER_PAGE)
-          );
-          const allSnapshot = await getDocs(allAnimalsQuery);
-          const allAnimals = allSnapshot.docs.map(doc => ({
-            ...doc.data(),
-            id: doc.id
-          })) as Animal[];
-
-          results = allAnimals.filter(animal => 
-            animal.type?.toLowerCase().includes(searchTermLower) ||
-            animal.id?.toLowerCase().includes(searchTermLower)
-          );
-        }
       }
 
-      // Cache search results
+      // Cache the results
       cacheService.set(cacheKey, results);
-
       setAnimals(results);
       setHasMore(false);
     } catch (err) {
-      console.error('Search error:', err);
       setError(err instanceof Error ? err.message : 'Failed to search animals');
       toast({
-        title: "Search Error",
-        description: "Failed to search animals. Please try again.",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to search animals. Please try again.',
+        variant: 'destructive'
       });
     } finally {
       setLoading(false);
     }
   }, [fetchAnimals, toast]);
+
+  // Load more animals
+  const loadMore = useCallback(async () => {
+    if (loading || !hasMore) return;
+    await fetchAnimals(false);
+  }, [loading, hasMore, fetchAnimals]);
+
+  // Refresh animals list
+  const refresh = useCallback(async () => {
+    lastDocRef.current = null;
+    setAnimals([]);
+    setHasMore(true);
+    await fetchAnimals(true);
+  }, [fetchAnimals]);
+
+  // Handle search term changes
+  useEffect(() => {
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      return;
+    }
+    searchAnimals(debouncedSearchTerm);
+  }, [debouncedSearchTerm, searchAnimals]);
+
+  // Initial load
+  useEffect(() => {
+    if (currentUser) {
+      fetchAnimals(true);
+    }
+  }, [currentUser, fetchAnimals]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cacheRef.current.clear();
+      searchCacheRef.current.clear();
+    };
+  }, []);
 
   // Handle animal deletion with cache invalidation
   const handleDeleteAnimal = useCallback(async (id: string) => {
@@ -441,23 +460,14 @@ export const useOptimizedAnimalsData = (): UseAnimalsDataReturn => {
     }
   }, []);
 
-  // Effect for initial load and search term changes
-  useEffect(() => {
-    if (debouncedSearchTerm) {
-      fetchAnimals(true);
-    } else {
-      fetchAnimals(true);
-    }
-  }, [debouncedSearchTerm, fetchAnimals]);
-
   // Memoized return value to prevent unnecessary re-renders
   return useMemo(() => ({
     animals,
     loading,
     error,
     hasMore,
-    loadMore: () => fetchAnimals(false),
-    refresh: () => fetchAnimals(true),
+    loadMore,
+    refresh,
     search: setSearchTerm,
     searchTerm,
     isDeleting,

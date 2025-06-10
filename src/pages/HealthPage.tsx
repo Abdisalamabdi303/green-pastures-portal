@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/layout/Navbar';
-import { HealthRecord, Vaccination } from '@/types';
+import { HealthRecord, Vaccination, Animal } from '@/types';
 import { BatchVaccinationForm } from '@/components/health/BatchVaccinationForm';
 import { HealthFilters } from '@/components/health/HealthFilters';
 import { useHealthData } from '@/hooks/useHealthData';
@@ -50,12 +50,12 @@ const HealthPage = () => {
     batchAddVaccinations
   } = useHealthData(currentPage);
 
-  const handleFilterChange = (newFilters: typeof filters) => {
+  const handleFilterChange = useCallback((newFilters: typeof filters) => {
     setFilters(newFilters);
     setCurrentPage(1); // Reset to first page when filters change
-  };
+  }, []);
 
-  const handleAddBatchHealthRecords = async (records: Omit<HealthRecord, 'id' | 'createdAt'>[]) => {
+  const handleAddBatchHealthRecords = useCallback(async (records: Omit<HealthRecord, 'id' | 'createdAt'>[]) => {
     try {
       console.log('HealthPage: Starting batch health record submission');
       console.log('Number of records to add:', records.length);
@@ -98,10 +98,11 @@ const HealthPage = () => {
     } catch (error) {
       console.error('Error adding batch health records:', error);
       toast.error('Failed to add batch health records');
+      throw error;
     }
-  };
+  }, [addHealthRecord]);
 
-  const handleBatchAddVaccinations = async (vaccinations: Omit<Vaccination, 'id' | 'createdAt'>[]) => {
+  const handleBatchAddVaccinations = useCallback(async (vaccinations: Omit<Vaccination, 'id' | 'createdAt'>[]) => {
     try {
       setIsBatchAddingVaccinations(true);
       await batchAddVaccinations(vaccinations);
@@ -110,22 +111,23 @@ const HealthPage = () => {
     } catch (error) {
       toast.error('Failed to add vaccinations');
       console.error('Error adding vaccinations:', error);
+      throw error;
     } finally {
       setIsBatchAddingVaccinations(false);
     }
-  };
+  }, [batchAddVaccinations]);
 
-  const handleDeleteHealthRecord = async (id: string) => {
+  const handleDeleteHealthRecord = useCallback(async (id: string) => {
     setRecordToDelete(id);
     setDeleteHealthDialogOpen(true);
-  };
+  }, []);
 
-  const handleDeleteVaccination = async (id: string) => {
+  const handleDeleteVaccination = useCallback(async (id: string) => {
     setVaccinationToDelete(id);
     setDeleteVaccinationDialogOpen(true);
-  };
+  }, []);
 
-  const confirmDeleteHealthRecord = async () => {
+  const confirmDeleteHealthRecord = useCallback(async () => {
     if (!recordToDelete) return;
     try {
       await deleteHealthRecord(recordToDelete);
@@ -136,9 +138,9 @@ const HealthPage = () => {
       toast.error('Failed to delete health record');
       console.error('Error deleting health record:', error);
     }
-  };
+  }, [recordToDelete, deleteHealthRecord]);
 
-  const confirmDeleteVaccination = async () => {
+  const confirmDeleteVaccination = useCallback(async () => {
     if (!vaccinationToDelete) return;
     try {
       await deleteVaccination(vaccinationToDelete);
@@ -149,30 +151,34 @@ const HealthPage = () => {
       toast.error('Failed to delete vaccination');
       console.error('Error deleting vaccination:', error);
     }
-  };
+  }, [vaccinationToDelete, deleteVaccination]);
 
-  const filteredHealthRecords = healthData?.records.filter(record => {
-    if (filters.search && !record.animalName.toLowerCase().includes(filters.search.toLowerCase())) {
-      return false;
-    }
-    if (filters.animalType && record.animalType !== filters.animalType) {
-      return false;
-    }
-    if (filters.condition && record.condition !== filters.condition) {
-      return false;
-    }
-    return true;
-  }) || [];
+  const filteredHealthRecords = useCallback(() => {
+    return healthData?.records.filter(record => {
+      if (filters.search && !record.animalName.toLowerCase().includes(filters.search.toLowerCase())) {
+        return false;
+      }
+      if (filters.animalType && record.animalType !== filters.animalType) {
+        return false;
+      }
+      if (filters.condition && record.condition !== filters.condition) {
+        return false;
+      }
+      return true;
+    }) || [];
+  }, [healthData?.records, filters]);
 
-  const filteredVaccinations = vaccinationData?.vaccinations.filter(vaccination => {
-    if (filters.search && !vaccination.animalName.toLowerCase().includes(filters.search.toLowerCase())) {
-      return false;
-    }
-    if (filters.animalType && vaccination.animalType !== filters.animalType) {
-      return false;
-    }
-    return true;
-  }) || [];
+  const filteredVaccinations = useCallback(() => {
+    return vaccinationData?.vaccinations.filter(vaccination => {
+      if (filters.search && !vaccination.animalName.toLowerCase().includes(filters.search.toLowerCase())) {
+        return false;
+      }
+      if (filters.animalType && vaccination.animalType !== filters.animalType) {
+        return false;
+      }
+      return true;
+    }) || [];
+  }, [vaccinationData?.vaccinations, filters]);
 
   useEffect(() => {
     // Check if user is logged in
@@ -201,6 +207,8 @@ const HealthPage = () => {
   }
 
   const isLoading = isLoadingHealth || isLoadingVaccinations || isLoadingAnimals;
+  const healthRecords = filteredHealthRecords();
+  const vaccinations = filteredVaccinations();
 
   return (
     <div className="min-h-screen bg-white">
@@ -287,14 +295,14 @@ const HealthPage = () => {
                               <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
                             </TableRow>
                           ))
-                        ) : filteredHealthRecords.length === 0 ? (
+                        ) : healthRecords.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={7} className="text-center text-[#4a6741] py-8">
                               No health records found
                             </TableCell>
                           </TableRow>
                         ) : (
-                          filteredHealthRecords.map((record) => (
+                          healthRecords.map((record) => (
                             <TableRow key={record.id} className="hover:bg-[#f5f5f0]">
                               <TableCell className="font-medium">
                                 {record.date.toDate().toLocaleDateString()}
@@ -357,14 +365,14 @@ const HealthPage = () => {
                               <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
                             </TableRow>
                           ))
-                        ) : filteredVaccinations.length === 0 ? (
+                        ) : vaccinations.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={7} className="text-center text-[#4a6741] py-8">
                               No vaccinations found
                             </TableCell>
                           </TableRow>
                         ) : (
-                          filteredVaccinations.map((vaccination) => (
+                          vaccinations.map((vaccination) => (
                             <TableRow key={vaccination.id} className="hover:bg-[#f5f5f0]">
                               <TableCell className="font-medium">
                                 {vaccination.date.toDate().toLocaleDateString()}

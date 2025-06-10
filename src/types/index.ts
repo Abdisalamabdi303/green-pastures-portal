@@ -27,6 +27,7 @@ export interface HealthRecord {
   treatment: string;
   cost: number;
   date: Timestamp;
+  notes?: string;
   createdAt: Timestamp;
 }
 
@@ -39,6 +40,7 @@ export interface Vaccination {
   status: string;
   cost?: number;
   date: Timestamp;
+  notes?: string;
   createdAt: Timestamp;
 }
 
