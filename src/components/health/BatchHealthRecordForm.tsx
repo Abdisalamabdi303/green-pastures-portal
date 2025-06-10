@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { HealthRecord, BatchHealthRecordFormProps } from '@/types';
+import { BatchHealthRecordFormProps } from '@/types';
+import { HealthRecord } from '@/types';
 import { Timestamp } from 'firebase/firestore';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
