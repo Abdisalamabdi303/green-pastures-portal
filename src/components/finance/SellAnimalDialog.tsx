@@ -75,7 +75,7 @@ export function SellAnimalDialog({ isOpen, onClose, onConfirm }: SellAnimalDialo
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl bg-white">
         <DialogHeader>
           <DialogTitle>Sell Animals</DialogTitle>
         </DialogHeader>

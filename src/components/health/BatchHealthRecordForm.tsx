@@ -136,7 +136,7 @@ export const BatchHealthRecordForm = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] bg-gray-50">
+      <DialogContent className="sm:max-w-[425px] bg-white">
         <DialogHeader>
           <DialogTitle>Batch Health Record</DialogTitle>
           <DialogDescription>
