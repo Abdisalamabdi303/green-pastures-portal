@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Vaccination } from '@/types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Vaccination, BatchVaccinationFormProps } from '@/types';
 import { Timestamp } from 'firebase/firestore';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,45 +8,56 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const batchVaccinationSchema = z.object({
-  vaccineName: z.string().min(1, { message: "Vaccine name is required" }),
+  vaccine: z.string().min(1, { message: "Vaccine is required" }),
+  status: z.string().min(1, { message: "Status is required" }),
+  cost: z.string().min(1, { message: "Cost is required" }),
   date: z.string().min(1, { message: "Date is required" }),
-  nextDueDate: z.string().min(1, { message: "Next due date is required" }),
   selectedAnimals: z.array(z.string()).min(1, { message: "Select at least one animal" }),
   notes: z.string().optional(),
 });
 
 type BatchVaccinationFormValues = z.infer<typeof batchVaccinationSchema>;
 
-interface BatchVaccinationFormProps {
-  onAddBatchVaccinations: (vaccinations: Omit<Vaccination, 'id' | 'createdAt'>[]) => Promise<void>;
-  onClose: () => void;
-  animals: Array<{ id: string; name: string; type: string; }>;
-  vaccinationData?: { vaccinations: Vaccination[] };
-}
-
 export const BatchVaccinationForm = ({ 
-  onAddBatchVaccinations, 
-  onClose, 
+  open,
+  onOpenChange,
+  onSubmit,
   animals,
-  vaccinationData 
+  isLoading
 }: BatchVaccinationFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<BatchVaccinationFormValues>({
     resolver: zodResolver(batchVaccinationSchema),
     defaultValues: {
-      vaccineName: "",
+      vaccine: "",
+      status: "",
+      cost: "",
       date: new Date().toISOString().split('T')[0],
-      nextDueDate: new Date().toISOString().split('T')[0],
       selectedAnimals: [],
       notes: "",
     },
   });
 
-  const onSubmit = async (data: BatchVaccinationFormValues) => {
+  // Reset form when dialog opens/closes
+  useEffect(() => {
+    if (!open) {
+      form.reset();
+      setIsSubmitting(false);
+    }
+  }, [open, form]);
+
+  const handleClose = useCallback(() => {
+    form.reset();
+    onOpenChange(false);
+  }, [form, onOpenChange]);
+
+  const handleSubmit = async (data: BatchVaccinationFormValues) => {
+    if (isSubmitting) return; // Prevent double submission
+    
     try {
       setIsSubmitting(true);
       console.log('Batch vaccination form submission started with data:', data);
@@ -57,52 +68,24 @@ export const BatchVaccinationForm = ({
       }
 
       // Validate required fields
-      if (!data.vaccineName.trim()) {
-        throw new Error('Vaccine name is required');
+      if (!data.vaccine.trim()) {
+        throw new Error('Vaccine is required');
+      }
+
+      if (!data.status.trim()) {
+        throw new Error('Status is required');
+      }
+
+      if (!data.cost.trim()) {
+        throw new Error('Cost is required');
       }
 
       if (!data.date) {
         throw new Error('Date is required');
       }
 
-      if (!data.nextDueDate) {
-        throw new Error('Next due date is required');
-      }
-
-      // Check for duplicates and prepare vaccination records
-      const existingVaccinations = vaccinationData?.vaccinations || [];
-      const duplicateAnimals: string[] = [];
-      const uniqueAnimals: string[] = [];
-
-      // Separate duplicates and unique animals
-      data.selectedAnimals.forEach(animalId => {
-        const hasVaccine = existingVaccinations.some(vacc => 
-          vacc.animalId === animalId && 
-          vacc.vaccineName.toLowerCase() === data.vaccineName.toLowerCase()
-        );
-        
-        if (hasVaccine) {
-          duplicateAnimals.push(animalId);
-        } else {
-          uniqueAnimals.push(animalId);
-        }
-      });
-
-      // If all animals are duplicates, show error
-      if (uniqueAnimals.length === 0) {
-        const duplicateIds = duplicateAnimals.join(', ');
-        throw new Error(`All selected animals (${duplicateIds}) already have this vaccine`);
-      }
-
-      // If some animals are duplicates, show warning but continue with unique ones
-      if (duplicateAnimals.length > 0) {
-        const duplicateIds = duplicateAnimals.join(', ');
-        console.warn(`Skipping duplicate vaccinations for animals: ${duplicateIds}`);
-        // You might want to show a toast or alert here
-      }
-
-      // Process each unique vaccination record
-      const vaccinations = uniqueAnimals.map(animalId => {
+      // Process each vaccination
+      const vaccinations = data.selectedAnimals.map(animalId => {
         // Find the animal in the animals array
         const animal = animals.find(a => a.id === animalId);
         if (!animal) {
@@ -112,17 +95,14 @@ export const BatchVaccinationForm = ({
 
         console.log(`Processing vaccination for animal: ${animal.id} (${animal.type})`);
         
-        // Ensure dates are properly formatted
+        // Ensure date is properly formatted
         const date = new Date(data.date);
-        const nextDueDate = new Date(data.nextDueDate);
-
-        if (isNaN(date.getTime()) || isNaN(nextDueDate.getTime())) {
+        if (isNaN(date.getTime())) {
           throw new Error('Invalid date format');
         }
 
-        // Create Timestamp objects
+        // Create Timestamp object
         const dateTimestamp = Timestamp.fromDate(date);
-        const nextDueDateTimestamp = Timestamp.fromDate(nextDueDate);
 
         // Validate animal data
         if (!animal.type) {
@@ -132,14 +112,13 @@ export const BatchVaccinationForm = ({
 
         const vaccinationData = {
           animalId: animal.id,
-          animalName: animal.id, // Use ID as name if name is not available
+          animalName: animal.name || animal.id, // Use name if available, otherwise use ID
           animalType: animal.type,
-          vaccineName: data.vaccineName.trim(),
+          vaccine: data.vaccine.trim(),
+          status: data.status.trim(),
+          cost: parseFloat(data.cost),
           date: dateTimestamp,
-          nextDueDate: nextDueDateTimestamp,
-          administered: false,
           notes: data.notes?.trim() || '',
-          createdAt: Timestamp.now(),
         };
 
         console.log('Created vaccination data:', vaccinationData);
@@ -149,44 +128,34 @@ export const BatchVaccinationForm = ({
       console.log('Processed batch vaccinations:', vaccinations);
       
       // Submit the batch vaccinations
-      await onAddBatchVaccinations(vaccinations);
+      await onSubmit(vaccinations);
       
-      // Show success message with details
-      const successMessage = `Successfully added ${vaccinations.length} vaccination${vaccinations.length > 1 ? 's' : ''}`;
-      if (duplicateAnimals.length > 0) {
-        const duplicateIds = duplicateAnimals.join(', ');
-        console.log(`${successMessage}. Skipped ${duplicateAnimals.length} duplicate vaccination${duplicateAnimals.length > 1 ? 's' : ''} for animals: ${duplicateIds}`);
-      } else {
-        console.log(successMessage);
-      }
-      
-      form.reset();
-      onClose();
+      handleClose();
     } catch (error) {
       console.error('Error submitting batch vaccinations:', error);
-      // You might want to show an error message to the user here
+      throw error;
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={true} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[425px] bg-gray-50">
         <DialogHeader>
           <DialogTitle>Batch Vaccination</DialogTitle>
           <DialogDescription>
-            Add vaccination records for multiple animals.
+            Add vaccinations for multiple animals.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="vaccineName"
+              name="vaccine"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Vaccine Name</FormLabel>
+                  <FormLabel>Vaccine</FormLabel>
                   <FormControl>
                     <Input placeholder="Enter vaccine name" className="bg-white border-gray-200" {...field} />
                   </FormControl>
@@ -195,34 +164,62 @@ export const BatchVaccinationForm = ({
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date</FormLabel>
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <Input type="date" className="bg-white border-gray-200" {...field} />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="nextDueDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Next Due Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" className="bg-white border-gray-200" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                    <SelectContent>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="scheduled">Scheduled</SelectItem>
+                      <SelectItem value="missed">Missed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="cost"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cost</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      placeholder="Enter cost" 
+                      className="bg-white border-gray-200" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date</FormLabel>
+                  <FormControl>
+                    <Input type="date" className="bg-white border-gray-200" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
@@ -246,7 +243,7 @@ export const BatchVaccinationForm = ({
                             className="h-4 w-4 text-farm-600 focus:ring-farm-500 border-gray-300 rounded"
                           />
                           <label className="text-sm">
-                            {animal.id} - {animal.name}
+                            {animal.name || animal.id} - {animal.type}
                           </label>
                         </div>
                       ))}
@@ -279,12 +276,12 @@ export const BatchVaccinationForm = ({
               <Button
                 type="button"
                 variant="outline"
-                onClick={onClose}
-                disabled={isSubmitting}
+                onClick={handleClose}
+                disabled={isLoading || isSubmitting}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="bg-farm-600 hover:bg-farm-700 text-white">
+              <Button type="submit" disabled={isLoading || isSubmitting} className="bg-farm-600 hover:bg-farm-700 text-white">
                 {isSubmitting ? "Saving..." : "Save Vaccinations"}
               </Button>
             </div>

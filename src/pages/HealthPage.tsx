@@ -5,7 +5,6 @@ import { HealthRecord, Vaccination } from '@/types';
 import { BatchVaccinationForm } from '@/components/health/BatchVaccinationForm';
 import { HealthFilters } from '@/components/health/HealthFilters';
 import { useHealthData } from '@/hooks/useHealthData';
-import { useAnimals } from '@/hooks/useAnimals';
 import { Timestamp } from 'firebase/firestore';
 import { BatchHealthRecordForm } from '@/components/health/BatchHealthRecordForm';
 import { Button } from '@/components/ui/button';
@@ -34,14 +33,16 @@ const HealthPage = () => {
   });
   const [isBatchAddingVaccinations, setIsBatchAddingVaccinations] = useState(false);
 
-  const { animals, isLoading: isLoadingAnimals, error: animalsError } = useAnimals();
   const {
     healthData,
     vaccinationData,
+    animals,
     isLoadingHealth,
     isLoadingVaccinations,
+    isLoadingAnimals,
     healthError,
     vaccinationError,
+    animalError,
     addHealthRecord,
     deleteHealthRecord,
     addVaccination,
@@ -182,7 +183,7 @@ const HealthPage = () => {
     }
   }, [navigate]);
 
-  if (animalsError || healthError || vaccinationError) {
+  if (animalError || healthError || vaccinationError) {
     return (
       <div className="min-h-screen bg-white">
         <Navbar />
@@ -191,13 +192,15 @@ const HealthPage = () => {
             <AlertCircle className="mx-auto h-12 w-12" />
             <h3 className="mt-2 text-sm font-medium">Error loading data</h3>
             <p className="mt-1 text-sm text-gray-500">
-              {animalsError?.message || healthError?.message || vaccinationError?.message}
+              {animalError?.message || healthError?.message || vaccinationError?.message}
             </p>
           </div>
         </main>
       </div>
     );
   }
+
+  const isLoading = isLoadingHealth || isLoadingVaccinations || isLoadingAnimals;
 
   return (
     <div className="min-h-screen bg-white">
@@ -219,6 +222,7 @@ const HealthPage = () => {
                 <Button
                   onClick={() => setOpenBatchHealthForm(true)}
                   className="bg-[#61a14d] hover:bg-[#5a8a4d] text-white"
+                  disabled={isLoading}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Health Record
@@ -226,7 +230,7 @@ const HealthPage = () => {
               ) : (
                 <Button
                   onClick={() => setOpenBatchVaccinationForm(true)}
-                  disabled={isBatchAddingVaccinations}
+                  disabled={isLoading || isBatchAddingVaccinations}
                   className="bg-[#61a14d] hover:bg-[#5a8a4d] text-white"
                 >
                   <Plus className="mr-2 h-4 w-4" />
@@ -256,7 +260,7 @@ const HealthPage = () => {
 
               <TabsContent value="health">
                 <div className="space-y-4">
-                  <HealthFilters onFilterChange={handleFilterChange} />
+                  <HealthFilters onFilterChange={handleFilterChange} animals={animals} />
                   <div className="rounded-md border border-[#e8e8e0] bg-white">
                     <Table>
                       <TableHeader>
@@ -271,7 +275,7 @@ const HealthPage = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {isLoadingHealth ? (
+                        {isLoading ? (
                           Array(5).fill(0).map((_, index) => (
                             <TableRow key={index}>
                               <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
@@ -309,6 +313,7 @@ const HealthPage = () => {
                                     size="sm"
                                     onClick={() => handleDeleteHealthRecord(record.id)}
                                     className="text-[#4a6741] hover:text-[#2c3e2d] hover:bg-[#f5f5f0]"
+                                    disabled={isLoading}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -325,7 +330,7 @@ const HealthPage = () => {
 
               <TabsContent value="vaccinations">
                 <div className="space-y-4">
-                  <HealthFilters onFilterChange={handleFilterChange} />
+                  <HealthFilters onFilterChange={handleFilterChange} animals={animals} />
                   <div className="rounded-md border border-[#e8e8e0] bg-white">
                     <Table>
                       <TableHeader>
@@ -474,22 +479,20 @@ const HealthPage = () => {
         </Dialog>
 
         {/* Form Dialogs */}
-        {openBatchHealthForm && (
-          <BatchHealthRecordForm
-            onAddBatchHealthRecords={handleAddBatchHealthRecords}
-            onClose={() => setOpenBatchHealthForm(false)}
-            animals={animals}
-            healthData={healthData}
-          />
-        )}
-        {openBatchVaccinationForm && (
-          <BatchVaccinationForm
-            onAddBatchVaccinations={handleBatchAddVaccinations}
-            onClose={() => setOpenBatchVaccinationForm(false)}
-            animals={animals}
-            vaccinationData={vaccinationData}
-          />
-        )}
+        <BatchHealthRecordForm
+          open={openBatchHealthForm}
+          onOpenChange={setOpenBatchHealthForm}
+          onSubmit={handleAddBatchHealthRecords}
+          animals={animals}
+          isLoading={isLoading}
+        />
+        <BatchVaccinationForm
+          open={openBatchVaccinationForm}
+          onOpenChange={setOpenBatchVaccinationForm}
+          onSubmit={handleBatchAddVaccinations}
+          animals={animals}
+          isLoading={isLoading || isBatchAddingVaccinations}
+        />
       </main>
     </div>
   );

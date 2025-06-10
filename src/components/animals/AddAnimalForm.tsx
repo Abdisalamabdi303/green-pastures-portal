@@ -4,14 +4,17 @@ import { Timestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Camera, CameraOff, RotateCcw, X, Upload } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/use-toast';
 
 interface AddAnimalFormProps {
-  onAddAnimal: (animal: Animal) => void;
+  onAddAnimal: (animal: Animal) => Promise<void>;
   onClose: () => void;
   animalToEdit?: Animal | null;
 }
 
 const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProps) => {
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
@@ -170,97 +173,135 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
     }
   }, [showCamera, startCamera]);
 
-  const handleFormChange = (
+  const handleFormChange = useCallback((
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value, type } = e.target;
     
     if (name === 'isVaccinated') {
-      setFormData({
-        ...formData,
+      setFormData(prev => ({
+        ...prev,
         isVaccinated: value === 'Yes'
-      });
+      }));
     } else if (type === 'number') {
       const numValue = value === '' ? 0 : Number(value);
-      setFormData({
-        ...formData,
+      setFormData(prev => ({
+        ...prev,
         [name]: isNaN(numValue) ? 0 : numValue
-      });
+      }));
     } else {
-      setFormData({
-        ...formData,
+      setFormData(prev => ({
+        ...prev,
         [name]: value
-      });
+      }));
     }
-  };
+  }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.id) {
-      alert('Animal ID is required');
-      return;
+  const validateForm = useCallback(() => {
+    if (!formData.id?.trim()) {
+      toast({
+        title: "Error",
+        description: "Animal ID is required",
+        variant: "destructive"
+      });
+      return false;
     }
 
     if (!photoPreview) {
-      alert('Animal photo is required');
-      return;
+      toast({
+        title: "Error",
+        description: "Animal photo is required",
+        variant: "destructive"
+      });
+      return false;
     }
 
     if (!formData.gender) {
-      alert('Gender is required');
-      return;
+      toast({
+        title: "Error",
+        description: "Gender is required",
+        variant: "destructive"
+      });
+      return false;
     }
 
     if (formData.purchasePrice === undefined || formData.purchasePrice < 0) {
-      alert('Purchase price must be a non-negative number');
+      toast({
+        title: "Error",
+        description: "Purchase price must be a non-negative number",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    return true;
+  }, [formData, photoPreview, toast]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
       return;
     }
 
-    const cleanId = formData.id.trim();
-    
-    if (!cleanId) {
-      alert('Animal ID cannot be empty');
-      return;
+    try {
+      setIsSubmitting(true);
+      
+      const cleanId = formData.id.trim();
+      
+      const newAnimal: Animal = {
+        id: cleanId,
+        type: formData.type || '',
+        breed: formData.breed || '',
+        age: formData.age || 0,
+        health: formData.health || 'Good',
+        weight: formData.weight || 0,
+        gender: formData.gender as 'male' | 'female',
+        status: formData.status || 'active',
+        purchaseDate: formData.purchaseDate,
+        purchasePrice: formData.purchasePrice || 0,
+        photoUrl: photoPreview,
+        isVaccinated: formData.isVaccinated || false,
+        notes: formData.notes || '',
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      };
+      
+      await onAddAnimal(newAnimal);
+      
+      toast({
+        title: "Success",
+        description: animalToEdit ? "Animal updated successfully" : "Animal added successfully",
+      });
+      
+      // Reset form
+      setFormData({
+        id: '',
+        type: '',
+        breed: '',
+        age: 0,
+        health: 'Good',
+        weight: 0,
+        gender: undefined,
+        status: 'active',
+        purchaseDate: new Date().toISOString().split('T')[0],
+        purchasePrice: 0,
+        photoUrl: '',
+        isVaccinated: false,
+        notes: ''
+      });
+      setPhotoPreview(null);
+      onClose();
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save animal. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    const newAnimal: Animal = {
-      id: cleanId,
-      type: formData.type || '',
-      breed: formData.breed,
-      age: formData.age || 0,
-      health: formData.health || 'Good',
-      weight: formData.weight || 0,
-      gender: formData.gender as 'male' | 'female',
-      status: formData.status || 'active',
-      purchaseDate: formData.purchaseDate,
-      purchasePrice: formData.purchasePrice,
-      photoUrl: photoPreview,
-      isVaccinated: formData.isVaccinated || false,
-      notes: formData.notes || '',
-      createdAt: Timestamp.now()
-    };
-    
-    onAddAnimal(newAnimal);
-    
-    // Reset form
-    setFormData({
-      id: '',
-      type: '',
-      breed: '',
-      age: 0,
-      health: 'Good',
-      weight: 0,
-      gender: undefined,
-      status: 'active',
-      purchaseDate: new Date().toISOString().split('T')[0],
-      purchasePrice: 0,
-      photoUrl: '',
-      isVaccinated: false,
-      notes: ''
-    });
-    setPhotoPreview(null);
-    onClose();
   };
 
   const switchCamera = async () => {
@@ -299,7 +340,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
       <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">{animalToEdit ? 'Edit Animal' : 'Add New Animal'}</h2>
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button variant="ghost" size="icon" onClick={onClose} disabled={isSubmitting}>
             <X className="h-6 w-6" />
           </Button>
         </div>
@@ -394,7 +435,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
                         />
                         <div className="flex flex-col items-center gap-2 p-4 rounded-lg hover:bg-gray-50">
                           <Upload className="h-8 w-8 text-gray-400" />
-                          <span className="text-sm text-gray-600">Upload Photo</span>
+                          <span className="text-sm text-green-600">Upload Photo</span>
                         </div>
                       </label>
                       <button
@@ -403,7 +444,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
                         className="flex flex-col items-center gap-2 p-4 rounded-lg hover:bg-gray-50"
                       >
                         <Camera className="h-8 w-8 text-gray-400" />
-                        <span className="text-sm text-gray-600">Take Photo</span>
+                        <span className="text-sm text-green-600">Take Photo</span>
                       </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-2">PNG, JPG, GIF up to 10MB</p>
@@ -499,19 +540,22 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
           />
           
           <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
-            <button 
+            <Button 
               type="submit" 
-              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-farm-600 text-base font-medium text-white hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500 sm:ml-3 sm:w-auto sm:text-sm"
+              className="w-full sm:w-auto"
+              disabled={isSubmitting}
             >
-              {animalToEdit ? 'Update Animal' : 'Add Animal'}
-            </button>
-            <button 
+              {isSubmitting ? 'Saving...' : animalToEdit ? 'Update Animal' : 'Add Animal'}
+            </Button>
+            <Button 
               type="button" 
+              variant="outline"
               onClick={onClose} 
-              className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500 sm:mt-0 sm:w-auto sm:text-sm"
+              className="mt-3 w-full sm:mt-0 sm:w-auto"
+              disabled={isSubmitting}
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </form>
       </div>

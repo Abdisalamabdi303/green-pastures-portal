@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useCallback, useRef } from 'react';
+import React, { memo, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Animal, TableColumn, SortConfig, TableSelection } from '@/types';
 import { ChevronUp, ChevronDown, Trash2, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -220,8 +220,12 @@ const VirtualizedAnimalTable = ({
   const rowVirtualizer = useVirtualizer({
     count: animals.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => ROW_HEIGHT,
-    overscan: 5
+    estimateSize: useCallback(() => ROW_HEIGHT, []),
+    overscan: 3,
+    initialOffset: 0,
+    measureElement: useCallback((element) => {
+      return element.getBoundingClientRect().height;
+    }, [])
   });
 
   const handleDeleteClick = useCallback((animal: Animal) => {
@@ -253,6 +257,12 @@ const VirtualizedAnimalTable = ({
     }
   }, [onLoadMore, hasMore]);
 
+  useEffect(() => {
+    return () => {
+      rowVirtualizer.cleanup();
+    };
+  }, [rowVirtualizer]);
+
   if (loading && animals.length === 0) {
     return (
       <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -265,7 +275,7 @@ const VirtualizedAnimalTable = ({
           onToggleSelectAll={onToggleSelectAll}
         />
         <div className="space-y-2 p-4">
-          {[...Array(10)].map((_, i) => (
+          {[...Array(5)].map((_, i) => (
             <div key={i} className="animate-pulse flex space-x-4">
               <div className="rounded bg-gray-200 h-12 w-12"></div>
               <div className="flex-1 space-y-2 py-1">

@@ -1,13 +1,36 @@
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, where, setDoc, getDoc, limit as firestoreLimit, startAfter, getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Animal, HealthRecord, Vaccination, Expense } from '@/types';
+import { handleFirebaseError } from '@/lib/firebase';
+
+// Helper function to validate required fields
+const validateRequiredFields = (data: any, requiredFields: string[]) => {
+  const missingFields = requiredFields.filter(field => !data[field]);
+  if (missingFields.length > 0) {
+    throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+  }
+};
+
+// Helper function to convert dates to Timestamps
+const convertDatesToTimestamps = (data: any) => {
+  const converted = { ...data };
+  Object.keys(converted).forEach(key => {
+    if (converted[key] instanceof Date) {
+      converted[key] = Timestamp.fromDate(converted[key]);
+    } else if (typeof converted[key] === 'string' && !isNaN(Date.parse(converted[key]))) {
+      converted[key] = Timestamp.fromDate(new Date(converted[key]));
+    }
+  });
+  return converted;
+};
 
 // Animal Services
 export const animalServices = {
   // Add a new animal
   addAnimal: async (animalData: Animal) => {
     try {
-      console.log('Adding animal to backend:', animalData);
+      // Validate required fields
+      validateRequiredFields(animalData, ['id', 'type', 'breed']);
       
       // Check if animal with this ID already exists
       const existingAnimalRef = doc(db, 'animals', animalData.id);
@@ -17,16 +40,17 @@ export const animalServices = {
         throw new Error(`Animal with ID ${animalData.id} already exists`);
       }
       
-      const animalRef = doc(db, 'animals', animalData.id);
       const animalToAdd = {
         ...animalData,
+        ...convertDatesToTimestamps(animalData),
         createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
         status: animalData.status || 'active',
         health: animalData.health || 'Good',
         isVaccinated: animalData.isVaccinated || false
       };
       
-      await setDoc(animalRef, animalToAdd);
+      await setDoc(existingAnimalRef, animalToAdd);
       console.log('Animal successfully added to backend');
 
       // Create an expense record for the animal purchase
@@ -35,7 +59,7 @@ export const animalServices = {
           category: 'Animal Purchase',
           amount: animalData.purchasePrice,
           date: Timestamp.fromDate(new Date(animalData.purchaseDate || new Date())),
-          description: `Purchase of ${animalData.type || 'Animal'} (${animalData.breed || 'Unknown Breed'})`,
+          description: `Purchase of ${animalData.type} (${animalData.breed})`,
           paymentMethod: 'Cash',
           animalRelated: true,
           animalId: animalData.id,
@@ -46,16 +70,14 @@ export const animalServices = {
         const expenseRef = await addDoc(collection(db, 'expenses'), expenseData);
         console.log('Expense record created:', expenseRef.id);
         
-        // Update the animal document with the expense reference
-        await updateDoc(animalRef, {
+        await updateDoc(existingAnimalRef, {
           expenseId: expenseRef.id
         });
       }
 
       return animalToAdd;
     } catch (error) {
-      console.error('Error adding animal:', error);
-      throw error;
+      handleFirebaseError(error);
     }
   },
 
@@ -296,22 +318,24 @@ export const animalServices = {
   }
 };
 
-// Expense Services - FIXED FOR PROPER CRUD
+// Expense Services
 export const expenseServices = {
   // Add a new expense
   addExpense: async (expenseData: any) => {
     try {
-      console.log('Adding expense to backend:', expenseData);
-      const docRef = await addDoc(collection(db, 'expenses'), {
+      validateRequiredFields(expenseData, ['amount', 'category', 'date']);
+
+      const expenseToAdd = {
         ...expenseData,
-        createdAt: Timestamp.now(),
-        date: Timestamp.fromDate(new Date(expenseData.date))
-      });
+        ...convertDatesToTimestamps(expenseData),
+        createdAt: Timestamp.now()
+      };
+
+      const docRef = await addDoc(collection(db, 'expenses'), expenseToAdd);
       console.log('Expense successfully added to backend:', docRef.id);
-      return { id: docRef.id, ...expenseData };
+      return { id: docRef.id, ...expenseToAdd };
     } catch (error) {
-      console.error('Error adding expense:', error);
-      throw error;
+      handleFirebaseError(error);
     }
   },
 
@@ -458,65 +482,58 @@ export const healthServices = {
   // Add a new health record
   addHealthRecord: async (recordData: Omit<HealthRecord, 'id' | 'createdAt'>) => {
     try {
-      // Ensure all required fields are present and properly formatted
+      validateRequiredFields(recordData, ['animalId', 'condition', 'treatment', 'date']);
+
       const healthRecord = {
-        animalId: recordData.animalId,
-        animalName: recordData.animalName || '',
-        animalType: recordData.animalType || '',
-        condition: recordData.condition,
-        treatment: recordData.treatment,
-        date: typeof recordData.date === 'string' 
-          ? Timestamp.fromDate(new Date(recordData.date))
-          : recordData.date,
-        cost: recordData.cost || 0,
-        notes: recordData.notes || '',
+        ...recordData,
+        ...convertDatesToTimestamps(recordData),
         createdAt: Timestamp.now()
       };
 
-      console.log('Submitting health record to Firestore:', healthRecord);
-      
       const docRef = await addDoc(collection(db, 'health_records'), healthRecord);
+      console.log('Health record successfully added:', docRef.id);
       return { 
         id: docRef.id, 
         ...healthRecord
       };
     } catch (error) {
-      console.error('Error adding health record:', error);
-      throw error;
+      handleFirebaseError(error);
     }
   },
 
-  // Get all health records
-  getHealthRecords: async () => {
+  // Get health records for an animal
+  getHealthRecords: async (animalId: string) => {
     try {
-      const q = query(collection(db, 'health_records'), orderBy('date', 'desc'));
-      const querySnapshot = await getDocs(q);
+      const q = query(
+        collection(db, 'health_records'),
+        where('animalId', '==', animalId),
+        orderBy('date', 'desc')
+      );
       
+      const querySnapshot = await getDocs(q);
       return querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as HealthRecord[];
     } catch (error) {
-      console.error('Error fetching health records:', error);
-      throw error;
+      handleFirebaseError(error);
     }
   },
 
   // Update a health record
-  updateHealthRecord: async (id: string, recordData: Partial<HealthRecord>) => {
+  updateHealthRecord: async (id: string, data: Partial<HealthRecord>) => {
     try {
       const recordRef = doc(db, 'health_records', id);
-      const updateData = { ...recordData };
-      
-      if (updateData.date && typeof updateData.date === 'string') {
-        updateData.date = Timestamp.fromDate(new Date(updateData.date));
-      }
+      const updateData = {
+        ...data,
+        ...convertDatesToTimestamps(data),
+        updatedAt: Timestamp.now()
+      };
       
       await updateDoc(recordRef, updateData);
-      return { id, ...recordData };
+      return { id, ...updateData };
     } catch (error) {
-      console.error('Error updating health record:', error);
-      throw error;
+      handleFirebaseError(error);
     }
   },
 
@@ -526,8 +543,7 @@ export const healthServices = {
       await deleteDoc(doc(db, 'health_records', id));
       return id;
     } catch (error) {
-      console.error('Error deleting health record:', error);
-      throw error;
+      handleFirebaseError(error);
     }
   }
 };
@@ -537,61 +553,58 @@ export const vaccinationServices = {
   // Add a new vaccination record
   addVaccination: async (vaccinationData: Omit<Vaccination, 'id' | 'createdAt'>) => {
     try {
-      const docRef = await addDoc(collection(db, 'vaccinations'), {
+      validateRequiredFields(vaccinationData, ['animalId', 'vaccineName', 'date']);
+
+      const vaccinationToAdd = {
         ...vaccinationData,
-        createdAt: Timestamp.now(),
-        date: typeof vaccinationData.date === 'string'
-          ? Timestamp.fromDate(new Date(vaccinationData.date))
-          : vaccinationData.date,
-        nextDueDate: typeof vaccinationData.nextDueDate === 'string'
-          ? Timestamp.fromDate(new Date(vaccinationData.nextDueDate))
-          : vaccinationData.nextDueDate
-      });
-      return { 
-        id: docRef.id, 
-        ...vaccinationData,
+        ...convertDatesToTimestamps(vaccinationData),
         createdAt: Timestamp.now()
       };
+
+      const docRef = await addDoc(collection(db, 'vaccinations'), vaccinationToAdd);
+      console.log('Vaccination record successfully added:', docRef.id);
+      return { 
+        id: docRef.id, 
+        ...vaccinationToAdd
+      };
     } catch (error) {
-      console.error('Error adding vaccination:', error);
-      throw error;
+      handleFirebaseError(error);
     }
   },
 
-  // Get all vaccinations
-  getVaccinations: async () => {
+  // Get vaccination records for an animal
+  getVaccinations: async (animalId: string) => {
     try {
-      const q = query(collection(db, 'vaccinations'), orderBy('date', 'desc'));
-      const querySnapshot = await getDocs(q);
+      const q = query(
+        collection(db, 'vaccinations'),
+        where('animalId', '==', animalId),
+        orderBy('date', 'desc')
+      );
       
+      const querySnapshot = await getDocs(q);
       return querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Vaccination[];
     } catch (error) {
-      console.error('Error fetching vaccinations:', error);
-      throw error;
+      handleFirebaseError(error);
     }
   },
 
   // Update a vaccination record
-  updateVaccination: async (id: string, vaccinationData: Partial<Vaccination>) => {
+  updateVaccination: async (id: string, data: Partial<Vaccination>) => {
     try {
       const vaccinationRef = doc(db, 'vaccinations', id);
-      const updateData = { ...vaccinationData };
-      
-      if (updateData.date && typeof updateData.date === 'string') {
-        updateData.date = Timestamp.fromDate(new Date(updateData.date));
-      }
-      if (updateData.nextDueDate && typeof updateData.nextDueDate === 'string') {
-        updateData.nextDueDate = Timestamp.fromDate(new Date(updateData.nextDueDate));
-      }
+      const updateData = {
+        ...data,
+        ...convertDatesToTimestamps(data),
+        updatedAt: Timestamp.now()
+      };
       
       await updateDoc(vaccinationRef, updateData);
-      return { id, ...vaccinationData };
+      return { id, ...updateData };
     } catch (error) {
-      console.error('Error updating vaccination:', error);
-      throw error;
+      handleFirebaseError(error);
     }
   },
 
@@ -601,8 +614,7 @@ export const vaccinationServices = {
       await deleteDoc(doc(db, 'vaccinations', id));
       return id;
     } catch (error) {
-      console.error('Error deleting vaccination:', error);
-      throw error;
+      handleFirebaseError(error);
     }
   }
 };
@@ -612,15 +624,18 @@ export const incomeServices = {
   // Add a new income
   addIncome: async (incomeData: any) => {
     try {
-      const docRef = await addDoc(collection(db, 'incomes'), {
+      validateRequiredFields(incomeData, ['amount', 'date']);
+
+      const incomeToAdd = {
         ...incomeData,
-        createdAt: Timestamp.now(),
-        date: Timestamp.fromDate(new Date(incomeData.date))
-      });
-      return { id: docRef.id, ...incomeData };
+        ...convertDatesToTimestamps(incomeData),
+        createdAt: Timestamp.now()
+      };
+
+      const docRef = await addDoc(collection(db, 'incomes'), incomeToAdd);
+      return { id: docRef.id, ...incomeToAdd };
     } catch (error) {
-      console.error('Error adding income:', error);
-      throw error;
+      handleFirebaseError(error);
     }
   },
 

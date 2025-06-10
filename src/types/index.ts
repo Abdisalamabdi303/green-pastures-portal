@@ -1,25 +1,21 @@
+import { Timestamp } from 'firebase/firestore';
+
 export type AnimalStatus = 'active' | 'deceased';
 
 export interface Animal {
   id: string;
-  name?: string;
-  type?: string;
+  name: string;
+  type: string;
   breed?: string;
   age?: number;
-  gender?: 'male' | 'female';
-  weight?: number;
-  price: number;
-  status: AnimalStatus;
-  health?: string;
-  isVaccinated?: boolean;
+  gender?: string;
+  status: 'active' | 'sold' | 'deceased';
+  purchaseDate?: Timestamp;
   purchasePrice?: number;
-  purchaseDate?: string;
-  photoUrl?: string;
-  notes?: string;
-  createdAt?: any;
-  expenseId?: string;
-  updatedAt: Date;
-  incomeId?: string;
+  sellingPrice?: number;
+  sellingDate?: Timestamp;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }
 
 export interface HealthRecord {
@@ -27,12 +23,11 @@ export interface HealthRecord {
   animalId: string;
   animalName: string;
   animalType: string;
-  condition: 'healthy' | 'sick' | 'injured' | 'pregnant';
+  condition: string;
   treatment: string;
-  date: any;
   cost: number;
-  notes: string;
-  createdAt: any;
+  date: Timestamp;
+  createdAt: Timestamp;
 }
 
 export interface Vaccination {
@@ -40,13 +35,11 @@ export interface Vaccination {
   animalId: string;
   animalName: string;
   animalType: string;
-  vaccineName: string;
-  date: any;
-  nextDueDate: any;
-  administered: boolean;
-  notes: string;
+  vaccine: string;
+  status: string;
   cost?: number;
-  createdAt: any;
+  date: Timestamp;
+  createdAt: Timestamp;
 }
 
 export interface Expense {
@@ -105,4 +98,20 @@ export interface Income {
   batchId?: string;
   totalBatchAmount?: number;
   animalsInBatch?: number;
+}
+
+export interface BatchHealthRecordFormProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (records: Omit<HealthRecord, 'id' | 'createdAt'>[]) => Promise<void>;
+  animals: Animal[];
+  isLoading: boolean;
+}
+
+export interface BatchVaccinationFormProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (vaccinations: Omit<Vaccination, 'id' | 'createdAt'>[]) => Promise<void>;
+  animals: Animal[];
+  isLoading: boolean;
 }

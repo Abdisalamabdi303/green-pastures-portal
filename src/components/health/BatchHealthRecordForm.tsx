@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { HealthRecord } from '@/types';
+import React, { useState, useEffect } from 'react';
+import { HealthRecord, BatchHealthRecordFormProps } from '@/types';
 import { Timestamp } from 'firebase/firestore';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,18 +21,12 @@ const batchHealthRecordSchema = z.object({
 
 type BatchHealthRecordFormValues = z.infer<typeof batchHealthRecordSchema>;
 
-interface BatchHealthRecordFormProps {
-  onAddBatchHealthRecords: (records: Omit<HealthRecord, 'id' | 'createdAt'>[]) => Promise<void>;
-  onClose: () => void;
-  animals: Array<{ id: string; name: string; type: string; }>;
-  healthData?: { records: HealthRecord[] };
-}
-
 export const BatchHealthRecordForm = ({ 
-  onAddBatchHealthRecords, 
-  onClose, 
+  open,
+  onOpenChange,
+  onSubmit,
   animals,
-  healthData 
+  isLoading
 }: BatchHealthRecordFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -48,7 +42,16 @@ export const BatchHealthRecordForm = ({
     },
   });
 
-  const onSubmit = async (data: BatchHealthRecordFormValues) => {
+  // Reset form when dialog opens/closes
+  useEffect(() => {
+    if (!open) {
+      form.reset();
+    }
+  }, [open, form]);
+
+  const handleSubmit = async (data: BatchHealthRecordFormValues) => {
+    if (isSubmitting) return; // Prevent double submission
+    
     try {
       setIsSubmitting(true);
       console.log('Batch health record form submission started with data:', data);
@@ -75,41 +78,8 @@ export const BatchHealthRecordForm = ({
         throw new Error('Date is required');
       }
 
-      // Check for duplicates and prepare health records
-      const existingRecords = healthData?.records || [];
-      const duplicateAnimals: string[] = [];
-      const uniqueAnimals: string[] = [];
-
-      // Separate duplicates and unique animals
-      data.selectedAnimals.forEach(animalId => {
-        const hasRecord = existingRecords.some(record => 
-          record.animalId === animalId && 
-          record.condition.toLowerCase() === data.condition.toLowerCase() &&
-          new Date(record.date).toDateString() === new Date(data.date).toDateString()
-        );
-        
-        if (hasRecord) {
-          duplicateAnimals.push(animalId);
-        } else {
-          uniqueAnimals.push(animalId);
-        }
-      });
-
-      // If all animals are duplicates, show error
-      if (uniqueAnimals.length === 0) {
-        const duplicateIds = duplicateAnimals.join(', ');
-        throw new Error(`All selected animals (${duplicateIds}) already have a health record for this condition on this date`);
-      }
-
-      // If some animals are duplicates, show warning but continue with unique ones
-      if (duplicateAnimals.length > 0) {
-        const duplicateIds = duplicateAnimals.join(', ');
-        console.warn(`Skipping duplicate health records for animals: ${duplicateIds}`);
-        // You might want to show a toast or alert here
-      }
-
-      // Process each unique health record
-      const healthRecords = uniqueAnimals.map(animalId => {
+      // Process each health record
+      const healthRecords = data.selectedAnimals.map(animalId => {
         // Find the animal in the animals array
         const animal = animals.find(a => a.id === animalId);
         if (!animal) {
@@ -136,14 +106,13 @@ export const BatchHealthRecordForm = ({
 
         const healthRecordData = {
           animalId: animal.id,
-          animalName: animal.id, // Use ID as name if name is not available
+          animalName: animal.name || animal.id, // Use name if available, otherwise use ID
           animalType: animal.type,
           condition: data.condition.trim(),
           treatment: data.treatment.trim(),
           cost: parseFloat(data.cost),
           date: dateTimestamp,
           notes: data.notes?.trim() || '',
-          createdAt: Timestamp.now(),
         };
 
         console.log('Created health record data:', healthRecordData);
@@ -153,29 +122,20 @@ export const BatchHealthRecordForm = ({
       console.log('Processed batch health records:', healthRecords);
       
       // Submit the batch health records
-      await onAddBatchHealthRecords(healthRecords);
-      
-      // Show success message with details
-      const successMessage = `Successfully added ${healthRecords.length} health record${healthRecords.length > 1 ? 's' : ''}`;
-      if (duplicateAnimals.length > 0) {
-        const duplicateIds = duplicateAnimals.join(', ');
-        console.log(`${successMessage}. Skipped ${duplicateAnimals.length} duplicate record${duplicateAnimals.length > 1 ? 's' : ''} for animals: ${duplicateIds}`);
-      } else {
-        console.log(successMessage);
-      }
+      await onSubmit(healthRecords);
       
       form.reset();
-      onClose();
+      onOpenChange(false);
     } catch (error) {
       console.error('Error submitting batch health records:', error);
-      // You might want to show an error message to the user here
+      throw error;
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={true} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px] bg-gray-50">
         <DialogHeader>
           <DialogTitle>Batch Health Record</DialogTitle>
@@ -184,7 +144,7 @@ export const BatchHealthRecordForm = ({
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="condition"
@@ -279,7 +239,7 @@ export const BatchHealthRecordForm = ({
                             className="h-4 w-4 text-farm-600 focus:ring-farm-500 border-gray-300 rounded"
                           />
                           <label className="text-sm">
-                            {animal.id} - {animal.type}
+                            {animal.name || animal.id} - {animal.type}
                           </label>
                         </div>
                       ))}
@@ -312,12 +272,12 @@ export const BatchHealthRecordForm = ({
               <Button
                 type="button"
                 variant="outline"
-                onClick={onClose}
-                disabled={isSubmitting}
+                onClick={() => onOpenChange(false)}
+                disabled={isLoading || isSubmitting}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="bg-farm-600 hover:bg-farm-700 text-white">
+              <Button type="submit" disabled={isLoading || isSubmitting} className="bg-farm-600 hover:bg-farm-700 text-white">
                 {isSubmitting ? "Saving..." : "Save Records"}
               </Button>
             </div>

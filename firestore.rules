@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isValidAnimal() {
+      let animal = request.resource.data;
+      return animal.id is string &&
+        animal.id.size() > 0 &&
+        animal.status in ['active', 'deceased'] &&
+        animal.createdAt is timestamp &&
+        animal.updatedAt is timestamp;
+    }
+
+    function isValidExpense() {
+      let expense = request.resource.data;
+      return expense.amount is number &&
+        expense.amount > 0 &&
+        expense.date is timestamp &&
+        expense.description is string;
+    }
+
+    function isValidIncome() {
+      let income = request.resource.data;
+      return income.amount is number &&
+        (income.date == null || income.date is timestamp) &&
+        (income.description == null || income.description is string) &&
+        (income.status == null || income.status is string);
+    }
+
+    function isValidHealthRecord() {
+      let record = request.resource.data;
+      return record.animalId is string &&
+        record.condition is string &&
+        record.treatment is string &&
+        record.date is timestamp;
+    }
+
+    function isValidVaccination() {
+      let vaccination = request.resource.data;
+      return vaccination.animalId is string &&
+        vaccination.vaccineName is string &&
+        vaccination.date is timestamp;
+    }
+
+    // Animals collection
+    match /animals/{animalId} {
+      allow read, write: if true;
+    }
+
+    // Expenses collection
+    match /expenses/{expenseId} {
+      allow read, write: if true;
+    }
+
+    // Income collection
+    match /income/{incomeId} {
+      allow read, write: if true;
+    }
+
+    // Health records collection
+    match /health_records/{recordId} {
+      allow read, write, list: if true;
+    }
+
+    // Vaccinations collection
+    match /vaccinations/{vaccinationId} {
+      allow read, write, list: if true;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Settings collection
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // Reports collection
+    match /reports/{reportId} {
+      allow read, write: if true;
+    }
+
+    // Analytics collection
+    match /analytics/{analyticId} {
+      allow read, write: if true;
+    }
+  }
+} 
