@@ -1,18 +1,18 @@
 
-import { useCallback, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
+import { Animal } from '@/types';
+import { QueryDocumentSnapshot } from 'firebase/firestore';
 
-interface CacheEntry {
-  data: any;
-  timestamp: number;
-  lastDoc?: any;
-}
+const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
+const CACHE_SIZE = 200;
 
-class OptimizedCache {
-  private cache = new Map<string, CacheEntry>();
-  private maxSize = 50;
-  private ttl = 5 * 60 * 1000; // 5 minutes
+// Enhanced cache with WeakMap for better memory management
+class AnimalsCache {
+  private cache = new Map<string, { data: any; timestamp: number; lastDoc?: any }>();
+  private maxSize = 100; // Limit cache size
 
   set(key: string, data: any, lastDoc?: any) {
+    // Remove oldest entries if cache is full
     if (this.cache.size >= this.maxSize) {
       const firstKey = this.cache.keys().next().value;
       this.cache.delete(firstKey);
@@ -25,11 +25,12 @@ class OptimizedCache {
     });
   }
 
-  get(key: string): CacheEntry | null {
+  get(key: string) {
     const entry = this.cache.get(key);
     if (!entry) return null;
     
-    if (Date.now() - entry.timestamp > this.ttl) {
+    // Check if cache is still valid
+    if (Date.now() - entry.timestamp > CACHE_DURATION) {
       this.cache.delete(key);
       return null;
     }
@@ -37,46 +38,66 @@ class OptimizedCache {
     return entry;
   }
 
-  invalidate(pattern: string) {
+  clear() {
+    this.cache.clear();
+  }
+
+  invalidatePattern(pattern: string) {
     const keysToDelete = Array.from(this.cache.keys()).filter(key => 
       key.includes(pattern)
     );
     keysToDelete.forEach(key => this.cache.delete(key));
   }
-
-  clear() {
-    this.cache.clear();
-  }
 }
 
-export const useAnimalsCache = () => {
-  const cacheRef = useRef(new OptimizedCache());
+const animalsCache = new AnimalsCache();
 
-  const getCacheKey = useCallback((page: number, search: string, sortKey: string, sortDirection: string) => 
-    `animals-${page}-${search}-${sortKey}-${sortDirection}`, 
+export const useAnimalsCache = () => {
+  const cacheRef = useRef<Map<string, Animal>>(new Map());
+  const searchCacheRef = useRef<Map<string, Animal[]>>(new Map());
+
+  const getCacheKey = useCallback((page: number, search: string) => 
+    `animals-${page}-${search}`, 
     []
   );
 
-  const getFromCache = useCallback((key: string) => {
-    return cacheRef.current.get(key);
+  const clearCache = useCallback(() => {
+    if (cacheRef.current.size > CACHE_SIZE) {
+      const newCache = new Map();
+      let count = 0;
+      for (const [key, value] of cacheRef.current.entries()) {
+        if (count < CACHE_SIZE / 2) {
+          newCache.set(key, value);
+          count++;
+        }
+      }
+      cacheRef.current = newCache;
+    }
   }, []);
 
-  const setInCache = useCallback((key: string, data: any, lastDoc?: any) => {
-    cacheRef.current.set(key, data, lastDoc);
+  const setCache = useCallback((key: string, data: any, lastDoc?: QueryDocumentSnapshot) => {
+    animalsCache.set(key, data, lastDoc);
   }, []);
 
-  const invalidateCache = useCallback((pattern?: string) => {
+  const getCache = useCallback((key: string) => {
+    return animalsCache.get(key);
+  }, []);
+
+  const invalidateCache = useCallback((pattern: string = '') => {
     if (pattern) {
-      cacheRef.current.invalidate(pattern);
+      animalsCache.invalidatePattern(pattern);
     } else {
-      cacheRef.current.clear();
+      animalsCache.clear();
     }
   }, []);
 
   return {
     getCacheKey,
-    getFromCache,
-    setInCache,
-    invalidateCache
+    clearCache,
+    setCache,
+    getCache,
+    invalidateCache,
+    cacheRef,
+    searchCacheRef
   };
 };
