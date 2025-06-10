@@ -18,31 +18,28 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    include: ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/storage'],
+    esbuildOptions: {
+      target: 'esnext'
+    }
+  },
   build: {
     chunkSizeWarningLimit: 1000, // Increase the warning limit to 1000kb
     rollupOptions: {
       output: {
         manualChunks: {
-          // Split vendor chunks
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-slot'],
-          'vendor-charts': ['recharts', 'd3'],
-          'vendor-utils': ['date-fns', 'firebase', '@tanstack/react-query'],
-          // Split feature chunks
-          'feature-dashboard': [
-            './src/pages/DashboardPage.tsx',
-            './src/components/dashboard/*',
-          ],
-          'feature-animals': [
-            './src/pages/AnimalsPage.tsx',
-            './src/components/animals/*',
-          ],
-          'feature-expenses': [
-            './src/pages/ExpensesPage.tsx',
-            './src/components/expenses/*',
-          ],
+          'vendor-charts': ['recharts'],
+          'vendor-utils': ['date-fns', '@tanstack/react-query'],
+          'vendor-firebase': ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/storage']
         },
       },
+    },
+    commonjsOptions: {
+      include: [/firebase/, /node_modules/],
+      transformMixedEsModules: true
     },
   },
 }));
