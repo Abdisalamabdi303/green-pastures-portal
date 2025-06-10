@@ -138,10 +138,10 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent className="bg-white border border-gray-200">
-                      <SelectItem value="healthy">Healthy</SelectItem>
-                      <SelectItem value="sick">Sick</SelectItem>
-                      <SelectItem value="injured">Injured</SelectItem>
-                      <SelectItem value="pregnant">Pregnant</SelectItem>
+                      <SelectItem value="healthy" className="bg-white hover:bg-gray-100">Healthy</SelectItem>
+                      <SelectItem value="sick" className="bg-white hover:bg-gray-100">Sick</SelectItem>
+                      <SelectItem value="injured" className="bg-white hover:bg-gray-100">Injured</SelectItem>
+                      <SelectItem value="pregnant" className="bg-white hover:bg-gray-100">Pregnant</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

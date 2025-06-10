@@ -157,11 +157,11 @@ export const BatchHealthRecordForm = ({
                         <SelectValue placeholder="Select condition" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="healthy">Healthy</SelectItem>
-                      <SelectItem value="sick">Sick</SelectItem>
-                      <SelectItem value="injured">Injured</SelectItem>
-                      <SelectItem value="underTreatment">Under Treatment</SelectItem>
+                    <SelectContent className="bg-white border border-gray-200">
+                      <SelectItem value="healthy" className="bg-white hover:bg-gray-100">Healthy</SelectItem>
+                      <SelectItem value="sick" className="bg-white hover:bg-gray-100">Sick</SelectItem>
+                      <SelectItem value="injured" className="bg-white hover:bg-gray-100">Injured</SelectItem>
+                      <SelectItem value="underTreatment" className="bg-white hover:bg-gray-100">Under Treatment</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

@@ -542,7 +542,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
           <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
             <Button 
               type="submit" 
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Saving...' : animalToEdit ? 'Update Animal' : 'Add Animal'}
