@@ -5,6 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Camera, CameraOff, RotateCcw, X, Upload } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { subYears, isValid } from 'date-fns';
+import { differenceInYears } from 'date-fns';
+import { useDashboardRefresh } from '@/pages/DashboardPage';
 
 interface AddAnimalFormProps {
   onAddAnimal: (animal: Animal) => Promise<void>;
@@ -27,29 +32,47 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
   const imageFile = useRef<File | null>(null);
   const [selectedCamera, setSelectedCamera] = useState<string>('environment');
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+  const [age, setAge] = useState<number>(0);
+  const { refreshDashboard } = useDashboardRefresh();
   
   const [formData, setFormData] = useState<Partial<Animal>>({
     id: '',
+    name: '',
     type: '',
     breed: '',
     age: 0,
-    health: 'Good',
-    weight: 0,
     gender: undefined,
+    weight: 0,
     status: 'active',
-    purchaseDate: new Date().toISOString().split('T')[0],
+    purchaseDate: new Date(),
     purchasePrice: 0,
-    photoUrl: '',
-    isVaccinated: false,
-    notes: ''
+    notes: '',
+    imageUrl: ''
   });
+
+  // Helper function to safely convert any date value to a Date object
+  const safeDate = (date: any): Date => {
+    if (!date) return new Date();
+    if (date instanceof Date) return date;
+    if (typeof date === 'object' && 'toDate' in date && typeof date.toDate === 'function') {
+      return date.toDate();
+    }
+    const parsed = new Date(date);
+    return isValid(parsed) ? parsed : new Date();
+  };
 
   // Initialize form with edit data if provided
   useEffect(() => {
     if (animalToEdit) {
-      setFormData(animalToEdit);
-      if (animalToEdit.photoUrl) {
-        setPhotoPreview(animalToEdit.photoUrl);
+      setFormData({
+        ...animalToEdit,
+        purchaseDate: animalToEdit.purchaseDate || new Date()
+      });
+      
+      setAge(animalToEdit.age || 0);
+      
+      if (animalToEdit.imageUrl) {
+        setPhotoPreview(animalToEdit.imageUrl);
       }
     }
   }, [animalToEdit]);
@@ -136,7 +159,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
         
         const imageData = canvas.toDataURL('image/jpeg', 0.95);
         setPhotoPreview(imageData);
-        setFormData(prev => ({ ...prev, photoUrl: imageData }));
+        setFormData(prev => ({ ...prev, imageUrl: imageData }));
         stopCamera();
         setShowCamera(false);
       }
@@ -150,7 +173,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
       reader.onloadend = () => {
         const result = reader.result as string;
         setPhotoPreview(result);
-        setFormData(prev => ({ ...prev, photoUrl: result }));
+        setFormData(prev => ({ ...prev, imageUrl: result }));
       };
       reader.readAsDataURL(file);
     }
@@ -174,14 +197,15 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
   }, [showCamera, startCamera]);
 
   const handleFormChange = useCallback((
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target;
     
-    if (name === 'isVaccinated') {
+    if (type === 'date') {
+      const dateValue = value ? new Date(value) : new Date();
       setFormData(prev => ({
         ...prev,
-        isVaccinated: value === 'Yes'
+        [name]: isValid(dateValue) ? dateValue : new Date()
       }));
     } else if (type === 'number') {
       const numValue = value === '' ? 0 : Number(value);
@@ -198,46 +222,67 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
   }, []);
 
   const validateForm = useCallback(() => {
-    if (!formData.id?.trim()) {
+    const requiredFields = ['id', 'name', 'type', 'breed', 'gender'];
+    const missingFields = requiredFields.filter(field => !formData[field]);
+    
+    if (missingFields.length > 0) {
+      toast({
+        title: "Missing Fields",
+        description: `Please fill in the following fields: ${missingFields.join(', ')}`,
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    if (formData.purchasePrice !== undefined && formData.purchasePrice < 0) {
       toast({
         title: "Error",
-        description: "Animal ID is required",
+        description: "Purchase price must be 0 or greater",
         variant: "destructive"
       });
       return false;
     }
 
-    if (!photoPreview) {
+    if (formData.weight !== undefined && formData.weight < 0) {
       toast({
         title: "Error",
-        description: "Animal photo is required",
+        description: "Weight must be 0 or greater",
         variant: "destructive"
       });
       return false;
     }
 
-    if (!formData.gender) {
+    if (formData.age !== undefined && formData.age < 0) {
       toast({
         title: "Error",
-        description: "Gender is required",
-        variant: "destructive"
-      });
-      return false;
-    }
-
-    if (formData.purchasePrice === undefined || formData.purchasePrice < 0) {
-      toast({
-        title: "Error",
-        description: "Purchase price must be a non-negative number",
+        description: "Age must be 0 or greater",
         variant: "destructive"
       });
       return false;
     }
 
     return true;
-  }, [formData, photoPreview, toast]);
+  }, [formData, toast]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleAgeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newAge = parseFloat(e.target.value);
+    if (isNaN(newAge)) {
+      setAge(0);
+      setFormData(prev => ({
+        ...prev,
+        age: 0
+      }));
+      return;
+    }
+    
+    setAge(newAge);
+    setFormData(prev => ({
+      ...prev,
+      age: newAge
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     if (!validateForm()) {
@@ -247,27 +292,25 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
     try {
       setIsSubmitting(true);
       
-      const cleanId = formData.id.trim();
+      const cleanId = formData.id?.trim() || '';
       
       const newAnimal: Animal = {
         id: cleanId,
+        name: formData.name || '',
         type: formData.type || '',
         breed: formData.breed || '',
         age: formData.age || 0,
-        health: formData.health || 'Good',
-        weight: formData.weight || 0,
         gender: formData.gender as 'male' | 'female',
+        weight: formData.weight || 0,
         status: formData.status || 'active',
-        purchaseDate: formData.purchaseDate,
+        purchaseDate: formData.purchaseDate || new Date(),
         purchasePrice: formData.purchasePrice || 0,
-        photoUrl: photoPreview,
-        isVaccinated: formData.isVaccinated || false,
         notes: formData.notes || '',
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now()
+        imageUrl: photoPreview || ''
       };
       
       await onAddAnimal(newAnimal);
+      refreshDashboard();
       
       toast({
         title: "Success",
@@ -277,19 +320,19 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
       // Reset form
       setFormData({
         id: '',
+        name: '',
         type: '',
         breed: '',
         age: 0,
-        health: 'Good',
-        weight: 0,
         gender: undefined,
+        weight: 0,
         status: 'active',
-        purchaseDate: new Date().toISOString().split('T')[0],
+        purchaseDate: new Date(),
         purchasePrice: 0,
-        photoUrl: '',
-        isVaccinated: false,
-        notes: ''
+        notes: '',
+        imageUrl: ''
       });
+      setAge(0);
       setPhotoPreview(null);
       onClose();
     } catch (error) {
@@ -363,7 +406,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
                     className="absolute top-2 right-2"
                     onClick={() => {
                       setPhotoPreview(null);
-                      setFormData(prev => ({ ...prev, photoUrl: '' }));
+                      setFormData(prev => ({ ...prev, imageUrl: '' }));
                     }}
                   >
                     <X className="h-4 w-4" />
@@ -464,6 +507,16 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
             required 
           />
          
+          <InputField 
+            label="Name" 
+            name="name" 
+            type="text" 
+            value={formData.name || ''} 
+            onChange={handleFormChange} 
+            placeholder="Enter animal name" 
+            required 
+          />
+         
           <div className="grid grid-cols-2 gap-4">
             <SelectField 
               label="Type" 
@@ -471,6 +524,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
               value={formData.type || ''} 
               onChange={handleFormChange} 
               options={["Cow", "Goat", "Sheep", "Camel"]} 
+              required
             />
             <InputField 
               label="Breed" 
@@ -478,66 +532,120 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
               type="text" 
               value={formData.breed || ''} 
               onChange={handleFormChange} 
+              placeholder="Enter breed"
+              required
             />
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
-            <InputField 
-              label="Age (years)" 
-              name="age" 
-              type="number" 
-              min={0} 
-              step={0.1} 
-              value={formData.age || 0} 
-              onChange={handleFormChange} 
-            />
-            <InputField 
-              label="Weight (kg)" 
-              name="weight" 
-              type="number" 
-              min={0} 
-              step={0.1} 
-              value={formData.weight || 0} 
-              onChange={handleFormChange} 
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="age">Age (years)</Label>
+              <Input
+                id="age"
+                type="number"
+                min={0}
+                step={0.1}
+                value={isNaN(age) ? '' : age}
+                onChange={handleAgeChange}
+                required
+                placeholder="Enter age in years"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="purchaseDate">Purchase Date</Label>
+              <Input
+                id="purchaseDate"
+                type="date"
+                name="purchaseDate"
+                value={formData.purchaseDate && isValid(formData.purchaseDate) ? 
+                  formData.purchaseDate.toISOString().split('T')[0] : 
+                  new Date().toISOString().split('T')[0]
+                }
+                onChange={handleFormChange}
+                max={new Date().toISOString().split('T')[0]}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <SelectField 
-              label="Gender" 
-              name="gender" 
-              value={formData.gender || ''} 
-              onChange={handleFormChange} 
-              required 
-              options={["male", "female"]} 
-            />
-            <InputField 
-              label="Purchase Price" 
-              name="purchasePrice" 
-              type="number" 
-              min={0} 
-              step={0.01} 
-              value={formData.purchasePrice || 0} 
-              onChange={handleFormChange} 
-              required 
-            />
+            <div className="space-y-2">
+              <Label htmlFor="weight">Weight (kg)</Label>
+              <Input
+                id="weight"
+                name="weight"
+                type="number"
+                min={0}
+                step={0.1}
+                value={formData.weight || 0}
+                onChange={handleFormChange}
+                placeholder="Enter weight in kg"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="purchasePrice">Purchase Price</Label>
+              <Input
+                id="purchasePrice"
+                name="purchasePrice"
+                type="number"
+                min={0}
+                step={0.01}
+                value={formData.purchasePrice || 0}
+                onChange={handleFormChange}
+                placeholder="Enter purchase price"
+              />
+            </div>
           </div>
           
-          <SelectField 
-            label="Health Status" 
-            name="health" 
-            value={formData.health || 'Good'} 
-            onChange={handleFormChange} 
-            options={["Excellent", "Good", "Fair", "Poor"]} 
-          />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Gender</Label>
+              <Select
+                value={formData.gender || ''}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, gender: value as 'male' | 'female' }))}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select
+                value={formData.status || 'active'}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as 'active' | 'sold' | 'deceased' }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="sold">Sold</SelectItem>
+                  <SelectItem value="deceased">Deceased</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           
-          <SelectField
-            label="Is Vaccinated?"
-            name="isVaccinated"
-            value={formData.isVaccinated === true ? 'Yes' : 'No'}
-            onChange={handleFormChange}
-            options={["Yes", "No"]}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes</Label>
+            <textarea
+              id="notes"
+              name="notes"
+              value={formData.notes || ''}
+              onChange={handleFormChange}
+              rows={4}
+              className="mt-1 focus:ring-farm-500 focus:border-farm-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md p-2"
+              placeholder="Enter any additional notes"
+            />
+          </div>
           
           <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
             <Button 

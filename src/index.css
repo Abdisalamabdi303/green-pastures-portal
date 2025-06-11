@@ -1,7 +1,34 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer utilities {
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+  
+  .animate-float-slow {
+    animation: float 4s ease-in-out infinite;
+  }
+
+  .bg-grid-pattern {
+    background-image: linear-gradient(to right, #00422510 1px, transparent 1px),
+                      linear-gradient(to bottom, #00422510 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
 
 body {
   font-family: 'Roboto', sans-serif;

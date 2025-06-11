@@ -6,55 +6,52 @@ export interface Animal {
   id: string;
   name: string;
   type: string;
-  breed?: string;
-  age?: number;
-  gender?: string;
+  breed: string;
+  age: number;
+  gender: 'male' | 'female';
+  weight: number;
   status: 'active' | 'sold' | 'deceased';
-  purchaseDate?: Timestamp;
+  purchaseDate?: Date;
   purchasePrice?: number;
-  sellingPrice?: number;
-  sellingDate?: Timestamp;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  notes?: string;
+  imageUrl?: string;
+  updatedAt?: Date | Timestamp;
+  createdAt?: Date | Timestamp;
 }
 
 export interface HealthRecord {
   id: string;
   animalId: string;
-  animalName: string;
-  animalType: string;
+  date: Date;
   condition: string;
   treatment: string;
-  cost: number;
-  date: Timestamp;
   notes?: string;
-  createdAt: Timestamp;
+  followUpDate?: Date;
+  cost?: number;
+  veterinarian?: string;
 }
 
 export interface Vaccination {
   id: string;
   animalId: string;
-  animalName: string;
-  animalType: string;
-  vaccine: string;
-  status: string;
-  cost?: number;
-  date: Timestamp;
+  date: Date;
+  type: string;
+  nextDueDate?: Date;
   notes?: string;
-  createdAt: Timestamp;
+  cost?: number;
+  administrator?: string;
 }
 
 export interface Expense {
   id: string;
   category: string;
   amount: number;
-  date: any;
+  date: Date;
   description: string;
   paymentMethod: string;
   animalRelated?: boolean;
   animalId?: string;
   animalName?: string;
-  createdAt: any;
 }
 
 export interface TableColumn {
@@ -90,12 +87,12 @@ export interface Income {
   id: string;
   type: string;
   amount: number;
-  date: Date | { toDate: () => Date };
+  date: Date;
   description: string;
   paymentMethod: string;
   animalRelated: boolean;
   animalId?: string;
-  createdAt: Date | { toDate: () => Date };
+  createdAt: Date;
   status: string;
   batchId?: string;
   totalBatchAmount?: number;

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   collection, 
@@ -14,6 +13,7 @@ import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { Expense, Animal } from "@/types";
+import { differenceInYears } from 'date-fns';
 
 export const expenseSchema = z.object({
   category: z.string().min(1, { message: "Category is required" }),
@@ -53,17 +53,14 @@ export function useExpenses() {
           name: animal.name,
           type: animal.type || '',
           breed: animal.breed || '',
-          age: animal.age || 0,
-          health: animal.health || '',
-          purchaseDate: animal.purchaseDate || '',
-          purchasePrice: animal.purchasePrice || 0,
+          birthDate: animal.birthDate ? animal.birthDate.toDate() : new Date(),
+          gender: animal.gender || 'male',
           weight: animal.weight || 0,
-          gender: animal.gender || '',
           status: animal.status || 'active',
-          imageUrl: animal.imageUrl,
-          photoUrl: animal.photoUrl,
-          isVaccinated: animal.isVaccinated || false,
-          createdAt: animal.createdAt || Timestamp.now()
+          purchaseDate: animal.purchaseDate ? animal.purchaseDate.toDate() : undefined,
+          purchasePrice: animal.purchasePrice || undefined,
+          notes: animal.notes,
+          imageUrl: animal.imageUrl
         });
       });
       
@@ -76,18 +73,18 @@ export function useExpenses() {
       const expensesList: Expense[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        expensesList.push({ 
-          id: doc.id, 
-          category: data.category || '',
-          amount: data.amount || 0,
-          date: data.date || null,
-          description: data.description || '',
-          createdAt: data.createdAt || null,
-          paymentMethod: data.paymentMethod || '',
-          animalName: data.animalName || '',
-          animalRelated: data.animalRelated || false,
-          animalId: data.animalId
-        });
+        const expense: Expense = {
+          id: doc.id,
+          category: String(data.category || ''),
+          amount: Number(data.amount || 0),
+          date: data.date?.toDate() || new Date(),
+          description: String(data.description || ''),
+          paymentMethod: String(data.paymentMethod || ''),
+          animalName: data.animalName ? String(data.animalName) : undefined,
+          animalRelated: Boolean(data.animalRelated),
+          animalId: data.animalId ? String(data.animalId) : undefined
+        };
+        expensesList.push(expense);
       });
       
       setExpenses(expensesList);
@@ -107,8 +104,7 @@ export function useExpenses() {
     try {
       const expenseData = {
         ...expense,
-        date: expense.date instanceof Timestamp ? expense.date : Timestamp.fromDate(new Date(expense.date)),
-        createdAt: Timestamp.now(),
+        date: expense.date instanceof Date ? Timestamp.fromDate(expense.date) : expense.date,
       };
       
       // If not animal related, remove animalName and animalId
@@ -125,8 +121,9 @@ export function useExpenses() {
       
       // Add the new expense to the local state
       setExpenses(prev => [{
-        ...expenseData,
-        id: docRef.id
+        ...expense,
+        id: docRef.id,
+        date: expenseData.date.toDate()
       }, ...prev]);
       
       toast({

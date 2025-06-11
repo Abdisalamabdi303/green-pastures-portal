@@ -1,25 +1,26 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import type { Expense } from '../types/index';
 import Navbar from '../components/layout/Navbar';
-import { User, Expense } from '../types';
-import { Calendar } from 'lucide-react';
+import ExpenseFilterBar from '../components/expenses/ExpenseFilterBar';
+import ExpenseAnalytics from '../components/expenses/ExpenseAnalytics';
 import OptimizedExpenseTable from '../components/expenses/OptimizedExpenseTable';
 import AddExpenseForm from '../components/expenses/AddExpenseForm';
-import ExpenseAnalytics from '../components/expenses/ExpenseAnalytics';
+import { Calendar } from 'lucide-react';
 import { getCategoryIcon } from '../utils/expenseIcons';
 import { expenseServices } from '../services/firebase';
 import { useExpenseFilters } from '@/hooks/useExpenseFilters';
-import ExpenseFilterBar from '@/components/expenses/ExpenseFilterBar';
 import { toast } from 'sonner';
 import { isSameDay, isSameMonth, startOfMonth, endOfMonth, format } from 'date-fns';
 
 const ITEMS_PER_PAGE = 20;
 
 const ExpensesPage = () => {
+  const { currentUser, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
-  const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -30,10 +31,19 @@ const ExpensesPage = () => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   
+  useEffect(() => {
+    if (authLoading) return;
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+  }, [navigate, currentUser, authLoading]);
+
   // Fetch expenses with pagination
   const fetchExpenses = async (page = 1) => {
     try {
       setLoading(true);
+      console.log('Fetching expenses with page:', page);
       
       // Create date range for the month if a date is selected
       const dateRange = selectedDate ? {
@@ -48,8 +58,10 @@ const ExpensesPage = () => {
         dateRange
       });
 
+      console.log('Fetched expenses:', result);
+
       // Update state with fetched data
-      setAllExpenses(result.expenses);
+      setExpenses(prev => page === 1 ? result.expenses : [...prev, ...result.expenses]);
       setTotalPages(result.totalPages);
       setCurrentPage(page);
       setHasMore(page < result.totalPages);
@@ -63,41 +75,41 @@ const ExpensesPage = () => {
 
   // Memoize daily expenses first
   const dailyExpenses = useMemo(() => {
-    if (!selectedDate) return allExpenses;
-    return allExpenses.filter(expense => {
+    if (!selectedDate) return expenses;
+    return expenses.filter(expense => {
       const expenseDate = expense.date instanceof Date 
         ? expense.date 
         : expense.date?.toDate?.() || new Date(expense.date);
       return isSameDay(expenseDate, selectedDate);
     });
-  }, [allExpenses, selectedDate]);
+  }, [expenses, selectedDate]);
 
   // Memoize monthly expenses
   const monthlyExpenses = useMemo(() => {
-    if (!selectedDate) return allExpenses;
-    return allExpenses.filter(expense => {
+    if (!selectedDate) return expenses;
+    return expenses.filter(expense => {
       const expenseDate = expense.date instanceof Date 
         ? expense.date 
         : expense.date?.toDate?.() || new Date(expense.date);
       return isSameMonth(expenseDate, selectedDate);
     });
-  }, [allExpenses, selectedDate]);
+  }, [expenses, selectedDate]);
 
   // Memoize filtered expenses
   const filteredExpenses = useMemo(() => {
     if (!searchTerm) {
-      return selectedDate ? dailyExpenses : allExpenses;
+      return selectedDate ? dailyExpenses : expenses;
     }
 
     const searchLower = searchTerm.toLowerCase();
-    const expensesToFilter = selectedDate ? dailyExpenses : allExpenses;
+    const expensesToFilter = selectedDate ? dailyExpenses : expenses;
     
     return expensesToFilter.filter(expense => 
       expense.description.toLowerCase().includes(searchLower) ||
       expense.category.toLowerCase().includes(searchLower) ||
       expense.amount.toString().includes(searchTerm)
     );
-  }, [searchTerm, selectedDate, dailyExpenses, allExpenses]);
+  }, [searchTerm, selectedDate, dailyExpenses, expenses]);
 
   // Memoize monthly data for charts
   const monthlyData = useMemo(() => {
@@ -158,24 +170,13 @@ const ExpensesPage = () => {
     );
   }, [monthlyExpenses]);
 
+  // Initial fetch and fetch on date change
   useEffect(() => {
-    // Check if user is logged in
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) {
-      navigate('/login');
-      return;
+    if (currentUser) {
+      console.log('Fetching initial expenses');
+      fetchExpenses(1);
     }
-    
-    setUser(JSON.parse(storedUser));
-    // Set initial date to today
-    setSelectedDate(new Date());
-    fetchExpenses(1);
-  }, [navigate]);
-
-  // Effect to fetch expenses when selected date changes
-  useEffect(() => {
-    fetchExpenses(1);
-  }, [selectedDate]);
+  }, [currentUser, selectedDate]);
 
   const handleLoadMore = () => {
     const nextPage = page + 1;
@@ -183,10 +184,10 @@ const ExpensesPage = () => {
     fetchExpenses(nextPage);
   };
 
-  const handleAddExpense = async (data) => {
+  const handleAddExpense = async (expense: Omit<Expense, 'id' | 'createdAt'>) => {
     try {
-      const addedExpense = await expenseServices.addExpense(data);
-      setAllExpenses(prev => [addedExpense, ...prev]);
+      const addedExpense = await expenseServices.addExpense(expense);
+      setExpenses(prev => [addedExpense, ...prev]);
       setIsAddExpenseOpen(false);
       toast.success('Expense added successfully');
     } catch (error) {
@@ -200,7 +201,7 @@ const ExpensesPage = () => {
     if (window.confirm(`Are you sure you want to delete the expense "${description}"?`)) {
       try {
         await expenseServices.deleteExpense(id);
-        setAllExpenses(prev => prev.filter(expense => expense.id !== id));
+        setExpenses(prev => prev.filter(expense => expense.id !== id));
         toast.success(`Expense "${description}" deleted successfully`);
         return true;
       } catch (error) {
@@ -221,68 +222,65 @@ const ExpensesPage = () => {
     return <span className="h-4 w-4 text-farm-600">💲</span>;
   };
 
-  if (!user) {
-    return <div className="p-8 text-center">Loading...</div>;
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farm-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return null;
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          {/* Expense filter bar */}
-          <ExpenseFilterBar 
-            searchTerm={searchTerm} 
-            setSearchTerm={setSearchTerm} 
-            setIsAddExpenseOpen={setIsAddExpenseOpen}
-            selectedDate={selectedDate}
-            setSelectedDate={setSelectedDate}
-          />
-          
-          {/* Expense Analytics */}
-          <ExpenseAnalytics 
-            selectedYear={selectedYear}
-            setSelectedYear={setSelectedYear}
-            selectedMonth={selectedMonth}
-            setSelectedMonth={setSelectedMonth}
-            expenses={monthlyExpenses}
-            totalExpense={totalExpense}
-            averageExpense={averageExpense}
-            highestExpense={highestExpense}
-            monthlyData={monthlyData}
-            categoryData={chartCategoryData}
-            getCategoryIcon={getCategoryIconElement}
-            selectedDate={selectedDate}
-          />
-          
-          {/* Expenses Table */}
-          <div className="bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden sm:rounded-lg border border-gray-200 mt-8">
-            <div className="p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-800 flex items-center">
-                <Calendar className="h-5 w-5 mr-2 text-farm-600" />
-                {selectedDate ? `Expense Transactions for ${format(selectedDate, 'MMMM d, yyyy')}` : 'Expense Transactions'}
-              </h2>
-            </div>
-            <OptimizedExpenseTable 
-              expenses={filteredExpenses}
-              deleteExpense={handleDeleteExpense}
-              isFiltered={searchTerm.length > 0 || selectedDate !== null}
-              onLoadMore={handleLoadMore}
-              hasMore={hasMore}
-              loading={loading}
-            />
-          </div>
-        </div>
-      </main>
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-8">Expense Management</h1>
+        
+        <ExpenseFilterBar
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          setIsAddExpenseOpen={setIsAddExpenseOpen}
+          selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
+        />
 
-      {/* Add Expense Modal */}
-      <AddExpenseForm 
-        handleAddExpense={handleAddExpense}
-        isAddExpenseOpen={isAddExpenseOpen}
-        setIsAddExpenseOpen={setIsAddExpenseOpen}
-        defaultDate={selectedDate}
-      />
+        <ExpenseAnalytics
+          selectedYear={selectedYear}
+          setSelectedYear={setSelectedYear}
+          selectedMonth={selectedMonth}
+          setSelectedMonth={setSelectedMonth}
+          expenses={monthlyExpenses}
+          totalExpense={totalExpense}
+          averageExpense={averageExpense}
+          highestExpense={highestExpense}
+          monthlyData={monthlyData}
+          categoryData={chartCategoryData}
+          getCategoryIcon={getCategoryIconElement}
+          selectedDate={selectedDate}
+        />
+
+        <OptimizedExpenseTable
+          expenses={filteredExpenses}
+          deleteExpense={handleDeleteExpense}
+          isFiltered={searchTerm.length > 0 || selectedDate !== null}
+          onLoadMore={handleLoadMore}
+          hasMore={hasMore}
+          loading={loading}
+        />
+
+        <AddExpenseForm
+          isAddExpenseOpen={isAddExpenseOpen}
+          setIsAddExpenseOpen={setIsAddExpenseOpen}
+          handleAddExpense={handleAddExpense}
+        />
+      </div>
     </div>
   );
 };

@@ -1,229 +1,170 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { useFinanceData } from '@/hooks/useFinanceData';
 import Navbar from '../components/layout/Navbar';
-import { User, Income } from '../types';
-import { Calendar, Plus, TrendingUp, DollarSign, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { isSameDay, isSameMonth, startOfMonth, endOfMonth, format, startOfDay, endOfDay } from 'date-fns';
-import { collection, query, where, getDocs, Timestamp, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { 
+  Calendar, 
+  Plus, 
+  TrendingUp, 
+  TrendingDown, 
+  DollarSign, 
+  PieChart, 
+  Trash2, 
+  Filter,
+  Download,
+  RefreshCw
+} from 'lucide-react';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { SellAnimalDialog } from '@/components/finance/SellAnimalDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-
-const ITEMS_PER_PAGE = 20;
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { formatCurrency } from '@/utils/format';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const FinancePage = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
-  const [income, setIncome] = useState<Income[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const { currentUser, loading: authLoading } = useAuth();
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isSellDialogOpen, setIsSellDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [incomeToDelete, setIncomeToDelete] = useState<Income | null>(null);
+  const [incomeToDelete, setIncomeToDelete] = useState<string | null>(null);
+  const [dateFilter, setDateFilter] = useState<'today' | 'month' | 'all'>('month');
 
-  // Fetch income from animal sales
-  const fetchIncomeData = async () => {
-    try {
-      setLoading(true);
-      
-      // Create date range for the month if a date is selected
-      const dateRange = selectedDate ? {
-        start: startOfMonth(selectedDate),
-        end: endOfMonth(selectedDate)
-      } : undefined;
+  const { 
+    income, 
+    expenses, 
+    loading, 
+    error, 
+    statistics,
+    refetch,
+    handleAnimalSale,
+    deleteIncomeRecord
+  } = useFinanceData(selectedDate);
 
-      // Fetch income from animal sales - only filter by type first
-      const incomeQuery = query(
-        collection(db, 'income'),
-        where('type', '==', 'Animal Sale')
-      );
-      const incomeSnapshot = await getDocs(incomeQuery);
-      const incomeData = incomeSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Income[];
-
-      // Filter by date range in memory
-      const filteredIncome = incomeData.filter(income => {
-        const incomeDate = income.date instanceof Date 
-          ? income.date 
-          : income.date?.toDate?.() || new Date(income.date);
-        return dateRange 
-          ? incomeDate >= dateRange.start && incomeDate <= dateRange.end
-          : true;
-      });
-
-      setIncome(filteredIncome);
-
-    } catch (error) {
-      console.error('Error fetching income data:', error);
-      toast.error('Failed to fetch income data');
-    } finally {
-      setLoading(false);
-    }
+  // Helper function to safely convert dates
+  const safeDate = (date: Date | { toDate(): Date } | string | number): Date => {
+    if (date instanceof Date) return date;
+    if (date && typeof date === 'object' && 'toDate' in date) return date.toDate();
+    if (typeof date === 'string' || typeof date === 'number') return new Date(date);
+    return new Date();
   };
 
-  // Handle animal sale
-  const handleAnimalSale = async (selectedIds: string[], totalPrice: number) => {
-    try {
-      const individualPrice = totalPrice / selectedIds.length;
-      const batchId = `sale-${Date.now()}`;
-
-      // Process each animal
-      for (const id of selectedIds) {
-        // Create income record
-        const incomeData = {
-          type: 'Animal Sale',
-          amount: individualPrice,
-          date: Timestamp.now(),
-          description: `Sale of animal ${id}`,
-          paymentMethod: 'Cash',
-          animalRelated: true,
-          animalId: id,
-          createdAt: Timestamp.now(),
-          status: 'completed',
-          batchId,
-          totalBatchAmount: totalPrice,
-          animalsInBatch: selectedIds.length
+  // Filter data based on selected filter
+  const filteredData = useMemo(() => {
+    const now = new Date();
+    
+    switch (dateFilter) {
+      case 'today': {
+        return {
+          income: income.filter(item => {
+            const itemDate = item.date instanceof Date ? item.date : safeDate(item.date);
+            return format(itemDate, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd');
+          }),
+          expenses: expenses.filter(expense => {
+            const expenseDate = expense.date instanceof Date ? expense.date : safeDate(expense.date);
+            return format(expenseDate, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd');
+          })
         };
-
-        // Create income record
-        const incomeRef = await addDoc(collection(db, 'income'), incomeData);
-
-        // Update animal status
-        const animalRef = doc(db, 'animals', id);
-        await updateDoc(animalRef, {
-          status: 'sold',
-          sellingPrice: individualPrice,
-          soldDate: Timestamp.now(),
-          incomeId: incomeRef.id
-        });
       }
+      case 'month': {
+        const monthStart = startOfMonth(now);
+        const monthEnd = endOfMonth(now);
+        return {
+          income: income.filter(item => {
+            const itemDate = item.date instanceof Date ? item.date : safeDate(item.date);
+            return itemDate >= monthStart && itemDate <= monthEnd;
+          }),
+          expenses: expenses.filter(expense => {
+            const expenseDate = expense.date instanceof Date ? expense.date : safeDate(expense.date);
+            return expenseDate >= monthStart && expenseDate <= monthEnd;
+          })
+        };
+      }
+      default:
+        return { income, expenses };
+    }
+  }, [income, expenses, dateFilter]);
 
-      toast.success('Animals sold successfully');
+  const handleSellAnimals = async (selectedIds: string[], totalPrice: number, paymentMethod: string) => {
+    const success = await handleAnimalSale(selectedIds, totalPrice, paymentMethod);
+    if (success) {
       setIsSellDialogOpen(false);
-      fetchIncomeData(); // Refresh the income data
-    } catch (error) {
-      console.error('Error selling animals:', error);
-      toast.error('Failed to sell animals');
     }
   };
 
-  // Memoize daily data
-  const dailyData = useMemo(() => {
-    if (!selectedDate) return { income: [] };
-    
-    return {
-      income: income.filter(income => {
-        const incomeDate = income.date instanceof Date 
-          ? income.date 
-          : income.date?.toDate?.() || new Date(income.date);
-        return isSameDay(incomeDate, selectedDate);
-      })
-    };
-  }, [income, selectedDate]);
-
-  // Memoize monthly data
-  const monthlyData = useMemo(() => {
-    if (!selectedDate) return { income: [] };
-    
-    return {
-      income: income.filter(income => {
-        const incomeDate = income.date instanceof Date 
-          ? income.date 
-          : income.date?.toDate?.() || new Date(income.date);
-        return isSameMonth(incomeDate, selectedDate);
-      })
-    };
-  }, [income, selectedDate]);
-
-  // Calculate statistics
-  const stats = useMemo(() => {
-    // Highest sale
-    const highestSale = income.reduce((max, sale) => 
-      sale.amount > max.amount ? sale : max, 
-      { amount: 0 } as Income
-    );
-
-    // Daily total
-    const dailyTotal = dailyData.income.reduce((sum, sale) => sum + sale.amount, 0);
-
-    // Monthly total
-    const monthlyTotal = monthlyData.income.reduce((sum, sale) => sum + sale.amount, 0);
-
-    return {
-      highestSale,
-      dailyTotal,
-      monthlyTotal
-    };
-  }, [income, dailyData, monthlyData]);
-
-  const handleDeleteIncome = async (income: Income) => {
-    setIncomeToDelete(income);
+  const handleDeleteIncome = (incomeId: string) => {
+    setIncomeToDelete(incomeId);
     setIsDeleteDialogOpen(true);
   };
 
   const confirmDelete = async () => {
-    if (!incomeToDelete) return;
-
-    try {
-      // Delete from Firestore
-      const incomeRef = doc(db, 'income', incomeToDelete.id);
-      await deleteDoc(incomeRef);
-
-      // Update local state
-      setIncome(prev => prev.filter(i => i.id !== incomeToDelete.id));
-      
-      toast.success('Income record deleted successfully');
-    } catch (error) {
-      console.error('Error deleting income:', error);
-      toast.error('Failed to delete income record');
-    } finally {
+    if (incomeToDelete) {
+      await deleteIncomeRecord(incomeToDelete);
       setIsDeleteDialogOpen(false);
       setIncomeToDelete(null);
     }
   };
 
-  useEffect(() => {
-    // Check if user is logged in
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) {
-      navigate('/login');
-      return;
-    }
-    
-    setUser(JSON.parse(storedUser));
-    // Set initial date to today
-    setSelectedDate(new Date());
-    fetchIncomeData();
-  }, [navigate]);
-
-  // Effect to fetch data when selected date changes
-  useEffect(() => {
-    fetchIncomeData();
-  }, [selectedDate]);
-
-  if (!user) {
-    return <div className="p-8 text-center">Loading...</div>;
+  // Handle auth states
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#004225] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
+  if (!currentUser) {
+    navigate('/login');
+    return null;
+  }
+
+  const currentStats: {
+    income: number;
+    expenses: number;
+    profit: number;
+  } = {
+    income: filteredData.income.reduce((sum, item) => sum + item.amount, 0),
+    expenses: filteredData.expenses.reduce((sum, item) => sum + item.amount, 0),
+    profit: 0
+  };
+  currentStats.profit = currentStats.income - currentStats.expenses;
+
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50">
       <Navbar />
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div className="md:flex md:items-center md:justify-between mb-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <div className="flex-1 min-w-0">
             <h2 className="text-2xl font-bold leading-7 text-[#2c3e2d] sm:text-3xl sm:truncate">
-              Animal Sales Income
+              Financial Management
             </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Track income from animal sales and manage your livestock business finances
+            </p>
           </div>
-          <div className="mt-4 flex md:mt-0 md:ml-4">
+          <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:mt-0 sm:ml-4">
+            <Button
+              onClick={() => refetch()}
+              variant="outline"
+              size="sm"
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
             <Button
               onClick={() => setIsSellDialogOpen(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#579445] hover:bg-[#5c8650] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4a6741]"
+              className="bg-[#004225] hover:bg-[#003820] text-white"
             >
               <Plus className="h-4 w-4 mr-2" />
               Sell Animals
@@ -231,124 +172,240 @@ const FinancePage = () => {
           </div>
         </div>
 
+        {/* Filter Tabs */}
+        <div className="mb-6">
+          <Tabs value={dateFilter} onValueChange={(value) => setDateFilter(value as typeof dateFilter)}>
+            <TabsList className="grid w-full max-w-md grid-cols-3">
+              <TabsTrigger value="today">Today</TabsTrigger>
+              <TabsTrigger value="month">This Month</TabsTrigger>
+              <TabsTrigger value="all">All Time</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
         {/* Overview Cards */}
-        <div className="grid gap-4 md:grid-cols-3 mb-6">
-          {/* Highest Sale Card */}
-          <Card className="bg-white border-[#e8e8e0]">
+        <div className="grid gap-4 md:grid-cols-4 mb-6">
+          {/* Total Income */}
+          <Card className="bg-white border-gray-200">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-[#2c3e2d]">Highest Sale</CardTitle>
-              <TrendingUp className="h-4 w-4 text-[#4a6741]" />
+              <CardTitle className="text-sm font-medium text-gray-600">
+                {dateFilter === 'today' ? "Today's Income" : 
+                 dateFilter === 'month' ? "Monthly Income" : "Total Income"}
+              </CardTitle>
+              <TrendingUp className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-[#2c3e2d]">${stats.highestSale.amount.toFixed(2)}</div>
-              {stats.highestSale.amount > 0 && (
-                <p className="text-xs text-[#4a6741] mt-1">
-                  {stats.highestSale.description}
+              <div className="text-2xl font-bold text-green-600">
+                {formatCurrency(currentStats.income)}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {filteredData.income.length} transaction{filteredData.income.length !== 1 ? 's' : ''}
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Total Expenses */}
+          <Card className="bg-white border-gray-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                {dateFilter === 'today' ? "Today's Expenses" : 
+                 dateFilter === 'month' ? "Monthly Expenses" : "Total Expenses"}
+              </CardTitle>
+              <TrendingDown className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                {formatCurrency(currentStats.expenses)}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {filteredData.expenses.length} transaction{filteredData.expenses.length !== 1 ? 's' : ''}
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Net Profit/Loss */}
+          <Card className="bg-white border-gray-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">
+                Net {currentStats.profit >= 0 ? 'Profit' : 'Loss'}
+              </CardTitle>
+              <DollarSign className={`h-4 w-4 ${currentStats.profit >= 0 ? 'text-green-600' : 'text-red-600'}`} />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${currentStats.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency(Math.abs(currentStats.profit))}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {((currentStats.income / (currentStats.expenses || 1)) * 100).toFixed(1)}% profit margin
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Highest Sale */}
+          <Card className="bg-white border-gray-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">Highest Sale</CardTitle>
+              <PieChart className="h-4 w-4 text-[#004225]" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-[#004225]">
+                {formatCurrency(statistics.highestSale?.amount || 0)}
+              </div>
+              {statistics.highestSale && (
+                <p className="text-xs text-gray-500 mt-1 truncate">
+                  {statistics.highestSale.description}
                 </p>
               )}
             </CardContent>
           </Card>
-
-          {/* Daily Sales Card */}
-          <Card className="bg-white border-[#e8e8e0]">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-[#2c3e2d]">Today's Sales</CardTitle>
-              <CalendarIcon className="h-4 w-4 text-[#4a6741]" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-[#2c3e2d]">${stats.dailyTotal.toFixed(2)}</div>
-              <p className="text-xs text-[#4a6741] mt-1">
-                {dailyData.income.length} sales today
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Monthly Sales Card */}
-          <Card className="bg-white border-[#e8e8e0]">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-[#2c3e2d]">Monthly Sales</CardTitle>
-              <DollarSign className="h-4 w-4 text-[#4a6741]" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-[#2c3e2d]">${stats.monthlyTotal.toFixed(2)}</div>
-              <p className="text-xs text-[#4a6741] mt-1">
-                {monthlyData.income.length} sales this month
-              </p>
-            </CardContent>
-          </Card>
         </div>
 
-        {/* Recent Sales */}
-        <div className="bg-white shadow rounded-lg border border-[#e8e8e0]">
-          <div className="px-4 py-5 sm:px-6 border-b border-[#e8e8e0]">
-            <h3 className="text-lg leading-6 font-medium text-[#2c3e2d]">
-              Recent Animal Sales
-            </h3>
-          </div>
-          <div className="border-t border-[#e8e8e0]">
-            {loading ? (
-              <div className="p-4 text-center text-[#4a6741]">Loading...</div>
-            ) : monthlyData.income.length === 0 ? (
-              <div className="p-4 text-center text-[#4a6741]">No sales found for this period</div>
-            ) : (
-              <div className="divide-y divide-[#e8e8e0]">
-                {monthlyData.income
-                  .sort((a, b) => {
-                    const dateA = a.date instanceof Date ? a.date : a.date?.toDate?.() || new Date(a.date);
-                    const dateB = b.date instanceof Date ? b.date : b.date?.toDate?.() || new Date(b.date);
-                    return dateB.getTime() - dateA.getTime();
-                  })
-                  .map((sale) => {
-                    const date = sale.date instanceof Date 
-                      ? sale.date 
-                      : sale.date?.toDate?.() || new Date(sale.date);
-                    
-                    return (
-                      <div key={sale.id} className="px-4 py-4 sm:px-6 hover:bg-[#f5f5f0] transition-colors duration-150">
-                        <div className="flex items-center justify-between">
+        {/* Recent Transactions */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Recent Income */}
+          <Card className="bg-white border-gray-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-green-600" />
+                Recent Income
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#004225] mx-auto"></div>
+                  <p className="mt-2 text-sm text-gray-500">Loading...</p>
+                </div>
+              ) : filteredData.income.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No income records found</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {filteredData.income
+                    .sort((a, b) => {
+                      const dateA = a.date instanceof Date ? a.date : safeDate(a.date);
+                      const dateB = b.date instanceof Date ? b.date : safeDate(b.date);
+                      return dateB.getTime() - dateA.getTime();
+                    })
+                    .slice(0, 10)
+                    .map((income) => {
+                      const date = income.date instanceof Date ? income.date : safeDate(income.date);
+                      
+                      return (
+                        <div key={income.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:border-gray-200 transition-colors">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-[#2c3e2d] truncate">
-                              {sale.description}
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {income.description}
                             </p>
-                            <p className="text-sm text-[#4a6741]">
-                              {format(date, 'MMM d, yyyy')}
-                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-xs text-gray-500">
+                                {format(date, 'MMM d, yyyy')}
+                              </p>
+                              <Badge variant="outline" className="text-xs">
+                                {income.paymentMethod}
+                              </Badge>
+                            </div>
                           </div>
-                          <div className="flex items-center space-x-4">
-                            <span className="text-sm font-medium text-[#18d651]">
-                              ${sale.amount.toFixed(2)}
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-green-600">
+                              {formatCurrency(income.amount)}
                             </span>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDeleteIncome(sale)}
-                              className="text-[#4a6741] hover:text-[#2c3e2d] hover:bg-[#f5f5f0]"
+                              onClick={() => handleDeleteIncome(income.id)}
+                              className="text-gray-400 hover:text-red-600 p-1"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
-          </div>
+                      );
+                    })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recent Expenses */}
+          <Card className="bg-white border-gray-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingDown className="h-5 w-5 text-red-600" />
+                Recent Expenses
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#004225] mx-auto"></div>
+                  <p className="mt-2 text-sm text-gray-500">Loading...</p>
+                </div>
+              ) : filteredData.expenses.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No expense records found</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {filteredData.expenses
+                    .sort((a, b) => {
+                      const dateA = a.date instanceof Date ? a.date : safeDate(a.date);
+                      const dateB = b.date instanceof Date ? b.date : safeDate(b.date);
+                      return dateB.getTime() - dateA.getTime();
+                    })
+                    .slice(0, 10)
+                    .map((expense) => {
+                      const date = expense.date instanceof Date ? expense.date : safeDate(expense.date);
+                      
+                      return (
+                        <div key={expense.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:border-gray-200 transition-colors">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {expense.description}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-xs text-gray-500">
+                                {format(date, 'MMM d, yyyy')}
+                              </p>
+                              <Badge variant="outline" className="text-xs">
+                                {expense.category}
+                              </Badge>
+                            </div>
+                          </div>
+                          <span className="text-sm font-semibold text-red-600">
+                            {formatCurrency(expense.amount)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-600">{error}</p>
+          </div>
+        )}
       </main>
 
+      {/* Sell Animal Dialog */}
       <SellAnimalDialog
         isOpen={isSellDialogOpen}
         onClose={() => setIsSellDialogOpen(false)}
-        onConfirm={handleAnimalSale}
+        onConfirm={handleSellAnimals}
       />
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="bg-white border-[#e8e8e0]">
+        <DialogContent className="bg-white border-gray-200">
           <DialogHeader>
-            <DialogTitle className="text-[#2c3e2d]">Delete Income Record</DialogTitle>
-            <DialogDescription className="text-[#4a6741]">
+            <DialogTitle className="text-gray-900">Delete Income Record</DialogTitle>
+            <DialogDescription className="text-gray-600">
               Are you sure you want to delete this income record? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
@@ -356,14 +413,14 @@ const FinancePage = () => {
             <Button
               variant="outline"
               onClick={() => setIsDeleteDialogOpen(false)}
-              className="border-[#e8e8e0] text-[#4a6741] hover:bg-[#f5f5f0]"
+              className="border-gray-300 text-gray-700 hover:bg-gray-50"
             >
               Cancel
             </Button>
             <Button
               variant="destructive"
               onClick={confirmDelete}
-              className="bg-[#4a6741] hover:bg-[#3d5636]"
+              className="bg-red-600 hover:bg-red-700"
             >
               Delete
             </Button>

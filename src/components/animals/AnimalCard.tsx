@@ -12,53 +12,28 @@ interface AnimalCardProps {
 }
 
 const AnimalCard = ({ animal, onEdit, onDelete, isDeleting }: AnimalCardProps) => {
-  const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete animal ${animal.id}?`)) {
-      onDelete(animal.id);
-    }
-  };
-
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
-      {animal.photoUrl && (
-        <div className="relative h-32 w-full overflow-hidden rounded-t-lg">
-          <img 
-            src={animal.photoUrl} 
-            alt={`${animal.type} ${animal.breed}`} 
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="relative aspect-video">
+        {animal.imageUrl ? (
+          <img
+            src={animal.imageUrl}
+            alt={`${animal.type} - ${animal.breed}`}
             className="w-full h-full object-cover"
           />
-        </div>
-      )}
-      <div className="p-3">
-        <div className="flex items-start justify-between mb-2">
-          <div>
-            <h3 className="font-semibold text-gray-900 truncate text-sm">{animal.id}</h3>
-            <p className="text-xs text-gray-600">{animal.type}</p>
+        ) : (
+          <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+            <span className="text-gray-400">No image</span>
           </div>
-          <div className="flex items-center gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => onEdit(animal)}
-              className="h-7 w-7 p-0 hover:bg-gray-100"
-              disabled={isDeleting === animal.id}
-            >
-              <Edit className="h-3 w-3 text-gray-600" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={handleDelete}
-              className="h-7 w-7 p-0 hover:bg-red-50"
-              disabled={isDeleting === animal.id}
-            >
-              {isDeleting === animal.id ? (
-                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-600" />
-              ) : (
-                <Trash2 className="h-3 w-3 text-red-600" />
-              )}
-            </Button>
-          </div>
+        )}
+      </div>
+
+      <div className="p-4 space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 truncate">
+            {animal.name || animal.id}
+          </h3>
+          <p className="text-sm text-gray-500">{animal.type}</p>
         </div>
 
         <div className="space-y-1.5">
@@ -68,7 +43,7 @@ const AnimalCard = ({ animal, onEdit, onDelete, isDeleting }: AnimalCardProps) =
           </div>
           <div className="flex items-center justify-between text-xs">
             <span className="text-gray-500">Age:</span>
-            <span className="font-medium text-gray-900">{animal.age || '-'}</span>
+            <span className="font-medium text-gray-900">{animal.age} {animal.age === 1 ? 'year' : 'years'}</span>
           </div>
           <div className="flex items-center justify-between text-xs">
             <span className="text-gray-500">Gender:</span>
@@ -96,6 +71,27 @@ const AnimalCard = ({ animal, onEdit, onDelete, isDeleting }: AnimalCardProps) =
               {animal.status}
             </span>
           </div>
+        </div>
+
+        <div className="flex justify-end space-x-2 pt-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onEdit(animal)}
+            className="text-farm-600 hover:text-farm-900"
+            disabled={isDeleting === animal.id}
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDelete(animal.id)}
+            className="text-red-600 hover:text-red-900"
+            disabled={isDeleting === animal.id}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       </div>
     </div>

@@ -9,12 +9,14 @@ import {
   deleteDoc,
   doc,
   limit,
-  startAfter
+  startAfter,
+  QueryDocumentSnapshot
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { Expense, Animal } from "@/types";
+import { differenceInYears } from 'date-fns';
 
 export const expenseSchema = z.object({
   category: z.string().min(1, { message: "Category is required" }),
@@ -32,7 +34,12 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const ITEMS_PER_PAGE = 20;
 
 // Cache outside component to persist between renders
-const cache = new Map<string, { data: any; timestamp: number }>();
+const cache = new Map<string, string>();
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
 
 export function useOptimizedExpenses() {
   const { toast } = useToast();
@@ -40,24 +47,35 @@ export function useOptimizedExpenses() {
   const [animals, setAnimals] = useState<Animal[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
-  const [lastDoc, setLastDoc] = useState<any>(null);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   
   // Check cache first
-  const getCachedData = useCallback((key: string) => {
+  const getCachedData = useCallback(<T,>(key: string): T | null => {
     const cached = cache.get(key);
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      return cached.data;
+    if (cached) {
+      try {
+        const entry = JSON.parse(cached) as CacheEntry<T>;
+        if (Date.now() - entry.timestamp < CACHE_DURATION) {
+          return entry.data;
+        }
+      } catch {
+        return null;
+      }
     }
     return null;
   }, []);
 
   // Set cache
-  const setCachedData = useCallback((key: string, data: any) => {
-    cache.set(key, { data, timestamp: Date.now() });
+  const setCachedData = useCallback(<T,>(key: string, data: T) => {
+    const entry: CacheEntry<T> = {
+      data,
+      timestamp: Date.now()
+    };
+    cache.set(key, JSON.stringify(entry));
   }, []);
   
   const fetchAnimals = useCallback(async () => {
-    const cachedAnimals = getCachedData('animals');
+    const cachedAnimals = getCachedData<Animal[]>('animals');
     if (cachedAnimals) {
       setAnimals(cachedAnimals);
       return;
@@ -68,23 +86,20 @@ export function useOptimizedExpenses() {
       const animalsSnapshot = await getDocs(animalsQuery);
       
       const animalsList: Animal[] = animalsSnapshot.docs.map(doc => {
-        const animal = doc.data();
+        const animal = doc.data() as Partial<Animal> & { birthDate?: Timestamp, purchaseDate?: Timestamp, createdAt?: Timestamp };
         return { 
           id: doc.id, 
-          name: animal.name,
+          name: animal.name || '',
           type: animal.type || '',
           breed: animal.breed || '',
-          age: animal.age || 0,
-          health: animal.health || '',
-          purchaseDate: animal.purchaseDate || '',
-          purchasePrice: animal.purchasePrice || 0,
+          birthDate: animal.birthDate ? animal.birthDate.toDate() : new Date(),
+          gender: animal.gender || 'male',
           weight: animal.weight || 0,
-          gender: animal.gender || '',
-          status: animal.status || '',
-          imageUrl: animal.imageUrl,
-          photoUrl: animal.photoUrl,
-          isVaccinated: animal.isVaccinated || false,
-          createdAt: animal.createdAt || Timestamp.now()
+          status: animal.status || 'active',
+          purchaseDate: animal.purchaseDate ? animal.purchaseDate.toDate() : undefined,
+          purchasePrice: animal.purchasePrice || undefined,
+          notes: animal.notes,
+          imageUrl: animal.imageUrl
         };
       });
       
@@ -99,7 +114,7 @@ export function useOptimizedExpenses() {
     const cacheKey = loadMore ? `expenses_page_${Math.floor(expenses.length / ITEMS_PER_PAGE)}` : 'expenses';
     
     if (!loadMore) {
-      const cachedExpenses = getCachedData(cacheKey);
+      const cachedExpenses = getCachedData<Expense[]>(cacheKey);
       if (cachedExpenses) {
         setExpenses(cachedExpenses);
         setLoading(false);
@@ -134,18 +149,18 @@ export function useOptimizedExpenses() {
 
       const newExpenses: Expense[] = querySnapshot.docs.map(doc => {
         const data = doc.data();
-        return { 
-          id: doc.id, 
-          category: data.category || '',
-          amount: data.amount || 0,
-          date: data.date || null,
-          description: data.description || '',
-          createdAt: data.createdAt || null,
-          paymentMethod: data.paymentMethod || '',
-          animalName: data.animalName || '',
-          animalRelated: data.animalRelated || false,
-          animalId: data.animalId
+        const expense: Expense = {
+          id: doc.id,
+          category: String(data.category || ''),
+          amount: Number(data.amount || 0),
+          date: data.date?.toDate() || new Date(),
+          description: String(data.description || ''),
+          paymentMethod: String(data.paymentMethod || ''),
+          animalName: data.animalName ? String(data.animalName) : undefined,
+          animalRelated: Boolean(data.animalRelated),
+          animalId: data.animalId ? String(data.animalId) : undefined
         };
+        return expense;
       });
       
       if (loadMore) {
@@ -180,8 +195,7 @@ export function useOptimizedExpenses() {
     try {
       const expenseData = {
         ...expense,
-        date: expense.date instanceof Timestamp ? expense.date : Timestamp.fromDate(new Date(expense.date)),
-        createdAt: Timestamp.now(),
+        date: expense.date instanceof Date ? Timestamp.fromDate(expense.date) : expense.date,
       };
       
       if (!expense.animalRelated) {
@@ -197,8 +211,9 @@ export function useOptimizedExpenses() {
       
       // Add to beginning of list for immediate feedback
       setExpenses(prev => [{
-        ...expenseData,
-        id: docRef.id
+        ...expense,
+        id: docRef.id,
+        date: expenseData.date.toDate()
       }, ...prev]);
       
       // Clear cache to force refresh on next load

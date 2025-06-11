@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '../components/layout/Navbar';
-import { User } from '../types';
+import { FirebaseError } from 'firebase/app';
 import {
   Card,
   CardContent,
@@ -26,20 +27,15 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import {
   User as UserIcon,
-  Settings as SettingsIcon,
-  Bell,
-  Shield,
-  Mail,
-  Building,
-  MapPin,
-  Phone
+  Lock,
+  Loader2
 } from 'lucide-react';
 
 const profileFormSchema = z.object({
@@ -50,22 +46,24 @@ const profileFormSchema = z.object({
   address: z.string().optional(),
 });
 
-const farmSettingsSchema = z.object({
-  farmName: z.string().min(2, 'Farm name must be at least 2 characters'),
-  location: z.string(),
-  currency: z.string(),
-  language: z.string(),
-  notifications: z.boolean(),
-  emailAlerts: z.boolean(),
+const securityFormSchema = z.object({
+  currentPassword: z.string().min(6, 'Current password is required'),
+  newPassword: z.string().min(6, 'Password must be at least 6 characters'),
+  confirmPassword: z.string().min(6, 'Please confirm your new password'),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
-type FarmSettingsValues = z.infer<typeof farmSettingsSchema>;
+type SecurityFormValues = z.infer<typeof securityFormSchema>;
 
 const SettingsPage = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
+  const { currentUser, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordChanged, setPasswordChanged] = useState(false);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -78,36 +76,33 @@ const SettingsPage = () => {
     },
   });
 
-  const farmSettingsForm = useForm<FarmSettingsValues>({
-    resolver: zodResolver(farmSettingsSchema),
+  const securityForm = useForm<SecurityFormValues>({
+    resolver: zodResolver(securityFormSchema),
     defaultValues: {
-      farmName: 'Green Pastures Farm',
-      location: '',
-      currency: 'USD',
-      language: 'en',
-      notifications: true,
-      emailAlerts: true,
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
     },
   });
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) {
+    if (authLoading) return;
+    if (!currentUser) {
       navigate('/login');
       return;
     }
-    const userData = JSON.parse(storedUser);
-    setUser(userData);
     
-    // Set profile form defaults
-    profileForm.reset({
-      name: userData.name,
-      email: userData.email,
-      role: userData.role,
-      phone: userData.phone || '',
-      address: userData.address || '',
-    });
-  }, [navigate]);
+    // Set profile form defaults if user data exists
+    if (currentUser) {
+      profileForm.reset({
+        name: currentUser.displayName || '',
+        email: currentUser.email || '',
+        role: 'user', // Default role
+        phone: '',
+        address: '',
+      });
+    }
+  }, [navigate, currentUser, authLoading]);
 
   const onProfileSubmit = async (data: ProfileFormValues) => {
     try {
@@ -123,22 +118,80 @@ const SettingsPage = () => {
     }
   };
 
-  const onFarmSettingsSubmit = async (data: FarmSettingsValues) => {
+  const onSecuritySubmit = async (data: SecurityFormValues) => {
     try {
-      setLoading(true);
-      // TODO: Update farm settings in Firebase
-      console.log('Updating farm settings:', data);
-      toast.success('Farm settings updated successfully');
+      setIsChangingPassword(true);
+      setPasswordChanged(false);
+      
+      if (!currentUser || !currentUser.email) {
+        throw new Error('No authenticated user found');
+      }
+
+      // Show initial feedback
+      toast.loading('Verifying current password...');
+
+      // Re-authenticate user before changing password
+      const credential = EmailAuthProvider.credential(
+        currentUser.email,
+        data.currentPassword
+      );
+      
+      await reauthenticateWithCredential(currentUser, credential);
+      
+      // Update loading message
+      toast.loading('Updating password...');
+      
+      // Update password
+      await updatePassword(currentUser, data.newPassword);
+      
+      // Clear form
+      securityForm.reset();
+      
+      // Show success state
+      setPasswordChanged(true);
+      
+      // Dismiss all toasts and show success
+      toast.dismiss();
+      toast.success('Password updated successfully', {
+        duration: 3000,
+      });
+
+      // Clear success message after 5 seconds
+      setTimeout(() => {
+        setPasswordChanged(false);
+      }, 5000);
     } catch (error) {
-      console.error('Error updating farm settings:', error);
-      toast.error('Failed to update farm settings');
+      console.error('Error updating password:', error);
+      // Dismiss all toasts before showing error
+      toast.dismiss();
+      setPasswordChanged(false);
+      if (error instanceof FirebaseError && error.code === 'auth/wrong-password') {
+        toast.error('Current password is incorrect', {
+          duration: 3000,
+        });
+      } else {
+        toast.error('Failed to update password', {
+          duration: 3000,
+        });
+      }
     } finally {
-      setLoading(false);
+      setIsChangingPassword(false);
     }
   };
 
-  if (!user) {
-    return <div className="p-8 text-center">Loading...</div>;
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farm-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return null;
   }
 
   return (
@@ -155,9 +208,9 @@ const SettingsPage = () => {
                 <UserIcon className="h-4 w-4 mr-2" />
                 Profile
               </TabsTrigger>
-              <TabsTrigger value="farm" className="flex items-center">
-                <SettingsIcon className="h-4 w-4 mr-2" />
-                Farm Settings
+              <TabsTrigger value="security" className="flex items-center">
+                <Lock className="h-4 w-4 mr-2" />
+                Security
               </TabsTrigger>
             </TabsList>
             
@@ -250,123 +303,113 @@ const SettingsPage = () => {
                 </CardContent>
               </Card>
             </TabsContent>
-            
-            <TabsContent value="farm">
+
+            <TabsContent value="security">
               <Card>
                 <CardHeader>
-                  <CardTitle>Farm Settings</CardTitle>
+                  <CardTitle>Security Settings</CardTitle>
                   <CardDescription>
-                    Configure your farm's settings and preferences
+                    Change your password and manage security preferences
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Form {...farmSettingsForm}>
-                    <form onSubmit={farmSettingsForm.handleSubmit(onFarmSettingsSubmit)} className="space-y-6">
+                  <Form {...securityForm}>
+                    <form onSubmit={securityForm.handleSubmit(onSecuritySubmit)} className="space-y-6">
                       <FormField
-                        control={farmSettingsForm.control}
-                        name="farmName"
+                        control={securityForm.control}
+                        name="currentPassword"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Farm Name</FormLabel>
+                            <FormLabel>Current Password</FormLabel>
                             <FormControl>
-                              <Input placeholder="Your farm's name" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={farmSettingsForm.control}
-                        name="location"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Location</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Farm location" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={farmSettingsForm.control}
-                        name="currency"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Currency</FormLabel>
-                            <FormControl>
-                              <Input placeholder="INR" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={farmSettingsForm.control}
-                        name="language"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Language</FormLabel>
-                            <FormControl>
-                              <Input placeholder="en" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={farmSettingsForm.control}
-                        name="notifications"
-                        render={({ field }) => (
-                          <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                            <div className="space-y-0.5">
-                              <FormLabel className="text-base">
-                                Push Notifications
-                              </FormLabel>
-                              <FormDescription>
-                                Receive notifications about important updates
-                              </FormDescription>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
+                              <Input 
+                                type="password" 
+                                placeholder="Enter current password" 
+                                disabled={isChangingPassword}
+                                {...field} 
                               />
                             </FormControl>
+                            <FormMessage />
                           </FormItem>
                         )}
                       />
                       
                       <FormField
-                        control={farmSettingsForm.control}
-                        name="emailAlerts"
+                        control={securityForm.control}
+                        name="newPassword"
                         render={({ field }) => (
-                          <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                            <div className="space-y-0.5">
-                              <FormLabel className="text-base">
-                                Email Alerts
-                              </FormLabel>
-                              <FormDescription>
-                                Receive email notifications for important events
-                              </FormDescription>
-                            </div>
+                          <FormItem>
+                            <FormLabel>New Password</FormLabel>
                             <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
+                              <Input 
+                                type="password" 
+                                placeholder="Enter new password" 
+                                disabled={isChangingPassword}
+                                {...field} 
                               />
                             </FormControl>
+                            <FormDescription>
+                              Password must be at least 6 characters long
+                            </FormDescription>
+                            <FormMessage />
                           </FormItem>
                         )}
                       />
                       
-                      <Button type="submit" disabled={loading}>
-                        {loading ? 'Saving...' : 'Save Changes'}
-                      </Button>
+                      <FormField
+                        control={securityForm.control}
+                        name="confirmPassword"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Confirm New Password</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="password" 
+                                placeholder="Confirm new password" 
+                                disabled={isChangingPassword}
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="space-y-4">
+                        <Button 
+                          type="submit" 
+                          disabled={isChangingPassword}
+                          className="w-full sm:w-auto"
+                        >
+                          {isChangingPassword ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Updating Password...
+                            </>
+                          ) : (
+                            'Update Password'
+                          )}
+                        </Button>
+
+                        {passwordChanged && (
+                          <div className="flex items-center text-sm font-medium text-green-600">
+                            <svg
+                              className="w-4 h-4 mr-2"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            Password successfully updated!
+                          </div>
+                        )}
+                      </div>
                     </form>
                   </Form>
                 </CardContent>

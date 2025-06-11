@@ -1,7 +1,7 @@
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, where, setDoc, getDoc, limit as firestoreLimit, startAfter, getCountFromServer } from 'firebase/firestore';
+import { FirebaseError } from 'firebase/app';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, orderBy, Timestamp, where, setDoc, getDoc, limit as firestoreLimit, startAfter, getCountFromServer, Query, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Animal, HealthRecord, Vaccination, Expense } from '@/types';
-import { handleFirebaseError } from '@/lib/firebase';
+import type { Animal, HealthRecord, Vaccination, Expense } from '@/types';
 
 // Helper function to validate required fields
 const validateRequiredFields = (data: any, requiredFields: string[]) => {
@@ -12,16 +12,40 @@ const validateRequiredFields = (data: any, requiredFields: string[]) => {
 };
 
 // Helper function to convert dates to Timestamps
-const convertDatesToTimestamps = (data: any) => {
-  const converted = { ...data };
-  Object.keys(converted).forEach(key => {
-    if (converted[key] instanceof Date) {
-      converted[key] = Timestamp.fromDate(converted[key]);
-    } else if (typeof converted[key] === 'string' && !isNaN(Date.parse(converted[key]))) {
-      converted[key] = Timestamp.fromDate(new Date(converted[key]));
+const convertDatesToTimestamps = (data: Partial<Animal> | Partial<Expense>): Record<string, unknown> => {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value instanceof Date) {
+      result[key] = Timestamp.fromDate(value);
+    } else if (value instanceof Timestamp) {
+      result[key] = value;
+    } else {
+      result[key] = value;
     }
-  });
-  return converted;
+  }
+  return result;
+};
+
+// Helper function to convert Timestamps to Dates
+const convertTimestampsToDates = <T extends DocumentData>(doc: QueryDocumentSnapshot<T>): T => {
+  const data = doc.data();
+  const converted: Record<string, unknown> = {};
+  
+  for (const [key, value] of Object.entries(data)) {
+    if (value instanceof Timestamp) {
+      converted[key] = value.toDate();
+    } else {
+      converted[key] = value;
+    }
+  }
+  
+  return converted as T;
+};
+
+// Helper function to handle Firebase errors
+const handleFirebaseError = (error: FirebaseError | Error): never => {
+  console.error('Firebase operation failed:', error);
+  throw error;
 };
 
 // Animal Services
@@ -45,9 +69,7 @@ export const animalServices = {
         ...convertDatesToTimestamps(animalData),
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
-        status: animalData.status || 'active',
-        health: animalData.health || 'Good',
-        isVaccinated: animalData.isVaccinated || false
+        status: animalData.status || 'active'
       };
       
       await setDoc(existingAnimalRef, animalToAdd);
@@ -87,7 +109,7 @@ export const animalServices = {
       console.log(`Fetching animals - Page: ${page}, Limit: ${limit}, Search: ${searchTerm}`);
       
       // Build the base query
-      let baseQuery = query(
+      const baseQuery = query(
         collection(db, 'animals'),
         orderBy('createdAt', 'desc')
       );
@@ -117,10 +139,29 @@ export const animalServices = {
       }
 
       const dataSnapshot = await getDocs(paginatedQuery);
-      let animals = dataSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Animal[];
+      let animals = dataSnapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log('Raw animal data from Firestore:', data); // Debug log
+        
+        const animal = {
+          id: doc.id,
+          name: data.name || '',
+          type: data.type || '',
+          breed: data.breed || '',
+          gender: data.gender || 'male',
+          weight: Number(data.weight || 0),
+          status: data.status || 'active',
+          purchasePrice: Number(data.purchasePrice || 0),
+          notes: data.notes || '',
+          imageUrl: data.imageUrl || '',
+          // Ensure age is properly converted to number
+          age: Number(data.age || 0),
+          purchaseDate: data.purchaseDate?.toDate?.() || (data.purchaseDate ? new Date(data.purchaseDate) : undefined)
+        } as Animal;
+        
+        console.log('Processed animal data:', animal); // Debug log
+        return animal;
+      });
 
       // Get the last document for next page cursor
       const lastVisible = dataSnapshot.docs[dataSnapshot.docs.length - 1];
@@ -155,7 +196,7 @@ export const animalServices = {
   },
 
   // Update an animal - Enhanced to handle ID changes properly
-  updateAnimal: async (id: string, animalData: Partial<Animal>) => {
+  updateAnimal: async (id: string, animalData: Partial<Animal>, onSuccess?: () => void) => {
     try {
       console.log('Updating animal in backend:', id, animalData);
       
@@ -181,61 +222,75 @@ export const animalServices = {
         }
         
         // Create new document with new ID
-        await setDoc(newAnimalRef, {
+        const updatedData = {
           ...currentData,
-          ...animalData,
-          id: animalData.id,
-          updatedAt: Timestamp.now()
-        });
-
-        // Delete old document
-        await deleteDoc(currentAnimalRef);
-
-        // Update related records with new animalId
-        const healthRecordsQuery = query(
-          collection(db, 'health_records'),
-          where('animalId', '==', id)
-        );
-        const healthRecordsSnapshot = await getDocs(healthRecordsQuery);
-        const healthRecordsUpdates = healthRecordsSnapshot.docs.map(doc => 
-          updateDoc(doc.ref, { animalId: animalData.id })
-        );
-        await Promise.all(healthRecordsUpdates);
-
-        const vaccinationsQuery = query(
-          collection(db, 'vaccinations'),
-          where('animalId', '==', id)
-        );
-        const vaccinationsSnapshot = await getDocs(vaccinationsQuery);
-        const vaccinationsUpdates = vaccinationsSnapshot.docs.map(doc => 
-          updateDoc(doc.ref, { animalId: animalData.id })
-        );
-        await Promise.all(vaccinationsUpdates);
-
-        const expensesQuery = query(
-          collection(db, 'expenses'),
-          where('animalId', '==', id)
-        );
-        const expensesSnapshot = await getDocs(expensesQuery);
-        const expensesUpdates = expensesSnapshot.docs.map(doc => 
-          updateDoc(doc.ref, { animalId: animalData.id })
-        );
-        await Promise.all(expensesUpdates);
-      } else {
-        // Regular update
-        const updateData = {
-          ...animalData,
+          ...convertDatesToTimestamps(animalData),
           updatedAt: Timestamp.now()
         };
-
-        // Update the animal record
-        await updateDoc(currentAnimalRef, updateData);
+        
+        await setDoc(newAnimalRef, updatedData);
+        await deleteDoc(currentAnimalRef);
+        
+        // Call onSuccess callback if provided
+        onSuccess?.();
+        
+        return updatedData;
       }
+      
+      // Regular update without ID change
+      const updatedData = {
+        ...animalData,
+        updatedAt: Timestamp.now()
+      };
+      
+      await updateDoc(currentAnimalRef, convertDatesToTimestamps(updatedData));
 
-      return { id, ...animalData };
+      // Handle purchase price changes
+      if (animalData.purchasePrice !== undefined && 
+          animalData.purchasePrice !== currentData.purchasePrice) {
+        // Find existing purchase expense
+        const expensesQuery = query(
+          collection(db, 'expenses'),
+          where('animalId', '==', id),
+          where('category', '==', 'Animal Purchase')
+        );
+        const expensesSnapshot = await getDocs(expensesQuery);
+
+        if (!expensesSnapshot.empty) {
+          // Update existing expense
+          const expenseDoc = expensesSnapshot.docs[0];
+          await updateDoc(expenseDoc.ref, {
+            amount: animalData.purchasePrice,
+            updatedAt: Timestamp.now(),
+            description: `Updated purchase price for ${currentData.type} (${currentData.breed})`
+          });
+        } else {
+          // Create new expense record
+          const expenseData = {
+            category: 'Animal Purchase',
+            amount: animalData.purchasePrice,
+            date: Timestamp.fromDate(new Date(currentData.purchaseDate || new Date())),
+            description: `Purchase of ${currentData.type} (${currentData.breed}) - Price updated`,
+            paymentMethod: 'Cash',
+            animalRelated: true,
+            animalId: id,
+            animalName: currentData.name || id,
+            createdAt: Timestamp.now()
+          };
+
+          await addDoc(collection(db, 'expenses'), expenseData);
+        }
+      }
+      
+      // Call onSuccess callback if provided
+      onSuccess?.();
+      
+      return {
+        ...currentData,
+        ...updatedData
+      };
     } catch (error) {
-      console.error('Error updating animal:', error);
-      throw error;
+      handleFirebaseError(error);
     }
   },
 
@@ -354,18 +409,22 @@ export const expenseServices = {
     total: number;
   }> {
     try {
-      console.log(`Fetching expenses - Page: ${page}, Limit: ${limit}`);
+      console.log(`Fetching expenses - Page: ${page}, Limit: ${limit}, DateRange:`, dateRange);
       const expensesRef = collection(db, 'expenses');
       
       // Build the base query
-      let baseQuery = query(expensesRef, orderBy('date', 'desc'));
+      let baseQuery: Query<DocumentData> = query(expensesRef, orderBy('date', 'desc'));
 
       // Add date range filter if provided
       if (dateRange) {
+        const startTimestamp = Timestamp.fromDate(dateRange.start);
+        const endTimestamp = Timestamp.fromDate(dateRange.end);
+        console.log('Date range timestamps:', { start: startTimestamp, end: endTimestamp });
+        
         baseQuery = query(
           expensesRef,
-          where('date', '>=', Timestamp.fromDate(dateRange.start)),
-          where('date', '<=', Timestamp.fromDate(dateRange.end)),
+          where('date', '>=', startTimestamp),
+          where('date', '<=', endTimestamp),
           orderBy('date', 'desc')
         );
       }
@@ -375,26 +434,18 @@ export const expenseServices = {
       const total = totalSnapshot.data().count;
       const totalPages = Math.ceil(total / limit);
 
+      console.log('Total expenses:', total, 'Total pages:', totalPages);
+
       // Build the paginated query
       let paginatedQuery = query(
-        expensesRef,
-        ...(dateRange ? [
-          where('date', '>=', Timestamp.fromDate(dateRange.start)),
-          where('date', '<=', Timestamp.fromDate(dateRange.end))
-        ] : []),
-        orderBy('date', 'desc'),
+        baseQuery,
         firestoreLimit(limit)
       );
 
       // If not on first page, get the last document from previous page
       if (page > 1) {
         const previousPageQuery = query(
-          expensesRef,
-          ...(dateRange ? [
-            where('date', '>=', Timestamp.fromDate(dateRange.start)),
-            where('date', '<=', Timestamp.fromDate(dateRange.end))
-          ] : []),
-          orderBy('date', 'desc'),
+          baseQuery,
           firestoreLimit((page - 1) * limit)
         );
         const previousPageSnapshot = await getDocs(previousPageQuery);
@@ -402,12 +453,7 @@ export const expenseServices = {
         
         if (lastVisible) {
           paginatedQuery = query(
-            expensesRef,
-            ...(dateRange ? [
-              where('date', '>=', Timestamp.fromDate(dateRange.start)),
-              where('date', '<=', Timestamp.fromDate(dateRange.end))
-            ] : []),
-            orderBy('date', 'desc'),
+            baseQuery,
             startAfter(lastVisible),
             firestoreLimit(limit)
           );

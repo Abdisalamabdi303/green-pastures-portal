@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Navbar from '@/components/layout/Navbar';
-import { HealthRecord, Vaccination, Animal } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
+import type { HealthRecord, Vaccination, Animal } from '../types/index';
+import Navbar from '../components/layout/Navbar';
 import { BatchVaccinationForm } from '@/components/health/BatchVaccinationForm';
 import { HealthFilters } from '@/components/health/HealthFilters';
 import { useHealthData } from '@/hooks/useHealthData';
@@ -18,6 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 
 const HealthPage = () => {
   const navigate = useNavigate();
+  const { currentUser, loading: authLoading } = useAuth();
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('health');
   const [openBatchVaccinationForm, setOpenBatchVaccinationForm] = useState(false);
@@ -181,27 +183,38 @@ const HealthPage = () => {
   }, [vaccinationData?.vaccinations, filters]);
 
   useEffect(() => {
-    // Check if user is logged in
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) {
+    if (authLoading) return;
+    if (!currentUser) {
       navigate('/login');
       return;
     }
-  }, [navigate]);
+  }, [navigate, currentUser, authLoading]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farm-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return null;
+  }
 
   if (animalError || healthError || vaccinationError) {
     return (
-      <div className="min-h-screen bg-white">
-        <Navbar />
-        <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <div className="text-center text-red-600">
-            <AlertCircle className="mx-auto h-12 w-12" />
-            <h3 className="mt-2 text-sm font-medium">Error loading data</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {animalError?.message || healthError?.message || vaccinationError?.message}
-            </p>
-          </div>
-        </main>
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center text-red-600">
+          <AlertCircle className="mx-auto h-12 w-12" />
+          <h3 className="mt-2 text-sm font-medium">Error loading data</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Please try refreshing the page
+          </p>
+        </div>
       </div>
     );
   }
@@ -211,41 +224,32 @@ const HealthPage = () => {
   const vaccinations = filteredVaccinations();
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50">
       <Navbar />
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div className="md:flex md:items-center md:justify-between mb-6">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-2xl font-bold leading-7 text-[#2c3e2d] sm:text-3xl sm:truncate">
-              Health Management
-            </h2>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Health Records</h1>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setOpenBatchHealthForm(true)}
+              className="bg-farm-600 hover:bg-farm-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Health Records
+            </Button>
+            <Button
+              onClick={() => setOpenBatchVaccinationForm(true)}
+              className="bg-farm-600 hover:bg-farm-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Vaccinations
+            </Button>
           </div>
         </div>
 
         <Card className="bg-white border-[#e8e8e0]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xl font-bold text-[#2c3e2d]">Health Records</CardTitle>
-            <div className="flex items-center space-x-2">
-              {activeTab === 'health' ? (
-                <Button
-                  onClick={() => setOpenBatchHealthForm(true)}
-                  className="bg-[#61a14d] hover:bg-[#5a8a4d] text-white"
-                  disabled={isLoading}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Health Record
-                </Button>
-              ) : (
-                <Button
-                  onClick={() => setOpenBatchVaccinationForm(true)}
-                  disabled={isLoading || isBatchAddingVaccinations}
-                  className="bg-[#61a14d] hover:bg-[#5a8a4d] text-white"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Vaccination
-                </Button>
-              )}
-            </div>
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -501,7 +505,7 @@ const HealthPage = () => {
           animals={animals}
           isLoading={isLoading || isBatchAddingVaccinations}
         />
-      </main>
+      </div>
     </div>
   );
 };

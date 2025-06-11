@@ -1,7 +1,7 @@
-
 import { ReactNode, useEffect } from "react";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
+import Footer from "./Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
 
@@ -58,14 +58,20 @@ export default function Layout({
     return <Navigate to="/dashboard" replace />;
   }
 
+  // Public layout (no auth required)
   if (!requireAuth) {
     return (
-      <div className="min-h-screen bg-background">
-        {children}
+      <div className="flex flex-col min-h-screen bg-background">
+        <Navbar />
+        <main className="flex-1">
+          {children}
+        </main>
+        <Footer />
       </div>
     );
   }
 
+  // Authenticated layout
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
@@ -74,6 +80,7 @@ export default function Layout({
         <main className="flex-1 p-4 md:p-6 animate-fade-in overflow-x-hidden">
           {children}
         </main>
+        <Footer />
       </div>
     </div>
   );

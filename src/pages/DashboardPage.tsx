@@ -1,14 +1,14 @@
-import React, { useEffect, useState, Suspense, lazy } from 'react';
+import React, { useEffect, useState, Suspense, lazy, useCallback, createContext, useContext, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '../components/layout/Navbar';
-import { User, Income, Expense, Animal } from '../types';
+import type { User, Income, Expense, Animal } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, TrendingUp, Calendar as CalendarIcon, Users, AlertTriangle } from 'lucide-react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { startOfMonth, endOfMonth, format, subMonths } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { useAuth } from '@/contexts/AuthContext';
 
 interface DashboardStats {
   totalAnimals: number;
@@ -41,9 +41,16 @@ const LoadingFallback = () => (
   </div>
 );
 
+// Create a context for dashboard refresh
+export const DashboardRefreshContext = createContext<{ refreshDashboard: () => void }>({
+  refreshDashboard: () => {}
+});
+
+export const useDashboardRefresh = () => useContext(DashboardRefreshContext);
+
 const DashboardPage = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
+  const { currentUser, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
     totalAnimals: 0,
@@ -59,19 +66,8 @@ const DashboardPage = () => {
     animalTypes: []
   });
 
-  useEffect(() => {
-    // Check if user is logged in
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) {
-      navigate('/login');
-      return;
-    }
-    
-    setUser(JSON.parse(storedUser));
-    fetchStats();
-  }, [navigate]);
-
-  const fetchStats = async () => {
+  // Make fetchStats a useCallback so it can be passed to context
+  const fetchStats = useCallback(async () => {
     try {
       setLoading(true);
       const now = new Date();
@@ -198,10 +194,28 @@ const DashboardPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  if (!user) {
-    return <div className="p-8 text-center">Loading...</div>;
+  useEffect(() => {
+    if (authLoading) return;
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+    fetchStats();
+  }, [navigate, currentUser, authLoading, fetchStats]);
+
+  // Create the context value
+  const contextValue = useMemo(() => ({
+    refreshDashboard: fetchStats
+  }), [fetchStats]);
+
+  if (authLoading) {
+    return <LoadingFallback />;
+  }
+
+  if (!currentUser) {
+    return null;
   }
 
   if (loading) {
@@ -223,47 +237,49 @@ const DashboardPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-8">Dashboard</h1>
-        
-        <div className="space-y-8">
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle>Monthly Overview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Suspense fallback={<LoadingFallback />}>
-                <DashboardStats stats={stats} />
-              </Suspense>
-            </CardContent>
-          </Card>
+    <DashboardRefreshContext.Provider value={contextValue}>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="container mx-auto px-4 py-8">
+          <h1 className="text-2xl font-semibold text-gray-900 mb-8">Dashboard</h1>
           
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle>Animal Distribution</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Suspense fallback={<LoadingFallback />}>
-                <AnimalTypeDistribution types={stats.animalTypes} />
-              </Suspense>
-            </CardContent>
-          </Card>
+          <div className="space-y-8">
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle>Monthly Overview</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Suspense fallback={<LoadingFallback />}>
+                  <DashboardStats stats={stats} />
+                </Suspense>
+              </CardContent>
+            </Card>
+            
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle>Animal Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Suspense fallback={<LoadingFallback />}>
+                  <AnimalTypeDistribution types={stats.animalTypes} />
+                </Suspense>
+              </CardContent>
+            </Card>
 
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle>Monthly Trends</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Suspense fallback={<LoadingFallback />}>
-                <MonthlyTrendsChart trends={stats.monthlyTrends} />
-              </Suspense>
-            </CardContent>
-          </Card>
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle>Monthly Trends</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Suspense fallback={<LoadingFallback />}>
+                  <MonthlyTrendsChart trends={stats.monthlyTrends} />
+                </Suspense>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
-    </div>
+    </DashboardRefreshContext.Provider>
   );
 };
 

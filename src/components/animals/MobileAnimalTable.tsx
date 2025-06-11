@@ -30,78 +30,71 @@ const MobileAnimalTable = memo(({
   searchTerm
 }: MobileAnimalTableProps) => {
   const handleDelete = (id: string) => {
-    if (window.confirm(`Are you sure you want to delete animal ${id}?`)) {
+    if (window.confirm(`Are you sure you want to delete this animal?`)) {
       onDelete(id);
     }
   };
 
   const highlightText = (text: string) => {
     if (!searchTerm || !text) return text;
-    
-    const regex = new RegExp(`(${searchTerm})`, 'gi');
-    const parts = text.split(regex);
-    
+    const parts = text.split(new RegExp(`(${searchTerm})`, 'gi'));
     return parts.map((part, i) => 
-      regex.test(part) ? (
-        <mark key={i} className="bg-yellow-200 px-1 rounded">{part}</mark>
-      ) : part
+      part.toLowerCase() === searchTerm?.toLowerCase() ? 
+        <span key={i} className="bg-yellow-200">{part}</span> : part
     );
   };
 
   return (
-    <div className="space-y-2">
-      {/* Header */}
-      <div className="flex items-center justify-between px-2 py-2 bg-gray-50 border-b border-gray-200">
-        <div className="flex items-center gap-2">
-          <Checkbox
-            checked={selection.isAllSelected}
-            onCheckedChange={() => onToggleSelectAll(animals.map(a => a.id))}
-          />
-          <span className="text-sm font-medium">Animals</span>
+    <div className="bg-white">
+      <div className="border-t border-gray-200">
+        <div className="flex items-center px-4 py-3 border-b border-gray-200">
+          <div className="flex items-center">
+            <Checkbox
+              checked={selection.isAllSelected}
+              onCheckedChange={() => onToggleSelectAll(animals.map(a => a.id))}
+            />
+            <span className="ml-2 text-sm text-gray-500">
+              {selection.selectedIds.size} selected
+            </span>
+          </div>
         </div>
-      </div>
 
-      {/* Animal Cards */}
-      <div className="space-y-2">
         {animals.map((animal) => (
-          <div
-            key={animal.id}
-            className="bg-white rounded-lg border border-gray-200 overflow-hidden"
-          >
-            <div className="p-2 space-y-1.5">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
+          <div key={animal.id} className="border-b border-gray-200">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center">
                   <Checkbox
                     checked={selection.selectedIds.has(animal.id)}
                     onCheckedChange={() => onToggleSelection(animal.id)}
                   />
-                  <div>
-                    <div className="font-medium text-sm">{highlightText(animal.id)}</div>
-                    <div className="text-xs text-gray-600">{highlightText(animal.type || '')}</div>
+                  <div className="ml-3">
+                    <div className="text-sm font-medium text-gray-900">
+                      {highlightText(animal.id)}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {highlightText(animal.type || '')}
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center space-x-2">
                   <Button
+                    variant="ghost"
                     size="sm"
-                    variant="outline"
                     onClick={() => onEdit(animal)}
-                    className="h-6 w-6 p-0"
+                    className="text-farm-600 hover:text-farm-900"
                     disabled={isDeleting === animal.id}
                   >
-                    <Edit className="h-3 w-3" />
+                    <Edit className="h-4 w-4" />
                   </Button>
                   <Button
+                    variant="ghost"
                     size="sm"
-                    variant="outline"
                     onClick={() => handleDelete(animal.id)}
+                    className="text-red-600 hover:text-red-900"
                     disabled={isDeleting === animal.id}
-                    className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
                   >
-                    {isDeleting === animal.id ? (
-                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-600" />
-                    ) : (
-                      <Trash2 className="h-3 w-3" />
-                    )}
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -117,7 +110,7 @@ const MobileAnimalTable = memo(({
                 </div>
                 <div>
                   <span className="text-gray-500">Age:</span>
-                  <span className="ml-1">{animal.age || '-'}</span>
+                  <span className="ml-1">{animal.age} {animal.age === 1 ? 'year' : 'years'}</span>
                 </div>
                 <div>
                   <span className="text-gray-500">Gender:</span>

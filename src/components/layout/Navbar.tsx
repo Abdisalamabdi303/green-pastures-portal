@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   Menu, 
@@ -12,129 +12,140 @@ import {
   ChevronDown,
   Compass,
   Landmark,
-  Home
+  Home,
+  User
 } from 'lucide-react';
-import { User } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const location = useLocation();
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-  }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    window.location.href = '/login';
-  };
+  const { currentUser, userData, logout } = useAuth();
 
   const closeMenu = () => {
     setIsOpen(false);
   };
 
-  const getLinkClass = (path: string) => {
-    return location.pathname === path
-      ? 'flex items-center px-4 py-2.5 bg-farm-600 text-white rounded-md'
-      : 'flex items-center px-4 py-2.5 text-gray-700 hover:bg-farm-100 hover:text-farm-600 rounded-md transition-colors';
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Failed to logout:', error);
+    }
   };
 
+  const getLinkClass = (path: string) => {
+    return location.pathname === path
+      ? 'flex items-center px-4 py-2.5 bg-[#004225] text-white rounded-lg'
+      : 'flex items-center px-4 py-2.5 text-gray-700 hover:bg-[#004225]/10 hover:text-[#004225] rounded-lg transition-colors duration-200';
+  };
+
+  // Protected navigation items
+  const protectedNavItems = [
+    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/animals', icon: Bird, label: 'Animals' },
+    { path: '/expenses', icon: Receipt, label: 'Expenses' },
+    { path: '/health', icon: Stethoscope, label: 'Health' },
+    { path: '/finance', icon: Landmark, label: 'Finance' },
+  ];
+
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200 justify-evenly sticky top-0 z-50">
+    <nav className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-evenly h-16">
-          <div className="flex">
-            <div className="flex-shrink-0 flex items-center">
-              <Link 
-                to="/" 
-                className="group relative flex items-center py-2"
+        <div className="flex justify-between h-20">
+          {/* Logo Section */}
+          <div className="flex-shrink-0 flex items-center">
+            <Link 
+              to={currentUser ? "/dashboard" : "/"} 
+              className="flex items-center"
+            >
+              <img
+                src="/logoQowsaar.png"
+                alt="Qowsaar Livestock"
+                className="h-16 w-auto drop-shadow-md hover:drop-shadow-lg transition-all duration-200"
+              />
+            </Link>
+          </div>
+
+          {/* Desktop Menu */}
+          <div className="hidden md:flex md:items-center md:space-x-1">
+            {!currentUser && (
+              <Link
+                to="/about"
+                className={getLinkClass('/about')}
               >
-                <div className="flex items-center">
-                  <div className="relative mr-3">
-                    <div className="absolute -left-0.5 -top-0.5">
-                      <Compass 
-                        className="h-8 w-8 text-farm-600/10 transform rotate-12" 
-                        strokeWidth={1.5}
-                      />
-                    </div>
-                    <Compass 
-                      className="h-8 w-8 text-farm-600 transition-transform duration-300 group-hover:rotate-45" 
-                      strokeWidth={2}
-                    />
-                  </div>
-                  <div className="flex flex-col border-l-2 border-farm-600/10 pl-3">
-                    <span className="text-xl font-bold text-farm-600 leading-tight tracking-widest">
-                      NEW DIRECTION
-                    </span>
-                    <span className="text-xs text-farm-500 font-medium tracking-wider uppercase">
-                      Farm Management System
-                    </span>
-                  </div>
-                </div>
+                About Us
               </Link>
-            </div>
-          </div>
-          <div className="hidden md:ml-6 md:flex md:items-center md:space-x-1">
-            <Link to="/" className={getLinkClass('/')}>
-              <Home className="h-5 w-5 mr-2"/>
-              Home
-            </Link>
-            <Link to="/dashboard" className={getLinkClass('/dashboard')}>
-              <LayoutDashboard className="h-5 w-5 mr-2" />
-              Dashboard
-            </Link>
-            <Link to="/animals" className={getLinkClass('/animals')}>
-              <Bird className="h-5 w-5 mr-2" />
-              Animals
-            </Link>
-            <Link to="/expenses" className={getLinkClass('/expenses')}>
-              <Receipt className="h-5 w-5 mr-2" />
-              Expenses
-            </Link>
+            )}
             
-            <Link to="/health" className={getLinkClass('/health')}>
-              <Stethoscope className="h-5 w-5 mr-2" />
-              Health
-            </Link>
-            <Link to="/finance" className={getLinkClass('/finance')}>
-              <Landmark className="h-5 w-5 mr-2" />
-              Finance
-            </Link>
-            <Link to="/settings" className={getLinkClass('/settings')}>
-              <Settings className="h-5 w-5 mr-2" />
-              Settings
-            </Link>
-          </div>
-          <div className="hidden md:ml-6 md:flex md:items-center">
-            {user && (
-              <div className="flex items-center">
-                <div className="relative group">
-                  <button className="flex items-center px-3 py-2 text-gray-700 hover:text-farm-600 transition-colors">
-                    <span className="mr-2">{user.name}</span>
+            {currentUser ? (
+              <>
+                {protectedNavItems.map((item) => (
+                  <Link 
+                    key={item.path} 
+                    to={item.path} 
+                    className={getLinkClass(item.path)}
+                  >
+                    <item.icon className="h-5 w-5 mr-2" />
+                    {item.label}
+                  </Link>
+                ))}
+
+                <div className="relative ml-4">
+                  <button 
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    className="flex items-center px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-[#004225]/10 hover:text-[#004225] transition-colors duration-200"
+                  >
+                    <User className="h-5 w-5 mr-2" />
+                    <span className="mr-2 font-medium">{userData?.name || currentUser.email}</span>
                     <ChevronDown className="h-4 w-4" />
                   </button>
-                  <div className="absolute right-0 w-48 mt-2 py-1 bg-white rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                    <button
-                      onClick={handleLogout}
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-farm-50 hover:text-farm-600"
+                  
+                  {/* User Dropdown Menu */}
+                  {isUserMenuOpen && (
+                    <div 
+                      className="absolute right-0 w-48 mt-2 py-2 bg-white rounded-lg shadow-lg border border-gray-100"
+                      onMouseLeave={() => setIsUserMenuOpen(false)}
                     >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Logout
-                    </button>
-                  </div>
+                      <div className="px-4 py-2 border-b border-gray-100">
+                        <p className="text-sm font-medium text-gray-900">{userData?.name}</p>
+                        <p className="text-sm text-gray-500">{currentUser.email}</p>
+                      </div>
+                      <Link
+                        to="/settings"
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-[#004225]/10 hover:text-[#004225]"
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Settings
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-[#004225]/10 hover:text-[#004225]"
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Logout
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
+              </>
+            ) : (
+              <Link
+                to="/login"
+                className="px-4 py-2 bg-[#004225] text-white rounded-lg hover:bg-[#003820] transition-colors duration-200"
+              >
+                Login to Dashboard
+              </Link>
             )}
           </div>
-          <div className="-mr-2 flex items-center md:hidden">
+
+          {/* Mobile Menu Button */}
+          <div className="flex items-center md:hidden">
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-farm-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-farm-500"
+              className="inline-flex items-center justify-center p-2 rounded-lg text-gray-400 hover:text-[#004225] hover:bg-[#004225]/10 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#004225]"
             >
               <span className="sr-only">Open main menu</span>
               {isOpen ? (
@@ -147,77 +158,56 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile Menu */}
       {isOpen && (
-        <div className="md:hidden">
-          <div className="pt-2 pb-3 space-y-1 sm:px-3">
-            <Link
-              to="/"
-              className={getLinkClass('/')}
-              onClick={closeMenu}
-            >
-              <Home className="h-5 w-5 mr-2" />
-              Home
-            </Link>
-            <Link
-              to="/dashboard"
-              className={getLinkClass('/dashboard')}
-              onClick={closeMenu}
-            >
-              <LayoutDashboard className="h-5 w-5 mr-2" />
-              Dashboard
-            </Link>
-            <Link
-              to="/animals"
-              className={getLinkClass('/animals')}
-              onClick={closeMenu}
-            >
-              <Bird className="h-5 w-5 mr-2" />
-              Animals
-            </Link>
-            <Link
-              to="/expenses"
-              className={getLinkClass('/expenses')}
-              onClick={closeMenu}
-            >
-              <Receipt className="h-5 w-5 mr-2" />
-              Expenses
-            </Link>
-            <Link
-              to="/finance"
-              className={getLinkClass('/finance')}
-              onClick={closeMenu}
-            >
-              <Landmark className="h-5 w-5 mr-2" />
-              Finance
-            </Link>
-            <Link
-              to="/health"
-              className={getLinkClass('/health')}
-              onClick={closeMenu}
-            >
-              <Stethoscope className="h-5 w-5 mr-2" />
-              Health
-            </Link>
-            <Link
-              to="/settings"
-              className={getLinkClass('/settings')}
-              onClick={closeMenu}
-            >
-              <Settings className="h-5 w-5 mr-2" />
-              Settings
-            </Link>
-            {user && (
-              <button
-                onClick={() => {
-                  handleLogout();
-                  closeMenu();
-                }}
-                className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-farm-50 hover:text-farm-600"
+        <div className="md:hidden bg-white border-t border-gray-100">
+          <div className="px-2 pt-2 pb-3 space-y-1">
+            {!currentUser && (
+              <Link
+                to="/about"
+                className={getLinkClass('/about')}
+                onClick={closeMenu}
               >
-                <LogOut className="h-5 w-5 mr-2" />
-                Logout
-              </button>
+                About Us
+              </Link>
+            )}
+            
+            {currentUser ? (
+              <>
+                {protectedNavItems.map((item) => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={getLinkClass(item.path)}
+                    onClick={closeMenu}
+                  >
+                    <item.icon className="h-5 w-5 mr-2" />
+                    {item.label}
+                  </Link>
+                ))}
+                <div className="px-4 py-2 border-t border-gray-100">
+                  <p className="text-sm font-medium text-gray-900">{userData?.name}</p>
+                  <p className="text-sm text-gray-500">{currentUser.email}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    closeMenu();
+                  }}
+                  className="flex items-center w-full px-4 py-2.5 text-gray-700 hover:bg-[#004225]/10 hover:text-[#004225] rounded-lg"
+                >
+                  <LogOut className="h-5 w-5 mr-2" />
+                  Logout
+                </button>
+              </>
+            ) : (
+              <Link
+                to="/login"
+                className="block px-4 py-2 bg-[#004225] text-white rounded-lg hover:bg-[#003820] transition-colors duration-200"
+                onClick={closeMenu}
+              >
+                Login to Dashboard
+              </Link>
             )}
           </div>
         </div>

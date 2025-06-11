@@ -1,23 +1,25 @@
-
 import { useCallback } from 'react';
 import { Animal } from '@/types';
 import { animalServices } from '@/services/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Timestamp } from 'firebase/firestore';
+import { useDashboardRefresh } from '@/pages/DashboardPage';
 
 export const useAnimalsMutations = () => {
   const { toast } = useToast();
+  const { refreshDashboard } = useDashboardRefresh();
 
   const handleAddAnimal = useCallback(async (newAnimal: Animal, animalToEdit?: Animal | null) => {
     try {
       if (animalToEdit) {
-        await animalServices.updateAnimal(animalToEdit.id, newAnimal);
+        await animalServices.updateAnimal(animalToEdit.id, newAnimal, refreshDashboard);
         toast({
           title: "Success",
           description: "Animal updated successfully.",
         });
       } else {
         await animalServices.addAnimal(newAnimal);
+        refreshDashboard();
         toast({
           title: "Success",
           description: "Animal added successfully.",
@@ -34,11 +36,12 @@ export const useAnimalsMutations = () => {
       });
       return false;
     }
-  }, [toast]);
+  }, [toast, refreshDashboard]);
 
   const handleDeleteAnimal = useCallback(async (id: string) => {
     try {
       await animalServices.deleteAnimal(id);
+      refreshDashboard();
       toast({
         title: "Success",
         description: "Animal deleted successfully.",
@@ -53,7 +56,7 @@ export const useAnimalsMutations = () => {
       });
       return false;
     }
-  }, [toast]);
+  }, [toast, refreshDashboard]);
 
   const handleBulkDelete = useCallback(async (selectedIds: string[]) => {
     try {
@@ -61,6 +64,7 @@ export const useAnimalsMutations = () => {
         await animalServices.deleteAnimal(id);
       }
       
+      refreshDashboard();
       toast({
         title: "Success",
         description: "Selected animals deleted successfully.",
@@ -75,7 +79,7 @@ export const useAnimalsMutations = () => {
       });
       return false;
     }
-  }, [toast]);
+  }, [toast, refreshDashboard]);
 
   const handleBulkStatusChange = useCallback(async (selectedIds: string[], status: 'active' | 'deceased') => {
     try {
@@ -89,7 +93,7 @@ export const useAnimalsMutations = () => {
         };
 
         // Update the animal
-        await animalServices.updateAnimal(id, updateData);
+        await animalServices.updateAnimal(id, updateData, refreshDashboard);
       }
       
       toast({
@@ -106,7 +110,7 @@ export const useAnimalsMutations = () => {
       });
       return false;
     }
-  }, [toast]);
+  }, [toast, refreshDashboard]);
 
   return {
     handleAddAnimal,

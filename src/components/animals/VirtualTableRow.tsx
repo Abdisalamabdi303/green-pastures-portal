@@ -1,4 +1,3 @@
-
 import React, { memo, useCallback } from 'react';
 import { Animal, TableSelection } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -24,28 +23,16 @@ export const VirtualTableRow = memo(({ index, style, data }: VirtualTableRowProp
   const { animals, selection, onEdit, onDelete, onToggleSelection, isDeleting, searchTerm } = data;
   const animal = animals[index];
 
-  if (!animal) return null;
-
-  const handleDelete = useCallback(() => {
-    onDelete(animal);
-  }, [animal, onDelete]);
-
-  const handleEdit = useCallback(() => {
-    onEdit(animal);
-  }, [animal, onEdit]);
-
   const handleToggleSelection = useCallback(() => {
     onToggleSelection(animal.id);
   }, [animal.id, onToggleSelection]);
 
   const highlightText = useCallback((text: string) => {
-    if (!searchTerm || !text) return text;
-    const regex = new RegExp(`(${searchTerm})`, 'gi');
-    const parts = text.split(regex);
+    if (!searchTerm) return text;
+    const parts = text.split(new RegExp(`(${searchTerm})`, 'gi'));
     return parts.map((part, i) => 
-      regex.test(part) ? (
-        <mark key={i} className="bg-yellow-200 px-1 rounded">{part}</mark>
-      ) : part
+      part.toLowerCase() === searchTerm?.toLowerCase() ? 
+        <span key={i} className="bg-yellow-200">{part}</span> : part
     );
   }, [searchTerm]);
 
@@ -75,7 +62,7 @@ export const VirtualTableRow = memo(({ index, style, data }: VirtualTableRowProp
           {formatPrice(animal.purchasePrice)}
         </div>
         <div className="truncate hidden sm:block">
-          {animal.age || '-'}
+          {animal.age} {animal.age === 1 ? 'year' : 'years'}
         </div>
         <div className="truncate hidden sm:block">
           {animal.gender || '-'}
@@ -92,28 +79,24 @@ export const VirtualTableRow = memo(({ index, style, data }: VirtualTableRowProp
             {animal.status}
           </span>
         </div>
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex justify-end gap-2">
           <Button
+            variant="ghost"
             size="sm"
-            variant="outline"
-            onClick={handleEdit}
-            className="h-7 w-7 sm:h-8 sm:w-8 p-0"
+            onClick={() => onEdit(animal)}
+            className="text-farm-600 hover:text-farm-900"
             disabled={isDeleting === animal.id}
           >
-            <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+            <Edit className="h-4 w-4" />
           </Button>
           <Button
+            variant="ghost"
             size="sm"
-            variant="outline"
-            onClick={handleDelete}
+            onClick={() => onDelete(animal)}
+            className="text-red-600 hover:text-red-900"
             disabled={isDeleting === animal.id}
-            className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-red-600 hover:text-red-700"
           >
-            {isDeleting === animal.id ? (
-              <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-red-600" />
-            ) : (
-              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-            )}
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>

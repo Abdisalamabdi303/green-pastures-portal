@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/layout/Navbar';
 
@@ -9,7 +9,11 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+
+  // Get return URL from location state, default to dashboard
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,6 +22,8 @@ const LoginPage = () => {
     
     try {
       await login(email, password);
+      // Navigate to the return URL after successful login
+      navigate(from, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign in');
     } finally {
@@ -32,19 +38,17 @@ const LoginPage = () => {
       <div className="flex justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8">
           <div>
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Sign in to your account</h2>
+            <img
+              src="/logoQowsaar.png"
+              alt="Qowsaar Livestock"
+              className="mx-auto h-20 w-auto"
+            />
+            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+              Welcome to Qowsaar Livestock Management
+            </h2>
             <p className="mt-2 text-center text-sm text-gray-600">
-              Or{' '}
-              <Link to="/register" className="font-medium text-farm-600 hover:text-farm-500">
-                create a new account
-              </Link>
+              Please sign in with your company credentials
             </p>
-            
-            <div className="mt-4 text-sm text-center text-gray-500 bg-gray-100 p-4 rounded">
-              <p>Demo Credentials:</p>
-              <p>Admin: admin@example.com / password</p>
-              <p>User: user@example.com / password</p>
-            </div>
           </div>
           
           {error && (
@@ -103,9 +107,13 @@ const LoginPage = () => {
               </div>
 
               <div className="text-sm">
-                <a href="#" className="font-medium text-farm-600 hover:text-farm-500">
-                  Forgot your password?
-                </a>
+                <button 
+                  type="button"
+                  onClick={() => window.location.href = 'mailto:support@qowsaar.com'}
+                  className="font-medium text-farm-600 hover:text-farm-500"
+                >
+                  Need help?
+                </button>
               </div>
             </div>
 
@@ -115,7 +123,7 @@ const LoginPage = () => {
                 disabled={isLoading}
                 className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-farm-600 hover:bg-farm-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-500 disabled:opacity-50"
               >
-                {isLoading ? 'Signing in...' : 'Sign in'}
+                {isLoading ? 'Signing in...' : 'Sign in to Dashboard'}
               </button>
             </div>
           </form>
