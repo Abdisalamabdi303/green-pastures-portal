@@ -1,8 +1,7 @@
-
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Animal } from '@/types';
 import { collection, query, orderBy, limit, startAfter, getDocs, QueryDocumentSnapshot } from 'firebase/firestore';
-import { db } from '@/firebase/config';
+import { firestoreDb } from '@/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useAnimalsCache } from './useAnimalsCache';
@@ -50,7 +49,7 @@ export const useAnimalsQuery = (): UseAnimalsQueryReturn => {
       }
 
       let q = query(
-        collection(db, 'animals'),
+        collection(firestoreDb, 'animals'),
         orderBy('createdAt', 'desc'),
         limit(ITEMS_PER_PAGE)
       );
@@ -82,7 +81,7 @@ export const useAnimalsQuery = (): UseAnimalsQueryReturn => {
         const nextPageKey = getCacheKey(Math.ceil(animals.length / ITEMS_PER_PAGE) + 2, '');
         cacheService.warmup(nextPageKey, async () => {
           const nextPageQuery = query(
-            collection(db, 'animals'),
+            collection(firestoreDb, 'animals'),
             orderBy('createdAt', 'desc'),
             startAfter(lastDocRef.current),
             limit(ITEMS_PER_PAGE)

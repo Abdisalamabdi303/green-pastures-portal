@@ -13,7 +13,7 @@ import {
   onAuthStateChanged,
   updateProfile
 } from "firebase/auth";
-import { auth, db } from "@/firebase/config";
+import { auth, firestoreDb } from "@/firebase/config";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fetch user data from Firestore
   const fetchUserData = async (user: User) => {
     try {
-      const userDocRef = doc(db, "users", user.uid);
+      const userDocRef = doc(firestoreDb, "users", user.uid);
       const userDoc = await getDoc(userDocRef);
       
       if (userDoc.exists()) {
@@ -128,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: name
       };
       
-      await setDoc(doc(db, "users", result.user.uid), userData);
+      await setDoc(doc(firestoreDb, "users", result.user.uid), userData);
       setUserData(userData);
       
       toast({

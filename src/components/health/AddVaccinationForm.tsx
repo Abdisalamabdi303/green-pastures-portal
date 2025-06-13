@@ -24,7 +24,7 @@ type VaccinationFormValues = z.infer<typeof vaccinationSchema>;
 interface AddVaccinationFormProps {
   onAddVaccination: (data: Omit<Vaccination, 'id' | 'createdAt'>) => Promise<void>;
   onClose: () => void;
-  animals: Array<{ id: string; name: string; type: string; }>;
+  animals: Array<{ id: string; name: string; type: string; vaccinationStatus: string; }>;
 }
 
 const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinationFormProps) => {
@@ -42,10 +42,10 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
     },
   });
 
-  const watchAnimalType = form.watch("animalType");
-
-  // Filter animals by selected type
-  const filteredAnimals = animals.filter(animal => animal.type === watchAnimalType);
+  // Filter animals to show only those with missed or scheduled vaccination status
+  const eligibleAnimals = animals.filter(animal => 
+    animal.vaccinationStatus === 'missed' || animal.vaccinationStatus === 'scheduled'
+  );
 
   const onSubmit = async (data: VaccinationFormValues) => {
     try {
@@ -77,16 +77,13 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
     }
   };
 
-  // Get unique animal types
-  const animalTypes = [...new Set(animals.map(animal => animal.type))];
-
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px] bg-gray-50">
         <DialogHeader>
           <DialogTitle>Add Vaccination</DialogTitle>
           <DialogDescription>
-            Enter the details of the vaccination below.
+            Enter the details of the vaccination below. Only animals with missed or scheduled vaccinations are shown.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -107,9 +104,9 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent className="bg-white border border-gray-200">
-                      {animals.map((animal) => (
+                      {eligibleAnimals.map((animal) => (
                         <SelectItem key={animal.id} value={animal.id}>
-                          {animal.id} - {animal.name}
+                          {animal.id} - {animal.name} ({animal.vaccinationStatus})
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -1,8 +1,7 @@
-
 import { useState, useCallback } from 'react';
 import { Animal } from '@/types';
 import { collection, query, where, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
-import { db } from '@/firebase/config';
+import { firestoreDb } from '@/firebase/config';
 import { useDebounce } from '@/hooks/useDebounce';
 import { cacheService } from '@/services/cacheService';
 
@@ -27,7 +26,7 @@ export const useAnimalsSearch = () => {
         return cachedResults.data;
       }
 
-      const animalsRef = collection(db, 'animals');
+      const animalsRef = collection(firestoreDb, 'animals');
       let results: Animal[] = [];
 
       // If the search term looks like an ID, search by ID first

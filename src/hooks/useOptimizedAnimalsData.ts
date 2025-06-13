@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Animal } from '@/types';
 import { useAnimalsQuery } from './useAnimalsQuery';
@@ -6,7 +5,7 @@ import { useAnimalsSearch } from './useAnimalsSearch';
 import { useAnimalsMutations } from './useAnimalsMutations';
 import { useAnimalsCache } from './useAnimalsCache';
 import { collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
-import { db } from '@/firebase/config';
+import { firestoreDb } from '@/firebase/config';
 
 interface UseOptimizedAnimalsDataReturn {
   animals: Animal[];
@@ -102,7 +101,7 @@ export const useOptimizedAnimalsData = (): UseOptimizedAnimalsDataReturn => {
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
       const soldAnimalsQuery = query(
-        collection(db, 'animals'),
+        collection(firestoreDb, 'animals'),
         where('status', '==', 'sold'),
         where('soldDate', '>=', Timestamp.fromDate(startOfMonth)),
         where('soldDate', '<=', Timestamp.fromDate(endOfMonth))

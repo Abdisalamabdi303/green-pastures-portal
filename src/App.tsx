@@ -1,5 +1,4 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from '@/contexts/AuthContext';
 import LoginPage from '@/pages/LoginPage';
 import HomePage from '@/pages/HomePage';
 import AboutPage from '@/pages/AboutPage';
@@ -13,25 +12,23 @@ import PrivateRoute from '@/components/PrivateRoute';
 
 function App() {
   return (
-    <AuthProvider>
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<HomePage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        
-        {/* Protected Routes */}
-        <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
-        <Route path="/animals" element={<PrivateRoute><AnimalsPage /></PrivateRoute>} />
-        <Route path="/expenses" element={<PrivateRoute><ExpensesPage /></PrivateRoute>} />
-        <Route path="/health" element={<PrivateRoute><HealthPage /></PrivateRoute>} />
-        <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
-        <Route path="/finance" element={<PrivateRoute><FinancePage /></PrivateRoute>} />
-        
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </AuthProvider>
+    <Routes>
+      {/* Public Routes */}
+      <Route path="/" element={<HomePage />} />
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      
+      {/* Protected Routes */}
+      <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+      <Route path="/animals" element={<PrivateRoute><AnimalsPage /></PrivateRoute>} />
+      <Route path="/expenses" element={<PrivateRoute><ExpensesPage /></PrivateRoute>} />
+      <Route path="/health" element={<PrivateRoute><HealthPage /></PrivateRoute>} />
+      <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
+      <Route path="/finance" element={<PrivateRoute><FinancePage /></PrivateRoute>} />
+      
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 

@@ -34,6 +34,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
   const [age, setAge] = useState<number>(0);
   const { refreshDashboard } = useDashboardRefresh();
+  const [vaccinationStatus, setVaccinationStatus] = useState('completed'); // New state for vaccination status
   
   const [formData, setFormData] = useState<Partial<Animal>>({
     id: '',
@@ -44,6 +45,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
     gender: undefined,
     weight: 0,
     status: 'active',
+    vaccinationStatus: 'completed', // Add vaccination status to form data
     purchaseDate: new Date(),
     purchasePrice: 0,
     notes: '',
@@ -327,6 +329,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
         gender: undefined,
         weight: 0,
         status: 'active',
+        vaccinationStatus: 'completed',
         purchaseDate: new Date(),
         purchasePrice: 0,
         notes: '',
@@ -632,6 +635,23 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Vaccination Status</Label>
+            <Select
+              value={formData.vaccinationStatus || 'completed'}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, vaccinationStatus: value as 'completed' | 'scheduled' | 'missed' }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select Vaccination Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="scheduled">Scheduled</SelectItem>
+                <SelectItem value="missed">Missed</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           
           <div className="space-y-2">

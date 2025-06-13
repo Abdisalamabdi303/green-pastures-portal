@@ -38,25 +38,7 @@ const BulkActions = memo(({
       </div>
       
       <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onBulkStatusChange(selectedIds, 'active')}
-          className="text-green-700 border-green-300 hover:bg-green-100"
-        >
-          <CheckCircle className="h-4 w-4 mr-1" />
-          Mark Active
-        </Button>
         
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onBulkStatusChange(selectedIds, 'deceased')}
-          className="text-gray-700 border-gray-300 hover:bg-gray-100"
-        >
-          <XCircle className="h-4 w-4 mr-1" />
-          Mark Deceased
-        </Button>
         
         <Button
           variant="destructive"
