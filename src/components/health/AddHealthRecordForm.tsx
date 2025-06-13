@@ -49,28 +49,16 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
       setIsSubmitting(true);
       console.log('Form submission started with data:', data);
       
-      // Find the selected animal
       const animal = animals.find(a => a.id === data.animalId);
-      console.log('Selected animal:', animal);
+      console.log('Found animal:', animal);
       
-      if (!animal) {
-        throw new Error('Please select an animal');
-      }
-
-      // Ensure all fields are properly formatted
       const healthRecordData = {
-        animalId: data.animalId,
-        animalName: animal.name,
-        animalType: animal.type,
-        condition: data.condition,
-        status: data.status,
+        ...data,
+        animalId: animal?.id || '',
+        animalType: animal?.type || '',
         date: Timestamp.fromDate(new Date(data.date)),
-        treatment: data.treatment,
-        cost: Number(data.cost) || 0,
-        notes: data.notes || '',
         createdAt: Timestamp.now(),
       };
-
       console.log('Processed health record data:', healthRecordData);
       
       await onAddHealthRecord(healthRecordData);
@@ -80,7 +68,6 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
       onClose();
     } catch (error) {
       console.error('Error submitting form:', error);
-      // You might want to show an error message to the user here
     } finally {
       setIsSubmitting(false);
     }
@@ -115,7 +102,7 @@ const AddHealthRecordForm = ({ onAddHealthRecord, onClose, animals }: AddHealthR
                     <SelectContent className="bg-white border border-gray-200">
                       {animals.map((animal) => (
                         <SelectItem key={animal.id} value={animal.id}>
-                          {animal.id} - {animal.name}
+                          {animal.id}
                         </SelectItem>
                       ))}
                     </SelectContent>

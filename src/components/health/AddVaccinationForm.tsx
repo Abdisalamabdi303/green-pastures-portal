@@ -24,7 +24,13 @@ type VaccinationFormValues = z.infer<typeof vaccinationSchema>;
 interface AddVaccinationFormProps {
   onAddVaccination: (data: Omit<Vaccination, 'id' | 'createdAt'>) => Promise<void>;
   onClose: () => void;
-  animals: Array<{ id: string; name: string; type: string; vaccinationStatus: string; }>;
+  animals: Array<{ 
+    id: string; 
+    name: string; 
+    type: string; 
+    vaccinationStatus: string;
+    status: string;
+  }>;
 }
 
 const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinationFormProps) => {
@@ -42,9 +48,10 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
     },
   });
 
-  // Filter animals to show only those with missed or scheduled vaccination status
+  // First filter for active animals, then check vaccination status
   const eligibleAnimals = animals.filter(animal => 
-    animal.vaccinationStatus === 'missed' || animal.vaccinationStatus === 'scheduled'
+    animal.status === 'active' && 
+    (animal.vaccinationStatus === 'missed' || animal.vaccinationStatus === 'scheduled')
   );
 
   const onSubmit = async (data: VaccinationFormValues) => {
@@ -57,7 +64,7 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
       
       const vaccinationData = {
         ...data,
-        animalName: animal?.name || '',
+        animalId: animal?.id || '',
         animalType: animal?.type || '',
         date: Timestamp.fromDate(new Date(data.date)),
         nextDueDate: Timestamp.fromDate(new Date(data.nextDueDate)),
@@ -106,7 +113,7 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
                     <SelectContent className="bg-white border border-gray-200">
                       {eligibleAnimals.map((animal) => (
                         <SelectItem key={animal.id} value={animal.id}>
-                          {animal.id} - {animal.name} ({animal.vaccinationStatus})
+                          {animal.id} ({animal.vaccinationStatus})
                         </SelectItem>
                       ))}
                     </SelectContent>
