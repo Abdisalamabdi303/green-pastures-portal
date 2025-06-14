@@ -1,4 +1,3 @@
-
 import { Animal } from '@/types';
 import AnimalCard from './AnimalCard';
 
@@ -15,17 +14,17 @@ const AnimalCardGrid = ({
   onDelete,
   isDeleting
 }: AnimalCardGridProps) => {
-  
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
       {animals.map((animal) => (
-        <AnimalCard
-          key={animal.id}
-          animal={animal}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          isDeleting={isDeleting}
-        />
+        <div key={animal.id} className="h-fit">
+          <AnimalCard
+            animal={animal}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            isDeleting={isDeleting}
+          />
+        </div>
       ))}
       {animals.length === 0 && (
         <div className="col-span-full text-center py-10 text-gray-500">
