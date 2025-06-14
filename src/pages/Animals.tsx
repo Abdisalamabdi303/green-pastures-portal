@@ -65,7 +65,6 @@ export default function Animals() {
           { key: 'id', label: 'ID', sortable: true },
           { key: 'type', label: 'Type', sortable: true },
           { key: 'breed', label: 'Breed', sortable: true },
-          { key: 'purchasePrice', label: 'Purchase Price', sortable: true },
           { key: 'age', label: 'Age', sortable: true },
           { key: 'gender', label: 'Gender', sortable: false },
           { key: 'weight', label: 'Weight', sortable: true },

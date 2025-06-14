@@ -112,13 +112,13 @@ export const BatchVaccinationForm = ({
 
         const vaccinationData = {
           animalId: animal.id,
-          animalName: animal.name || animal.id, // Use name if available, otherwise use ID
           animalType: animal.type,
-          vaccine: data.vaccine.trim(),
-          status: data.status.trim(),
-          cost: parseFloat(data.cost),
-          date: dateTimestamp,
+          date: Timestamp.fromDate(new Date(data.date)),
+          type: data.type,
+          nextDueDate: data.nextDueDate ? Timestamp.fromDate(new Date(data.nextDueDate)) : undefined,
           notes: data.notes?.trim() || '',
+          cost: parseFloat(data.cost),
+          administrator: data.administrator?.trim() || '',
         };
 
         console.log('Created vaccination data:', vaccinationData);
@@ -243,7 +243,7 @@ export const BatchVaccinationForm = ({
                             className="h-4 w-4 text-farm-600 focus:ring-farm-500 border-gray-300 rounded"
                           />
                           <label className="text-sm">
-                            {animal.name || animal.id} - {animal.type}
+                            {animal.id} - {animal.type}
                           </label>
                         </div>
                       ))}

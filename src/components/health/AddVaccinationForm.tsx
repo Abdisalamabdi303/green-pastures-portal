@@ -26,9 +26,8 @@ interface AddVaccinationFormProps {
   onClose: () => void;
   animals: Array<{ 
     id: string; 
-    name: string; 
     type: string; 
-    vaccinationStatus: string;
+    vaccinated: boolean;
     status: string;
   }>;
 }
@@ -51,7 +50,7 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
   // First filter for active animals, then check vaccination status
   const eligibleAnimals = animals.filter(animal => 
     animal.status === 'active' && 
-    (animal.vaccinationStatus === 'missed' || animal.vaccinationStatus === 'scheduled')
+    !animal.vaccinated // Only show animals that haven't been vaccinated
   );
 
   const onSubmit = async (data: VaccinationFormValues) => {
@@ -90,7 +89,7 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
         <DialogHeader>
           <DialogTitle>Add Vaccination</DialogTitle>
           <DialogDescription>
-            Enter the details of the vaccination below. Only animals with missed or scheduled vaccinations are shown.
+            Enter the details of the vaccination below. Only animals that haven't been vaccinated are shown.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -113,7 +112,7 @@ const AddVaccinationForm = ({ onAddVaccination, onClose, animals }: AddVaccinati
                     <SelectContent className="bg-white border border-gray-200">
                       {eligibleAnimals.map((animal) => (
                         <SelectItem key={animal.id} value={animal.id}>
-                          {animal.id} ({animal.vaccinationStatus})
+                          {animal.id} ({animal.vaccinated ? 'Vaccinated' : 'Not Vaccinated'})
                         </SelectItem>
                       ))}
                     </SelectContent>

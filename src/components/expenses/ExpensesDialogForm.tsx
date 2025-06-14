@@ -1,4 +1,3 @@
-
 import { 
   Dialog, 
   DialogContent, 
@@ -179,7 +178,7 @@ export function ExpensesDialogForm({
             {watchAnimalRelated && (
               <FormField
                 control={form.control}
-                name="animalName"
+                name="animalId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Animal</FormLabel>
@@ -189,12 +188,12 @@ export function ExpensesDialogForm({
                         onValueChange={field.onChange}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select Animal" />
+                          <SelectValue placeholder="Select animal" />
                         </SelectTrigger>
                         <SelectContent>
                           {animals.map((animal) => (
-                            <SelectItem key={animal.id} value={animal.name}>
-                              {animal.name}
+                            <SelectItem key={animal.id} value={animal.id}>
+                              {animal.id}
                             </SelectItem>
                           ))}
                         </SelectContent>

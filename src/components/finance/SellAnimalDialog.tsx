@@ -44,10 +44,8 @@ export function SellAnimalDialog({ isOpen, onClose, onConfirm }: SellAnimalDialo
     
     const term = searchTerm.toLowerCase();
     return animals.filter(animal => 
-      animal.id.toLowerCase().includes(term) ||
-      animal.type?.toLowerCase().includes(term) ||
-      animal.breed?.toLowerCase().includes(term) ||
-      animal.name?.toLowerCase().includes(term)
+      animal.status === 'active' && 
+      animal.id.toLowerCase().includes(term)
     );
   }, [animals, searchTerm]);
 
@@ -174,7 +172,7 @@ export function SellAnimalDialog({ isOpen, onClose, onConfirm }: SellAnimalDialo
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Search animals by ID, type, breed, or name..."
+                    placeholder="Search by animal ID..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"

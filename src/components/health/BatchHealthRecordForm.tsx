@@ -107,7 +107,6 @@ export const BatchHealthRecordForm = ({
 
         const healthRecordData = {
           animalId: animal.id,
-          animalName: animal.name || animal.id, // Use name if available, otherwise use ID
           animalType: animal.type,
           condition: data.condition.trim(),
           treatment: data.treatment.trim(),
@@ -240,7 +239,7 @@ export const BatchHealthRecordForm = ({
                             className="h-4 w-4 text-farm-600 focus:ring-farm-500 border-gray-300 rounded"
                           />
                           <label className="text-sm">
-                            {animal.name || animal.id} - {animal.type}
+                            {animal.id} - {animal.type}
                           </label>
                         </div>
                       ))}

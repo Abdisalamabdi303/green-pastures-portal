@@ -31,7 +31,7 @@ const AnimalCard = ({ animal, onEdit, onDelete, isDeleting }: AnimalCardProps) =
       <div className="p-4 space-y-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-900 truncate">
-            {animal.name || animal.id}
+            {animal.id}
           </h3>
           <p className="text-sm text-gray-500">{animal.type}</p>
         </div>
@@ -61,15 +61,62 @@ const AnimalCard = ({ animal, onEdit, onDelete, isDeleting }: AnimalCardProps) =
               {formatPrice(animal.purchasePrice)}
             </span>
           </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-500">Status:</span>
-            <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
               animal.status === 'active' ? 'bg-green-100 text-green-800' :
               animal.status === 'sold' ? 'bg-blue-100 text-blue-800' :
               'bg-red-100 text-red-800'
             }`}>
-              {animal.status}
+              {animal.status.charAt(0).toUpperCase() + animal.status.slice(1)}
             </span>
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+              animal.vaccinated ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+            }`}>
+              {animal.vaccinated ? 'Vaccinated' : 'Not Vaccinated'}
+            </span>
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+              animal.washing ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+            }`}>
+              {animal.washing ? 'Washed' : 'Not Washed'}
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-500">Type</span>
+            <span className="text-sm font-medium">{animal.type}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-500">Breed</span>
+            <span className="text-sm font-medium">{animal.breed}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-500">Age</span>
+            <span className="text-sm font-medium">{animal.age} years</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-500">Gender</span>
+            <span className="text-sm font-medium">{animal.gender.charAt(0).toUpperCase() + animal.gender.slice(1)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-500">Weight</span>
+            <span className="text-sm font-medium">{animal.weight} kg</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-sm text-gray-500">Lineage</span>
+            <div className="text-sm font-medium">
+              {animal.bornInFarm ? (
+                <div className="flex flex-col items-end">
+                  <span>Born in Farm</span>
+                  {animal.parentId && (
+                    <span className="text-xs text-gray-500">Parent: {animal.parentId}</span>
+                  )}
+                </div>
+              ) : (
+                <span>Not born in farm</span>
+              )}
+            </div>
           </div>
         </div>
 

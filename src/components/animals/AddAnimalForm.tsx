@@ -38,18 +38,20 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
   
   const [formData, setFormData] = useState<Partial<Animal>>({
     id: '',
-    name: '',
     type: '',
     breed: '',
     age: 0,
     gender: undefined,
     weight: 0,
     status: 'active',
-    vaccinationStatus: 'completed', // Add vaccination status to form data
+    vaccinated: true,
     purchaseDate: new Date(),
     purchasePrice: 0,
     notes: '',
-    imageUrl: ''
+    imageUrl: '',
+    washing: true,
+    bornInFarm: false,
+    parentId: undefined
   });
 
   // Helper function to safely convert any date value to a Date object
@@ -224,7 +226,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
   }, []);
 
   const validateForm = useCallback(() => {
-    const requiredFields = ['id', 'name', 'type', 'breed', 'gender'];
+    const requiredFields = ['id', 'type', 'breed', 'gender'];
     const missingFields = requiredFields.filter(field => !formData[field]);
     
     if (missingFields.length > 0) {
@@ -298,17 +300,20 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
       
       const newAnimal: Animal = {
         id: cleanId,
-        name: formData.name || '',
         type: formData.type || '',
         breed: formData.breed || '',
         age: formData.age || 0,
         gender: formData.gender as 'male' | 'female',
         weight: formData.weight || 0,
         status: formData.status || 'active',
+        vaccinated: formData.vaccinated || true,
         purchaseDate: formData.purchaseDate || new Date(),
         purchasePrice: formData.purchasePrice || 0,
         notes: formData.notes || '',
-        imageUrl: photoPreview || ''
+        imageUrl: photoPreview || '',
+        washing: formData.washing || true,
+        bornInFarm: formData.bornInFarm || false,
+        parentId: formData.parentId
       };
       
       await onAddAnimal(newAnimal);
@@ -322,18 +327,20 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
       // Reset form
       setFormData({
         id: '',
-        name: '',
         type: '',
         breed: '',
         age: 0,
         gender: undefined,
         weight: 0,
         status: 'active',
-        vaccinationStatus: 'completed',
+        vaccinated: true,
         purchaseDate: new Date(),
         purchasePrice: 0,
         notes: '',
-        imageUrl: ''
+        imageUrl: '',
+        washing: true,
+        bornInFarm: false,
+        parentId: undefined
       });
       setAge(0);
       setPhotoPreview(null);
@@ -510,16 +517,6 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
             required 
           />
          
-          <InputField 
-            label="Name" 
-            name="name" 
-            type="text" 
-            value={formData.name || ''} 
-            onChange={handleFormChange} 
-            placeholder="Enter animal name" 
-            required 
-          />
-         
           <div className="grid grid-cols-2 gap-4">
             <SelectField 
               label="Type" 
@@ -637,21 +634,70 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Vaccination Status</Label>
-            <Select
-              value={formData.vaccinationStatus || 'completed'}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, vaccinationStatus: value as 'completed' | 'scheduled' | 'missed' }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select Vaccination Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="scheduled">Scheduled</SelectItem>
-                <SelectItem value="missed">Missed</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Vaccinated</Label>
+              <Select
+                value={formData.vaccinated ? "yes" : "no"}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, vaccinated: value === "yes" }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select vaccination status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">Yes</SelectItem>
+                  <SelectItem value="no">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Washing</Label>
+              <Select
+                value={formData.washing ? "yes" : "no"}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, washing: value === "yes" }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select washing status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">Yes</SelectItem>
+                  <SelectItem value="no">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Born in Farm</Label>
+              <Select
+                value={formData.bornInFarm ? "yes" : "no"}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, bornInFarm: value === "yes" }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select if born in farm" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">Yes</SelectItem>
+                  <SelectItem value="no">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {formData.bornInFarm && (
+              <div className="space-y-2">
+                <Label htmlFor="parentId">Parent ID</Label>
+                <Input
+                  id="parentId"
+                  name="parentId"
+                  type="text"
+                  value={formData.parentId || ''}
+                  onChange={handleFormChange}
+                  placeholder="Enter parent animal ID"
+                />
+              </div>
+            )}
           </div>
           
           <div className="space-y-2">
@@ -666,7 +712,7 @@ const AddAnimalForm = ({ onAddAnimal, onClose, animalToEdit }: AddAnimalFormProp
               placeholder="Enter any additional notes"
             />
           </div>
-          
+
           <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
             <Button 
               type="submit" 

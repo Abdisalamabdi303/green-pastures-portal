@@ -4,17 +4,20 @@ export type AnimalStatus = 'active' | 'deceased';
 
 export interface Animal {
   id: string;
-  name: string;
   type: string;
   breed: string;
   age: number;
   gender: 'male' | 'female';
   weight: number;
   status: 'active' | 'sold' | 'deceased';
-  purchaseDate?: Date;
-  purchasePrice?: number;
-  notes?: string;
-  imageUrl?: string;
+  vaccinated: boolean;
+  purchaseDate: Date;
+  purchasePrice: number;
+  notes: string;
+  imageUrl: string;
+  washing: boolean;
+  bornInFarm: boolean;
+  parentId?: string;
   updatedAt?: Date | Timestamp;
   createdAt?: Date | Timestamp;
 }
